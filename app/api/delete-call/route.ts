@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -9,8 +10,32 @@ export async function POST(request: NextRequest) {
   const { callId } = await request.json()
   if (!callId) return NextResponse.json({ error: 'Missing callId' }, { status: 400 })
 
-  // RLS enforces ownership — agents can only delete their own, leaders can delete their team's
-  const { error } = await supabase.from('call_records').delete().eq('id', callId)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, company_id')
+    .eq('id', user.id)
+    .single()
+  if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
+
+  const admin = createAdminClient()
+
+  // Verify the call belongs to this user/team before deleting
+  const { data: call } = await admin
+    .from('call_records')
+    .select('agent_id, company_id')
+    .eq('id', callId)
+    .single()
+  if (!call) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const isAgent = profile.role === 'agent'
+  if (isAgent && call.agent_id !== user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  if (!isAgent && call.company_id !== profile.company_id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { error } = await admin.from('call_records').delete().eq('id', callId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ success: true })
