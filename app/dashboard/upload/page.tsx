@@ -29,25 +29,39 @@ export default function UploadPage() {
     setStatus('uploading')
     setErrorMsg('')
 
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('fileName', file.name)
-    formData.append('agentName', agentName)
-    formData.append('team', team)
+    // Step 1: Create the call record (metadata only — no file, avoids Vercel's 4.5 MB body limit)
+    const meta = new FormData()
+    meta.append('fileName', file.name)
+    meta.append('agentName', agentName)
+    meta.append('team', team)
 
-    const res = await fetch('/api/process-call', {
-      method: 'POST',
-      body: formData,
-    })
-
-    if (res.ok) {
-      setStatus('done')
-      setTimeout(() => router.push('/dashboard'), 1500)
-    } else {
-      const data = await res.json().catch(() => ({}))
+    const metaRes = await fetch('/api/process-call', { method: 'POST', body: meta })
+    if (!metaRes.ok) {
+      const data = await metaRes.json().catch(() => ({}))
       setErrorMsg(data.error ?? 'Something went wrong. Please try again.')
       setStatus('error')
+      return
     }
+    const { callRecordId } = await metaRes.json()
+
+    // Step 2: Send the file directly to n8n (bypasses Vercel — no size limit)
+    const n8nForm = new FormData()
+    n8nForm.append('file', file, file.name)
+    n8nForm.append('fileName', file.name)
+    n8nForm.append('agentName', agentName)
+    n8nForm.append('team', team)
+    n8nForm.append('callRecordId', callRecordId)
+
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL!
+    const n8nRes = await fetch(webhookUrl, { method: 'POST', body: n8nForm })
+    if (!n8nRes.ok) {
+      setErrorMsg('Failed to send file for processing. Please try again.')
+      setStatus('error')
+      return
+    }
+
+    setStatus('done')
+    setTimeout(() => router.push('/dashboard'), 1500)
   }
 
   return (
