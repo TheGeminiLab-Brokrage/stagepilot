@@ -3,7 +3,16 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
-const ACCEPTED = '.m4a,.mp3,.mp4,.wav,.ogg,.amr,.aac,.flac'
+const ACCEPTED = '.m4a,.mp3,.mp4,.wav,.ogg,.amr,.aac,.flac,.webm,.mpeg,.mpga'
+const SUPPORTED_EXTENSIONS = ['mp3', 'm4a', 'mp4', 'wav', 'ogg', 'amr', 'aac', 'flac', 'webm', 'mpeg', 'mpga']
+
+function validateFile(f: File): string | null {
+  const ext = f.name.split('.').pop()?.toLowerCase() ?? ''
+  if (!ext || !SUPPORTED_EXTENSIONS.includes(ext)) {
+    return `"${f.name}" has an unsupported format${ext ? ` (.${ext})` : ' (no extension)'}. Supported: ${SUPPORTED_EXTENSIONS.join(', ')}.`
+  }
+  return null
+}
 
 export default function UploadPage() {
   const router = useRouter()
@@ -19,7 +28,11 @@ export default function UploadPage() {
     e.preventDefault()
     setDragging(false)
     const f = e.dataTransfer.files[0]
-    if (f) setFile(f)
+    if (!f) return
+    const err = validateFile(f)
+    if (err) { setErrorMsg(err); return }
+    setErrorMsg('')
+    setFile(f)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -89,7 +102,14 @@ export default function UploadPage() {
             type="file"
             accept={ACCEPTED}
             className="hidden"
-            onChange={e => setFile(e.target.files?.[0] ?? null)}
+            onChange={e => {
+              const f = e.target.files?.[0]
+              if (!f) return
+              const err = validateFile(f)
+              if (err) { setErrorMsg(err); e.target.value = ''; return }
+              setErrorMsg('')
+              setFile(f)
+            }}
           />
           {file ? (
             <div>

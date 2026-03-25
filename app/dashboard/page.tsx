@@ -19,7 +19,7 @@ export default async function DashboardPage() {
   // Fetch calls — RLS enforces the right scope automatically
   const { data: calls } = await supabase
     .from('call_records')
-    .select('id, file_name, client_name, client_phone, campaign, stage, stage_corrected, status, uploaded_at, agent_id, team_name')
+    .select('id, file_name, client_name, client_phone, campaign, stage, stage_corrected, status, error_message, uploaded_at, agent_id, team_name')
     .order('uploaded_at', { ascending: false })
     .limit(100)
 

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 const STAGE_COLORS: Record<string, string> = {
   'interested / follow up': 'bg-blue-500/20 text-blue-300',
@@ -23,6 +24,7 @@ type Call = {
   stage: string | null
   stage_corrected: string | null
   status: string
+  error_message: string | null
   uploaded_at: string
   agent_id: string
   team_name: string | null
@@ -37,9 +39,23 @@ export default function CallsTable({
   isLeader: boolean
   currentUserId: string
 }) {
+  const router = useRouter()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [localCalls, setLocalCalls] = useState(calls)
+
+  // Sync when server re-fetches
+  useEffect(() => {
+    setLocalCalls(calls)
+  }, [calls])
+
+  // Auto-refresh every 5s while any call is still processing
+  useEffect(() => {
+    const hasProcessing = localCalls.some(c => c.status === 'processing')
+    if (!hasProcessing) return
+    const id = setInterval(() => router.refresh(), 5000)
+    return () => clearInterval(id)
+  }, [localCalls, router])
 
   async function saveCorrection(callId: string, newStage: string) {
     setSaving(true)
@@ -144,7 +160,15 @@ export default function CallsTable({
                     <span className="text-xs text-green-400">Done</span>
                   )}
                   {call.status === 'error' && (
-                    <span className="text-xs text-red-400">Error</span>
+                    <span className="flex items-center gap-1">
+                      <span className="text-xs text-red-400">Error</span>
+                      {call.error_message && (
+                        <span
+                          title={call.error_message.slice(0, 200)}
+                          className="cursor-help text-red-400 text-xs"
+                        >ⓘ</span>
+                      )}
+                    </span>
                   )}
                 </td>
 
