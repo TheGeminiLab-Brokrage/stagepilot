@@ -25,15 +25,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Only agents can upload calls' }, { status: 403 })
   }
 
-  // 3. Parse the multipart form data
+  // 3. Parse metadata only — the file is sent directly to n8n from the browser
+  //    to avoid Vercel's ~4.5 MB serverless body limit
   const formData = await request.formData()
-  const file = formData.get('file') as File | null
   const fileName = formData.get('fileName') as string
   const agentName = formData.get('agentName') as string
   const team = formData.get('team') as string
 
-  if (!file || !fileName) {
-    return NextResponse.json({ error: 'Missing file' }, { status: 400 })
+  if (!fileName) {
+    return NextResponse.json({ error: 'Missing fileName' }, { status: 400 })
   }
 
   // 4. Create a call_record with status=processing (using admin to bypass RLS insert check for company_id)
@@ -54,24 +54,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create call record' }, { status: 500 })
   }
 
-  // 5. Forward the file + metadata to n8n webhook
-  // n8n processes it and will call back our /api/webhook/n8n-result endpoint with results
-  const n8nForm = new FormData()
-  n8nForm.append('file', file, fileName)
-  n8nForm.append('fileName', fileName)
-  n8nForm.append('agentName', agentName)
-  n8nForm.append('team', team)
-  n8nForm.append('callRecordId', callRecord.id)  // n8n will use this to update the record
-
-  const webhookUrl = process.env.N8N_WEBHOOK_URL
-  if (!webhookUrl) {
-    return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
-  }
-
-  // Fire and forget — n8n processes async and calls back with results
-  fetch(webhookUrl, { method: 'POST', body: n8nForm }).catch(err => {
-    console.error('n8n webhook error:', err)
-  })
-
+  // 5. Return the callRecordId — the browser will POST the file directly to n8n
+  //    n8n will call back /api/webhook/n8n-result with the results when done
   return NextResponse.json({ success: true, callRecordId: callRecord.id })
 }
