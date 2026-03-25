@@ -44,6 +44,15 @@ export default function CallsTable({
   const [saving, setSaving] = useState(false)
   const [localCalls, setLocalCalls] = useState(calls)
 
+  async function removeCall(callId: string) {
+    const res = await fetch('/api/delete-call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callId }),
+    })
+    if (res.ok) setLocalCalls(prev => prev.filter(c => c.id !== callId))
+  }
+
   // Sync when server re-fetches
   useEffect(() => {
     setLocalCalls(calls)
@@ -98,6 +107,7 @@ export default function CallsTable({
             {isLeader && <th className="text-left px-4 py-3">Correction</th>}
             <th className="text-left px-4 py-3">Status</th>
             <th className="text-left px-4 py-3">Date</th>
+            <th className="px-2 py-3" />
           </tr>
         </thead>
         <tbody>
@@ -106,7 +116,7 @@ export default function CallsTable({
             const stageBadge = displayStage ? STAGE_COLORS[displayStage] ?? 'bg-gray-700 text-gray-300' : ''
 
             return (
-              <tr key={call.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
+              <tr key={call.id} className="group border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
                 <td className="px-4 py-3 text-gray-300 max-w-[200px] truncate" title={call.file_name}>
                   {call.file_name}
                 </td>
@@ -174,6 +184,13 @@ export default function CallsTable({
 
                 <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
                   {new Date(call.uploaded_at).toLocaleDateString('en-GB')}
+                </td>
+                <td className="px-2 py-3 text-right">
+                  <button
+                    onClick={() => removeCall(call.id)}
+                    title="Remove"
+                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-sm transition-all px-1"
+                  >×</button>
                 </td>
               </tr>
             )
