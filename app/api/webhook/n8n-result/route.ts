@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-// n8n calls this endpoint after processing a call, with the results
-// Secured with a shared secret in the Authorization header
+// n8n calls this endpoint after processing a call, with the results.
+// Secured with a shared secret in the Authorization header (N8N_CALLBACK_SECRET).
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const expectedSecret = process.env.N8N_CALLBACK_SECRET
