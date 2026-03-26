@@ -30,7 +30,8 @@ export default async function DashboardPage() {
     .limit(200)
 
   // Fetch agent names separately — avoids relying on FK join
-  const agentIds = [...new Set((rawCalls ?? []).map((c: { agent_id: string }) => c.agent_id))]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const agentIds = [...new Set((rawCalls ?? []).map((c: any) => c.agent_id as string))]
   const { data: profileRows } = agentIds.length > 0
     ? await supabase.from('profiles').select('id, full_name').in('id', agentIds)
     : { data: [] }
@@ -38,7 +39,8 @@ export default async function DashboardPage() {
   const profileMap: Record<string, string> = {}
   for (const p of profileRows ?? []) profileMap[p.id] = p.full_name
 
-  const calls = (rawCalls ?? []).map((c: { agent_id: string }) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const calls = (rawCalls ?? []).map((c: any) => ({
     ...c,
     agent_full_name: profileMap[c.agent_id] ?? null,
   }))
