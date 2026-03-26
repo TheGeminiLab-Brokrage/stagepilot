@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import CallsTable from './CallsTable'
+import StatsCards from './StatsCards'
+import DashboardClient from './DashboardClient'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -16,12 +17,31 @@ export default async function DashboardPage() {
   const role = profile?.role ?? 'agent'
   const isLeader = role === 'team_leader' || role === 'super_admin'
 
-  // Fetch calls — RLS enforces the right scope automatically
-  const { data: calls } = await supabase
+  // Fetch calls — RLS enforces scope automatically
+  const { data: rawCalls } = await supabase
     .from('call_records')
-    .select('id, file_name, client_name, client_phone, campaign, stage, stage_corrected, status, error_message, uploaded_at, agent_id, team_name')
+    .select(`
+      id, file_name, client_name, client_phone, campaign,
+      stage, stage_corrected, reasoning, transcript_summary,
+      pain_points, triple_c, agent_feedback,
+      status, error_message, uploaded_at, agent_id, team_name
+    `)
     .order('uploaded_at', { ascending: false })
-    .limit(100)
+    .limit(200)
+
+  // Fetch agent names separately — avoids relying on FK join
+  const agentIds = [...new Set((rawCalls ?? []).map((c: { agent_id: string }) => c.agent_id))]
+  const { data: profileRows } = agentIds.length > 0
+    ? await supabase.from('profiles').select('id, full_name').in('id', agentIds)
+    : { data: [] }
+
+  const profileMap: Record<string, string> = {}
+  for (const p of profileRows ?? []) profileMap[p.id] = p.full_name
+
+  const calls = (rawCalls ?? []).map((c: { agent_id: string }) => ({
+    ...c,
+    agent_full_name: profileMap[c.agent_id] ?? null,
+  }))
 
   return (
     <div>
@@ -31,7 +51,9 @@ export default async function DashboardPage() {
             {isLeader ? 'Team Calls' : 'My Calls'}
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {isLeader ? `Reviewing calls for ${profile?.team_name ?? 'your team'}` : 'Your processed call recordings'}
+            {isLeader
+              ? `Reviewing calls for ${profile?.team_name ?? 'your team'}`
+              : 'Your processed call recordings'}
           </p>
         </div>
         {role === 'agent' && (
@@ -44,7 +66,8 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <CallsTable calls={calls ?? []} isLeader={isLeader} currentUserId={user.id} />
+      <StatsCards calls={calls} />
+      <DashboardClient calls={calls} isLeader={isLeader} currentUserId={user.id} />
     </div>
   )
 }

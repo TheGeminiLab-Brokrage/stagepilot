@@ -29,8 +29,6 @@ export async function POST(request: NextRequest) {
   //    to avoid Vercel's ~4.5 MB serverless body limit
   const formData = await request.formData()
   const fileName = formData.get('fileName') as string
-  const agentName = formData.get('agentName') as string
-  const team = formData.get('team') as string
 
   if (!fileName) {
     return NextResponse.json({ error: 'Missing fileName' }, { status: 400 })
@@ -43,7 +41,7 @@ export async function POST(request: NextRequest) {
     .insert({
       company_id: profile.company_id,
       agent_id: user.id,
-      team_name: profile.team_name ?? team,
+      team_name: profile.team_name ?? null,
       file_name: fileName,
       status: 'processing',
     })

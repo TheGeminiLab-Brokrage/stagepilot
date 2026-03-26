@@ -19,7 +19,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Top nav */}
       <header className="border-b border-gray-800 bg-gray-900">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-6">
@@ -37,6 +36,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
                   className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
                 >
                   Upload Call
+                </a>
+              )}
+              {role === 'super_admin' && (
+                <a
+                  href="/dashboard/admin"
+                  className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
+                >
+                  Admin
                 </a>
               )}
             </nav>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import CallDetailModal from './CallDetailModal'
 
 const STAGE_COLORS: Record<string, string> = {
   'interested / follow up': 'bg-blue-500/20 text-blue-300',
@@ -15,7 +16,13 @@ const STAGE_COLORS: Record<string, string> = {
 
 const ALL_STAGES = Object.keys(STAGE_COLORS)
 
-type Call = {
+type TripleC = {
+  clear_need?: { met: boolean; detail: string }
+  clear_budget?: { met: boolean; detail: string }
+  clear_path?: { met: boolean; detail: string }
+}
+
+export type Call = {
   id: string
   file_name: string
   client_name: string | null
@@ -23,11 +30,17 @@ type Call = {
   campaign: string | null
   stage: string | null
   stage_corrected: string | null
+  reasoning: string | null
+  transcript_summary: string | null
+  pain_points: string | null
+  triple_c: TripleC | null
+  agent_feedback: string | null
   status: string
   error_message: string | null
   uploaded_at: string
   agent_id: string
   team_name: string | null
+  agent_full_name?: string | null
 }
 
 export default function CallsTable({
@@ -43,6 +56,7 @@ export default function CallsTable({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [localCalls, setLocalCalls] = useState(calls)
+  const [selectedCall, setSelectedCall] = useState<Call | null>(null)
 
   async function removeCall(callId: string) {
     const res = await fetch('/api/delete-call', {
@@ -53,12 +67,10 @@ export default function CallsTable({
     if (res.ok) setLocalCalls(prev => prev.filter(c => c.id !== callId))
   }
 
-  // Sync when server re-fetches
   useEffect(() => {
     setLocalCalls(calls)
   }, [calls])
 
-  // Auto-refresh every 5s while any call is still processing
   useEffect(() => {
     const hasProcessing = localCalls.some(c => c.status === 'processing')
     if (!hasProcessing) return
@@ -96,107 +108,118 @@ export default function CallsTable({
   }
 
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-            <th className="text-left px-4 py-3">File</th>
-            <th className="text-left px-4 py-3">Client</th>
-            <th className="text-left px-4 py-3">Campaign</th>
-            <th className="text-left px-4 py-3">AI Stage</th>
-            {isLeader && <th className="text-left px-4 py-3">Correction</th>}
-            <th className="text-left px-4 py-3">Status</th>
-            <th className="text-left px-4 py-3">Date</th>
-            <th className="px-2 py-3" />
-          </tr>
-        </thead>
-        <tbody>
-          {localCalls.map(call => {
-            const displayStage = call.stage_corrected ?? call.stage
-            const stageBadge = displayStage ? STAGE_COLORS[displayStage] ?? 'bg-gray-700 text-gray-300' : ''
+    <>
+      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
+              <th className="text-left px-4 py-3">File</th>
+              <th className="text-left px-4 py-3">Client</th>
+              {isLeader && <th className="text-left px-4 py-3">Agent</th>}
+              <th className="text-left px-4 py-3">Campaign</th>
+              <th className="text-left px-4 py-3">AI Stage</th>
+              {isLeader && <th className="text-left px-4 py-3">Correction</th>}
+              <th className="text-left px-4 py-3">Status</th>
+              <th className="text-left px-4 py-3">Date</th>
+              <th className="px-2 py-3" />
+            </tr>
+          </thead>
+          <tbody>
+            {localCalls.map(call => {
+              const displayStage = call.stage_corrected ?? call.stage
+              const stageBadge = displayStage ? STAGE_COLORS[displayStage] ?? 'bg-gray-700 text-gray-300' : ''
 
-            return (
-              <tr key={call.id} className="group border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                <td className="px-4 py-3 text-gray-300 max-w-[200px] truncate" title={call.file_name}>
-                  {call.file_name}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="text-white">{call.client_name ?? '—'}</div>
-                  <div className="text-gray-500 text-xs">{call.client_phone ?? ''}</div>
-                </td>
-                <td className="px-4 py-3 text-gray-400">{call.campaign ?? '—'}</td>
-                <td className="px-4 py-3">
-                  {call.stage ? (
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${stageBadge}`}>
-                      {call.stage}
-                      {call.stage_corrected && call.stage_corrected !== call.stage && (
-                        <span className="ml-1 line-through opacity-50">{call.stage}</span>
-                      )}
-                    </span>
-                  ) : '—'}
-                </td>
-
-                {isLeader && (
+              return (
+                <tr
+                  key={call.id}
+                  className="group border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors cursor-pointer"
+                  onClick={() => call.status === 'done' && setSelectedCall(call)}
+                >
+                  <td className="px-4 py-3 text-gray-300 max-w-[180px] truncate" title={call.file_name}>
+                    {call.file_name}
+                  </td>
                   <td className="px-4 py-3">
-                    {editingId === call.id ? (
-                      <select
-                        autoFocus
-                        disabled={saving}
-                        defaultValue={call.stage_corrected ?? call.stage ?? ''}
-                        onChange={e => saveCorrection(call.id, e.target.value)}
-                        onBlur={() => setEditingId(null)}
-                        className="bg-gray-800 border border-gray-600 text-white text-xs rounded px-2 py-1"
-                      >
-                        {ALL_STAGES.map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <button
-                        onClick={() => setEditingId(call.id)}
-                        className="text-xs text-gray-500 hover:text-blue-400 transition-colors"
-                      >
-                        {call.stage_corrected ? `✓ ${call.stage_corrected}` : 'Correct →'}
-                      </button>
+                    <div className="text-white">{call.client_name ?? '—'}</div>
+                    <div className="text-gray-500 text-xs">{call.client_phone ?? ''}</div>
+                  </td>
+                  {isLeader && (
+                    <td className="px-4 py-3 text-gray-400 text-xs">{call.agent_full_name ?? '—'}</td>
+                  )}
+                  <td className="px-4 py-3 text-gray-400">{call.campaign ?? '—'}</td>
+                  <td className="px-4 py-3">
+                    {displayStage ? (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${stageBadge}`}>
+                        {displayStage}
+                      </span>
+                    ) : '—'}
+                  </td>
+
+                  {isLeader && (
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                      {editingId === call.id ? (
+                        <select
+                          autoFocus
+                          disabled={saving}
+                          defaultValue={call.stage_corrected ?? call.stage ?? ''}
+                          onChange={e => saveCorrection(call.id, e.target.value)}
+                          onBlur={() => setEditingId(null)}
+                          className="bg-gray-800 border border-gray-600 text-white text-xs rounded px-2 py-1"
+                        >
+                          {ALL_STAGES.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <button
+                          onClick={() => setEditingId(call.id)}
+                          className="text-xs text-gray-500 hover:text-blue-400 transition-colors"
+                        >
+                          {call.stage_corrected ? `✓ ${call.stage_corrected}` : 'Correct →'}
+                        </button>
+                      )}
+                    </td>
+                  )}
+
+                  <td className="px-4 py-3">
+                    {call.status === 'processing' && (
+                      <span className="text-xs text-yellow-400">Processing…</span>
+                    )}
+                    {call.status === 'done' && (
+                      <span className="text-xs text-green-400">Done</span>
+                    )}
+                    {call.status === 'error' && (
+                      <span className="flex items-center gap-1">
+                        <span className="text-xs text-red-400">Error</span>
+                        {call.error_message && (
+                          <span
+                            title={call.error_message.slice(0, 200)}
+                            className="cursor-help text-red-400 text-xs"
+                          >ⓘ</span>
+                        )}
+                      </span>
                     )}
                   </td>
-                )}
 
-                <td className="px-4 py-3">
-                  {call.status === 'processing' && (
-                    <span className="text-xs text-yellow-400">Processing…</span>
-                  )}
-                  {call.status === 'done' && (
-                    <span className="text-xs text-green-400">Done</span>
-                  )}
-                  {call.status === 'error' && (
-                    <span className="flex items-center gap-1">
-                      <span className="text-xs text-red-400">Error</span>
-                      {call.error_message && (
-                        <span
-                          title={call.error_message.slice(0, 200)}
-                          className="cursor-help text-red-400 text-xs"
-                        >ⓘ</span>
-                      )}
-                    </span>
-                  )}
-                </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+                    {new Date(call.uploaded_at).toLocaleDateString('en-GB')}
+                  </td>
+                  <td className="px-2 py-3 text-right" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => removeCall(call.id)}
+                      title="Remove"
+                      className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-sm transition-all px-1"
+                    >×</button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
-                <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
-                  {new Date(call.uploaded_at).toLocaleDateString('en-GB')}
-                </td>
-                <td className="px-2 py-3 text-right">
-                  <button
-                    onClick={() => removeCall(call.id)}
-                    title="Remove"
-                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-sm transition-all px-1"
-                  >×</button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+      {selectedCall && (
+        <CallDetailModal call={selectedCall} onClose={() => setSelectedCall(null)} />
+      )}
+    </>
   )
 }
