@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { type Call } from './CallsTable'
 
 const ALL_STAGES = [
   'interested / follow up',
@@ -11,16 +12,6 @@ const ALL_STAGES = [
   'not interested',
   'low budget',
 ]
-
-type Call = {
-  status: string
-  stage: string | null
-  stage_corrected: string | null
-  client_name: string | null
-  team_name: string | null
-  agent_full_name?: string | null
-  uploaded_at: string
-}
 
 type Props = {
   calls: Call[]
@@ -38,6 +29,7 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
   const [stageOpen, setStageOpen] = useState(false)
   const stageRef = useRef<HTMLDivElement>(null)
 
+  // Close stage dropdown on outside click
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       if (stageRef.current && !stageRef.current.contains(e.target as Node)) {
@@ -48,8 +40,10 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [])
 
+  // Unique teams from data
   const teams = Array.from(new Set(calls.map(c => c.team_name).filter(Boolean))) as string[]
 
+  // Apply filters whenever any filter changes
   useEffect(() => {
     let result = calls
 
@@ -80,7 +74,7 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
     }
 
     if (dateTo) {
-      const to = new Date(dateTo).getTime() + 86400000
+      const to = new Date(dateTo).getTime() + 86400000 // include the full day
       result = result.filter(c => new Date(c.uploaded_at).getTime() <= to)
     }
 
@@ -106,6 +100,7 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-2 mb-4">
+      {/* Stage multiselect */}
       <div className="relative" ref={stageRef}>
         <button
           onClick={() => setStageOpen(o => !o)}
@@ -135,14 +130,16 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
         )}
       </div>
 
+      {/* Client search */}
       <input
         type="text"
-        placeholder="Search client…"
+        placeholder="Search client\u2026"
         value={clientSearch}
         onChange={e => setClientSearch(e.target.value)}
         className="text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-600 w-36"
       />
 
+      {/* Team filter \u2014 leaders/admin only */}
       {isLeader && teams.length > 0 && (
         <select
           value={teamFilter}
@@ -158,23 +155,25 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
         </select>
       )}
 
+      {/* Agent search \u2014 leaders/admin only */}
       {isLeader && (
         <input
           type="text"
-          placeholder="Search agent…"
+          placeholder="Search agent\u2026"
           value={agentSearch}
           onChange={e => setAgentSearch(e.target.value)}
           className="text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-600 w-32"
         />
       )}
 
+      {/* Date range */}
       <input
         type="date"
         value={dateFrom}
         onChange={e => setDateFrom(e.target.value)}
         className="text-xs bg-gray-800 border border-gray-700 text-gray-400 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
       />
-      <span className="text-gray-600 text-xs">→</span>
+      <span className="text-gray-600 text-xs">\u2192</span>
       <input
         type="date"
         value={dateTo}
@@ -182,6 +181,7 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
         className="text-xs bg-gray-800 border border-gray-700 text-gray-400 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
       />
 
+      {/* Clear */}
       {hasFilters && (
         <button
           onClick={clearAll}
