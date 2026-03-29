@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 const STAGE_COLORS: Record<string, string> = {
   'interested / follow up': 'bg-blue-500/20 text-blue-300',
@@ -25,6 +25,8 @@ type Call = {
   campaign: string | null
   stage: string | null
   stage_corrected: string | null
+  agent_stage: string | null
+  audio_url: string | null
   reasoning: string | null
   transcript_summary: string | null
   pain_points: string | null
@@ -33,9 +35,21 @@ type Call = {
   file_name: string
 }
 
-export default function CallDetailModal({ call, onClose }: { call: Call; onClose: () => void }) {
+export default function CallDetailModal({
+  call,
+  isLeader,
+  onClose,
+}: {
+  call: Call
+  isLeader: boolean
+  onClose: () => void
+}) {
   const stage = call.stage_corrected ?? call.stage
   const stageBadge = stage ? (STAGE_COLORS[stage] ?? 'bg-gray-700 text-gray-300') : ''
+
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [audioLoading, setAudioLoading] = useState(false)
+  const [audioError, setAudioError] = useState('')
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -44,6 +58,20 @@ export default function CallDetailModal({ call, onClose }: { call: Call; onClose
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  async function loadAudio() {
+    setAudioLoading(true)
+    setAudioError('')
+    const res = await fetch(`/api/audio-url?callRecordId=${call.id}`)
+    if (!res.ok) {
+      setAudioError('Could not load recording.')
+      setAudioLoading(false)
+      return
+    }
+    const { signedUrl } = await res.json()
+    setAudioUrl(signedUrl)
+    setAudioLoading(false)
+  }
 
   const tripleC = call.triple_c
   const tripleCItems = tripleC ? [
@@ -75,6 +103,14 @@ export default function CallDetailModal({ call, onClose }: { call: Call; onClose
                   )}
                 </span>
               )}
+              {call.agent_stage && (
+                <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                  <span>Agent:</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STAGE_COLORS[call.agent_stage] ?? 'bg-gray-700 text-gray-300'}`}>
+                    {call.agent_stage}
+                  </span>
+                </span>
+              )}
             </div>
             {call.campaign && <p className="text-gray-500 text-sm mt-0.5">Campaign: {call.campaign}</p>}
             <p className="text-gray-600 text-xs mt-0.5 truncate max-w-xs">{call.file_name}</p>
@@ -86,6 +122,24 @@ export default function CallDetailModal({ call, onClose }: { call: Call; onClose
         </div>
 
         <div className="px-6 py-5 space-y-6">
+          {/* Audio Player — team leaders and admins only */}
+          {isLeader && call.audio_url && (
+            <Section title="Call Recording">
+              {audioUrl ? (
+                <audio controls src={audioUrl} className="w-full h-10 accent-blue-500" />
+              ) : (
+                <button
+                  onClick={loadAudio}
+                  disabled={audioLoading}
+                  className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
+                >
+                  {audioLoading ? 'Loading…' : '▶ Load Recording'}
+                </button>
+              )}
+              {audioError && <p className="text-red-400 text-xs mt-1">{audioError}</p>}
+            </Section>
+          )}
+
           {/* Summary */}
           <Section title="Summary">
             {call.transcript_summary
@@ -99,7 +153,7 @@ export default function CallDetailModal({ call, onClose }: { call: Call; onClose
               <div className="space-y-3">
                 {tripleCItems.map(({ key, label, description, data }) => (
                   <div key={key} className="flex gap-3">
-                    <div className="mt-0.5 flex-shrink-0">
+                    <div className="mt-0.5 shrink-0">
                       {data?.met
                         ? <span className="text-green-400 text-base">✓</span>
                         : <span className="text-red-400 text-base">✗</span>}

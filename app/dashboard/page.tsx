@@ -22,8 +22,8 @@ export default async function DashboardPage() {
     .from('call_records')
     .select(`
       id, file_name, client_name, client_phone, campaign,
-      stage, stage_corrected, reasoning, transcript_summary,
-      pain_points, triple_c, agent_feedback,
+      stage, stage_corrected, agent_stage, reasoning, transcript_summary,
+      pain_points, triple_c, agent_feedback, audio_url,
       status, error_message, uploaded_at, agent_id, team_name
     `)
     .order('uploaded_at', { ascending: false })

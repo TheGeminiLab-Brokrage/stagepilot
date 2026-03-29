@@ -30,11 +30,13 @@ export type Call = {
   campaign: string | null
   stage: string | null
   stage_corrected: string | null
+  agent_stage: string | null
   reasoning: string | null
   transcript_summary: string | null
   pain_points: string | null
   triple_c: TripleC | null
   agent_feedback: string | null
+  audio_url: string | null
   status: string
   error_message: string | null
   uploaded_at: string
@@ -118,6 +120,7 @@ export default function CallsTable({
               {isLeader && <th className="text-left px-4 py-3">Agent</th>}
               <th className="text-left px-4 py-3">Campaign</th>
               <th className="text-left px-4 py-3">AI Stage</th>
+              {isLeader && <th className="text-left px-4 py-3">Agent Stage</th>}
               {isLeader && <th className="text-left px-4 py-3">Correction</th>}
               <th className="text-left px-4 py-3">Status</th>
               <th className="text-left px-4 py-3">Date</th>
@@ -153,6 +156,16 @@ export default function CallsTable({
                       </span>
                     ) : '—'}
                   </td>
+
+                  {isLeader && (
+                    <td className="px-4 py-3">
+                      {call.agent_stage ? (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STAGE_COLORS[call.agent_stage] ?? 'bg-gray-700 text-gray-300'}`}>
+                          {call.agent_stage}
+                        </span>
+                      ) : '—'}
+                    </td>
+                  )}
 
                   {isLeader && (
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
@@ -218,7 +231,7 @@ export default function CallsTable({
       </div>
 
       {selectedCall && (
-        <CallDetailModal call={selectedCall} onClose={() => setSelectedCall(null)} />
+        <CallDetailModal call={selectedCall} isLeader={isLeader} onClose={() => setSelectedCall(null)} />
       )}
     </>
   )
