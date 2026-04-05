@@ -203,26 +203,62 @@ export default function CallDetailModal({
           <Section title="Client Pain Points">
             {(() => {
               if (!call.pain_points) return <p className="text-gray-600 text-sm italic">Analysis not available</p>
+
+              // Try JSON array format (supports both "point" and "client_pain" key)
               try {
-                const points: { point: string; addressed: string }[] = JSON.parse(call.pain_points)
-                if (!Array.isArray(points)) throw new Error()
+                const parsed = JSON.parse(call.pain_points)
+                if (Array.isArray(parsed)) {
+                  return (
+                    <div className="space-y-2">
+                      {parsed.map((p, i) => {
+                        const text = p.point ?? p.client_pain ?? ''
+                        const addressed = p.addressed === 'addressed'
+                        return (
+                          <div key={i} className="flex gap-3">
+                            <div className="mt-0.5 shrink-0">
+                              {addressed
+                                ? <span className="text-green-400 text-base">✓</span>
+                                : <span className="text-red-400 text-base">✗</span>}
+                            </div>
+                            <p className="text-sm text-gray-300 leading-relaxed">{text}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                }
+              } catch { /* fall through to plain text parsing */ }
+
+              // Plain text: split on numbered points (1. 2. 3. …)
+              const raw = call.pain_points
+              const items = raw.split(/\s(?=\d+\.\s)/).map(s => s.trim()).filter(s => /^\d+\./.test(s))
+              if (items.length > 0) {
                 return (
                   <div className="space-y-2">
-                    {points.map((p, i) => (
-                      <div key={i} className="flex gap-3">
-                        <div className="mt-0.5 shrink-0">
-                          {p.addressed === 'addressed'
-                            ? <span className="text-green-400 text-base">✓</span>
-                            : <span className="text-red-400 text-base">✗</span>}
+                    {items.map((item, i) => {
+                      const isNotAddressed = item.includes('(not addressed)')
+                      const clean = item
+                        .replace(/^\d+\.\s*/, '')
+                        .replace(/\(not addressed\)/g, '')
+                        .replace(/\(addressed\)/g, '')
+                        .trim()
+                      return (
+                        <div key={i} className="flex gap-3">
+                          <div className="mt-0.5 shrink-0">
+                            {isNotAddressed
+                              ? <span className="text-red-400 text-base">✗</span>
+                              : <span className="text-green-400 text-base">✓</span>}
+                          </div>
+                          <p className="text-sm text-gray-300 leading-relaxed">{clean}</p>
                         </div>
-                        <p className="text-sm text-gray-300 leading-relaxed">{p.point}</p>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )
-              } catch {
-                return <pre className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap font-sans">{call.pain_points}</pre>
               }
+
+              // Absolute fallback
+              return <p className="text-gray-300 text-sm leading-relaxed">{raw}</p>
             })()}
           </Section>
 
