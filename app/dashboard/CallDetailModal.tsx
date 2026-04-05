@@ -125,17 +125,43 @@ export default function CallDetailModal({
           {/* Audio Player — team leaders and admins only */}
           {isLeader && call.audio_url && (
             <Section title="Call Recording">
-              {audioUrl ? (
-                <audio controls src={audioUrl} className="w-full h-10 accent-blue-500" />
-              ) : (
-                <button
-                  onClick={loadAudio}
-                  disabled={audioLoading}
-                  className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
-                >
-                  {audioLoading ? 'Loading…' : '▶ Load Recording'}
-                </button>
-              )}
+              {(() => {
+                const ext = call.audio_url?.split('.').pop()?.toLowerCase()
+                const browserPlayable = ['mp3', 'm4a', 'mp4', 'wav', 'ogg', 'webm', 'flac', 'aac'].includes(ext ?? '')
+                if (!browserPlayable) {
+                  return audioUrl ? (
+                    <a
+                      href={audioUrl}
+                      download
+                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      ⬇ Download Recording ({ext?.toUpperCase()})
+                    </a>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={loadAudio}
+                        disabled={audioLoading}
+                        className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
+                      >
+                        {audioLoading ? 'Loading…' : '⬇ Get Download Link'}
+                      </button>
+                      <span className="text-xs text-gray-600">({ext?.toUpperCase()} — not playable in browser)</span>
+                    </div>
+                  )
+                }
+                return audioUrl ? (
+                  <audio controls src={audioUrl} className="w-full h-10 accent-blue-500" />
+                ) : (
+                  <button
+                    onClick={loadAudio}
+                    disabled={audioLoading}
+                    className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
+                  >
+                    {audioLoading ? 'Loading…' : '▶ Load Recording'}
+                  </button>
+                )
+              })()}
               {audioError && <p className="text-red-400 text-xs mt-1">{audioError}</p>}
             </Section>
           )}
