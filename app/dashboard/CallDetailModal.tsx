@@ -201,9 +201,29 @@ export default function CallDetailModal({
 
           {/* Pain Points */}
           <Section title="Client Pain Points">
-            {call.pain_points
-              ? <pre className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap font-sans">{call.pain_points}</pre>
-              : <p className="text-gray-600 text-sm italic">Analysis not available</p>}
+            {(() => {
+              if (!call.pain_points) return <p className="text-gray-600 text-sm italic">Analysis not available</p>
+              try {
+                const points: { point: string; addressed: string }[] = JSON.parse(call.pain_points)
+                if (!Array.isArray(points)) throw new Error()
+                return (
+                  <div className="space-y-2">
+                    {points.map((p, i) => (
+                      <div key={i} className="flex gap-3">
+                        <div className="mt-0.5 shrink-0">
+                          {p.addressed === 'addressed'
+                            ? <span className="text-green-400 text-base">✓</span>
+                            : <span className="text-red-400 text-base">✗</span>}
+                        </div>
+                        <p className="text-sm text-gray-300 leading-relaxed">{p.point}</p>
+                      </div>
+                    ))}
+                  </div>
+                )
+              } catch {
+                return <pre className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap font-sans">{call.pain_points}</pre>
+              }
+            })()}
           </Section>
 
           {/* Agent Feedback */}
