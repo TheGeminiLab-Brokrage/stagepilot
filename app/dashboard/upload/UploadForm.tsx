@@ -35,10 +35,20 @@ export default function UploadForm() {
   const [status, setStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [uploadPct, setUploadPct] = useState(0)
+  const [pendingCallId, setPendingCallId] = useState<string | null>(null)
 
-  function removeFile() {
+  async function removeFile() {
     xhrRef.current?.abort()
     xhrRef.current = null
+    // Clean up any record that was already created before the upload was cancelled
+    if (pendingCallId) {
+      await fetch('/api/delete-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callId: pendingCallId }),
+      }).catch(() => {})
+      setPendingCallId(null)
+    }
     setFile(null)
     setStatus('idle')
     setErrorMsg('')
@@ -77,6 +87,7 @@ export default function UploadForm() {
       return
     }
     const { callRecordId, audioPath } = await metaRes.json()
+    setPendingCallId(callRecordId)
 
     // Step 2: Fire Supabase Storage upload + n8n XHR in parallel
     const supabase = createClient()
@@ -112,8 +123,15 @@ export default function UploadForm() {
     })
 
     let uploadFailed = false
-    await Promise.all([storageUploadPromise, n8nUploadPromise]).catch(err => {
+    await Promise.all([storageUploadPromise, n8nUploadPromise]).catch(async err => {
       uploadFailed = true
+      // Delete the orphaned processing record so it doesn't stay stuck
+      await fetch('/api/delete-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callId: callRecordId }),
+      }).catch(() => {})
+      setPendingCallId(null)
       setErrorMsg(err.message ?? 'Upload failed. Please try again.')
       setStatus('error')
     })
@@ -154,13 +172,15 @@ export default function UploadForm() {
           <div>
             <p className="text-white font-medium">{file.name}</p>
             <p className="text-gray-500 text-sm mt-1">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
-            <button
-              type="button"
-              onClick={e => { e.stopPropagation(); removeFile() }}
-              className="text-xs text-gray-600 hover:text-red-400 mt-2 transition-colors"
-            >
-              Remove
-            </button>
+            {status !== 'uploading' && (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); removeFile() }}
+                className="text-xs text-gray-600 hover:text-red-400 mt-2 transition-colors"
+              >
+                Remove
+              </button>
+            )}
           </div>
         ) : (
           <div>
