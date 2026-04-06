@@ -42,6 +42,9 @@ export async function POST(request: NextRequest) {
   }
 
   // 3. Insert the profile row into the same company
+  // Team leaders use their own full_name as the team identifier (agents set team_name = leader's full_name)
+  const resolvedTeamName = role === 'team_leader' ? fullName : (teamName || null)
+
   const { error: profileError } = await adminClient
     .from('profiles')
     .insert({
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
       company_id: adminProfile.company_id,
       full_name: fullName,
       role,
-      team_name: teamName || null,
+      team_name: resolvedTeamName,
     })
 
   if (profileError) {
