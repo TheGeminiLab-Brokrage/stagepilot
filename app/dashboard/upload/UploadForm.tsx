@@ -170,7 +170,7 @@ export default function UploadForm() {
           <div>
             <p className="text-white font-medium">{file.name}</p>
             <p className="text-gray-500 text-sm mt-1">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
-            {status !== 'uploading' && (
+            {status === 'idle' && (
               <button
                 type="button"
                 onClick={e => { e.stopPropagation(); removeFile() }}
