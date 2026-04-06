@@ -37,6 +37,11 @@ export default function UserTable({
   const [roleSort, setRoleSort] = useState<'asc' | 'desc' | null>(null)
   const [removingUser, setRemovingUser] = useState<{ id: string; name: string } | null>(null)
   const [removeError, setRemoveError] = useState<string | null>(null)
+  const [settingPassword, setSettingPassword] = useState<{ id: string; name: string } | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordDone, setPasswordDone] = useState(false)
 
   const teamLeaders = useMemo(
     () => profiles.filter(p => p.role === 'team_leader').map(p => p.full_name),
@@ -87,6 +92,33 @@ export default function UserTable({
 
   function cycleRoleSort() {
     setRoleSort(s => s === null ? 'asc' : s === 'asc' ? 'desc' : null)
+  }
+
+  async function savePassword() {
+    if (!settingPassword) return
+    setPasswordError(null)
+    if (newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters')
+      return
+    }
+    setPasswordSaving(true)
+    const res = await fetch('/api/admin/set-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: settingPassword.id, password: newPassword }),
+    })
+    setPasswordSaving(false)
+    if (res.ok) {
+      setPasswordDone(true)
+      setTimeout(() => {
+        setSettingPassword(null)
+        setNewPassword('')
+        setPasswordDone(false)
+      }, 1500)
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setPasswordError(d.error ?? 'Failed to update password')
+    }
   }
 
   return (
@@ -157,19 +189,69 @@ export default function UserTable({
                 {new Date(p.created_at).toLocaleDateString('en-GB')}
               </td>
               <td className="px-4 py-3 text-right">
-                {p.id !== currentUserId && (
+                <div className="flex items-center justify-end gap-3">
                   <button
-                    onClick={() => { setRemoveError(null); setRemovingUser({ id: p.id, name: p.full_name }) }}
-                    className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                    onClick={() => { setNewPassword(''); setPasswordError(null); setPasswordDone(false); setSettingPassword({ id: p.id, name: p.full_name }) }}
+                    className="text-xs text-gray-600 hover:text-blue-400 transition-colors"
                   >
-                    Remove
+                    Set password
                   </button>
-                )}
+                  {p.id !== currentUserId && (
+                    <button
+                      onClick={() => { setRemoveError(null); setRemovingUser({ id: p.id, name: p.full_name }) }}
+                      className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {settingPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-80 shadow-xl">
+            <h3 className="text-white font-semibold text-base mb-1">Set new password</h3>
+            <p className="text-gray-400 text-sm mb-4">{settingPassword.name}</p>
+            {passwordDone ? (
+              <p className="text-green-400 text-sm text-center py-2">Password updated.</p>
+            ) : (
+              <>
+                <input
+                  type="password"
+                  autoFocus
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') savePassword() }}
+                  placeholder="Min. 8 characters"
+                  className="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {passwordError && (
+                  <p className="text-red-400 text-xs mb-3">{passwordError}</p>
+                )}
+                <div className="flex gap-3 justify-end mt-4">
+                  <button
+                    onClick={() => setSettingPassword(null)}
+                    className="px-4 py-1.5 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={savePassword}
+                    disabled={passwordSaving}
+                    className="px-4 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg transition-colors"
+                  >
+                    {passwordSaving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {removingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
