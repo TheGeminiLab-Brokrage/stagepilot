@@ -7,7 +7,9 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: adminProfile } = await supabase
+  const adminClient = createAdminClient()
+
+  const { data: adminProfile } = await adminClient
     .from('profiles')
     .select('role, company_id')
     .eq('id', user.id)
@@ -19,8 +21,6 @@ export async function POST(request: NextRequest) {
 
   const { userId, teamName } = await request.json()
   if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
-
-  const adminClient = createAdminClient()
 
   const { error } = await adminClient
     .from('profiles')
