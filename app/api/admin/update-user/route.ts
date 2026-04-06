@@ -30,5 +30,12 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Keep all existing call records in sync — RLS filters by call_records.team_name
+  await adminClient
+    .from('call_records')
+    .update({ team_name: teamName || null })
+    .eq('agent_id', userId)
+    .eq('company_id', adminProfile.company_id)
+
   return NextResponse.json({ success: true })
 }
