@@ -48,7 +48,11 @@ export default async function AdminPage() {
       {/* Create user form */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl px-6 py-5">
         <h2 className="text-white font-medium mb-4">Add New User</h2>
-        <CreateUserForm />
+        <CreateUserForm
+          teamLeaders={(profiles ?? [])
+            .filter(p => p.role === 'team_leader')
+            .map(p => p.full_name)}
+        />
       </div>
     </div>
   )

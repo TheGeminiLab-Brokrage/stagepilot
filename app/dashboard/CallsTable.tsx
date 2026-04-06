@@ -16,6 +16,9 @@ const STAGE_COLORS: Record<string, string> = {
 
 const ALL_STAGES = Object.keys(STAGE_COLORS)
 
+// Correction dropdown excludes final stages that leaders shouldn't manually assign
+const CORRECTION_STAGES = ALL_STAGES.filter(s => s !== 'meeting done' && s !== 'done deal')
+
 type TripleC = {
   clear_need?: { met: boolean; detail: string }
   clear_budget?: { met: boolean; detail: string }
@@ -59,6 +62,7 @@ export default function CallsTable({
   const [saving, setSaving] = useState(false)
   const [localCalls, setLocalCalls] = useState(calls)
   const [selectedCall, setSelectedCall] = useState<Call | null>(null)
+  const [deletingCall, setDeletingCall] = useState<{ id: string; name: string | null; phone: string | null } | null>(null)
 
   async function removeCall(callId: string) {
     const res = await fetch('/api/delete-call', {
@@ -67,6 +71,7 @@ export default function CallsTable({
       body: JSON.stringify({ callId }),
     })
     if (res.ok) setLocalCalls(prev => prev.filter(c => c.id !== callId))
+    setDeletingCall(null)
   }
 
   useEffect(() => {
@@ -81,16 +86,17 @@ export default function CallsTable({
   }, [localCalls, router])
 
   async function saveCorrection(callId: string, newStage: string) {
+    const stageValue = newStage || null // "" → null to clear correction
     setSaving(true)
     const res = await fetch('/api/update-stage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ callId, stage: newStage }),
+      body: JSON.stringify({ callId, stage: stageValue }),
     })
     setSaving(false)
     if (res.ok) {
       setLocalCalls(prev =>
-        prev.map(c => c.id === callId ? { ...c, stage_corrected: newStage } : c)
+        prev.map(c => c.id === callId ? { ...c, stage_corrected: stageValue } : c)
       )
       setEditingId(null)
     }
@@ -130,8 +136,9 @@ export default function CallsTable({
           <tbody>
             {localCalls.map(call => {
               const displayStage = call.stage_corrected ?? call.stage
+              const correctionDiffers = call.stage_corrected && call.stage_corrected !== call.stage
               const stageBadge = displayStage
-                ? (call.stage_corrected
+                ? (correctionDiffers
                     ? 'bg-red-900/40 text-red-300 ring-1 ring-red-700/50'
                     : 'bg-green-900/40 text-green-300 ring-1 ring-green-700/50')
                 : ''
@@ -177,19 +184,26 @@ export default function CallsTable({
                         <select
                           autoFocus
                           disabled={saving}
-                          defaultValue={call.stage_corrected ?? call.stage ?? ''}
+                          defaultValue={call.stage_corrected ?? ''}
                           onChange={e => saveCorrection(call.id, e.target.value)}
                           onBlur={() => setEditingId(null)}
                           className="bg-gray-800 border border-gray-600 text-white text-xs rounded px-2 py-1"
                         >
-                          {ALL_STAGES.map(s => (
+                          <option value="">— remove correction —</option>
+                          {CORRECTION_STAGES.map(s => (
                             <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
                       ) : (
                         <button
                           onClick={() => setEditingId(call.id)}
-                          className="text-xs text-gray-500 hover:text-blue-400 transition-colors"
+                          className={`text-xs transition-colors ${
+                            call.stage_corrected
+                              ? correctionDiffers
+                                ? 'text-red-400 hover:text-blue-400'
+                                : 'text-green-400 hover:text-blue-400'
+                              : 'text-gray-500 hover:text-blue-400'
+                          }`}
                         >
                           {call.stage_corrected ? `✓ ${call.stage_corrected}` : 'Correct →'}
                         </button>
@@ -222,7 +236,7 @@ export default function CallsTable({
                   </td>
                   <td className="px-2 py-3 text-right" onClick={e => e.stopPropagation()}>
                     <button
-                      onClick={() => removeCall(call.id)}
+                      onClick={() => setDeletingCall({ id: call.id, name: call.client_name, phone: call.client_phone })}
                       title="Remove"
                       className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-sm transition-all px-1"
                     >×</button>
@@ -236,6 +250,33 @@ export default function CallsTable({
 
       {selectedCall && (
         <CallDetailModal call={selectedCall} isLeader={isLeader} onClose={() => setSelectedCall(null)} />
+      )}
+
+      {deletingCall && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-80 shadow-xl">
+            <h3 className="text-white font-semibold text-base mb-1">Remove client?</h3>
+            <p className="text-gray-400 text-sm mb-1">{deletingCall.name ?? 'Unknown client'}</p>
+            {deletingCall.phone && (
+              <p className="text-gray-600 text-xs mb-4">{deletingCall.phone}</p>
+            )}
+            <p className="text-gray-500 text-xs mb-5">This call record will be permanently deleted.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeletingCall(null)}
+                className="px-4 py-1.5 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => removeCall(deletingCall.id)}
+                className="px-4 py-1.5 text-sm text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function CreateUserForm() {
+export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] }) {
   const router = useRouter()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -21,7 +21,7 @@ export default function CreateUserForm() {
     const res = await fetch('/api/admin/create-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName, email, password, role, teamName }),
+      body: JSON.stringify({ fullName, email, password, role, teamName: teamName || null }),
     })
 
     if (!res.ok) {
@@ -81,7 +81,7 @@ export default function CreateUserForm() {
           <label className="block text-xs font-medium text-gray-400 mb-1.5">Role</label>
           <select
             value={role}
-            onChange={e => setRole(e.target.value)}
+            onChange={e => { setRole(e.target.value); setTeamName('') }}
             className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="agent">Agent</option>
@@ -89,16 +89,21 @@ export default function CreateUserForm() {
             <option value="super_admin">Super Admin</option>
           </select>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Team (optional)</label>
-          <input
-            type="text"
-            value={teamName}
-            onChange={e => setTeamName(e.target.value)}
-            placeholder="e.g. Youssef"
-            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        {role === 'agent' && (
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1.5">Team</label>
+            <select
+              value={teamName}
+              onChange={e => setTeamName(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">No team</option>
+              {teamLeaders.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {error && (

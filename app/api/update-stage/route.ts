@@ -18,9 +18,10 @@ export async function POST(request: NextRequest) {
   }
 
   const { callId, stage } = await request.json()
-  if (!callId || !stage) {
-    return NextResponse.json({ error: 'Missing callId or stage' }, { status: 400 })
+  if (!callId) {
+    return NextResponse.json({ error: 'Missing callId' }, { status: 400 })
   }
+  // stage may be null to clear a correction
 
   // RLS will ensure team leader can only update their own team's calls
   const { error } = await supabase
