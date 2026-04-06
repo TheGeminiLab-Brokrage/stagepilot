@@ -7,8 +7,6 @@ const VALID_STAGES = [
   'interested / follow up',
   'potential to close',
   'meeting scheduled',
-  'meeting done',
-  'done deal',
   'not interested',
   'low budget',
 ]

@@ -45,7 +45,11 @@ export default function CallDetailModal({
   onClose: () => void
 }) {
   const stage = call.stage_corrected ?? call.stage
-  const stageBadge = stage ? (STAGE_COLORS[stage] ?? 'bg-gray-700 text-gray-300') : ''
+  const stageBadge = stage
+    ? (call.stage_corrected
+        ? 'bg-red-900/40 text-red-300 ring-1 ring-red-700/50'
+        : 'bg-green-900/40 text-green-300 ring-1 ring-green-700/50')
+    : ''
 
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [audioLoading, setAudioLoading] = useState(false)

@@ -130,7 +130,11 @@ export default function CallsTable({
           <tbody>
             {localCalls.map(call => {
               const displayStage = call.stage_corrected ?? call.stage
-              const stageBadge = displayStage ? STAGE_COLORS[displayStage] ?? 'bg-gray-700 text-gray-300' : ''
+              const stageBadge = displayStage
+                ? (call.stage_corrected
+                    ? 'bg-red-900/40 text-red-300 ring-1 ring-red-700/50'
+                    : 'bg-green-900/40 text-green-300 ring-1 ring-green-700/50')
+                : ''
 
               return (
                 <tr

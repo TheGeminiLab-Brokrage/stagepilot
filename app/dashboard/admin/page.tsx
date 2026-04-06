@@ -2,20 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import CreateUserForm from './CreateUserForm'
-
-type Profile = {
-  id: string
-  full_name: string
-  role: string
-  team_name: string | null
-  created_at: string
-}
-
-const ROLE_COLORS: Record<string, string> = {
-  super_admin: 'bg-purple-500/20 text-purple-300',
-  team_leader: 'bg-blue-500/20 text-blue-300',
-  agent: 'bg-gray-500/20 text-gray-400',
-}
+import UserTable from './UserTable'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -30,7 +17,6 @@ export default async function AdminPage() {
 
   if (profile?.role !== 'super_admin') redirect('/dashboard')
 
-  // Use admin client to get all users in this company (bypasses RLS)
   const adminClient = createAdminClient()
   const { data: profiles } = await adminClient
     .from('profiles')
@@ -38,9 +24,8 @@ export default async function AdminPage() {
     .eq('company_id', profile.company_id)
     .order('created_at', { ascending: true })
 
-  // Get auth emails for display
   const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers()
-  const emailMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u.email]))
+  const emailMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u.email ?? '']))
 
   return (
     <div className="max-w-3xl">
@@ -53,37 +38,11 @@ export default async function AdminPage() {
 
       {/* User list */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-8">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-              <th className="text-left px-4 py-3">Name</th>
-              <th className="text-left px-4 py-3">Email</th>
-              <th className="text-left px-4 py-3">Role</th>
-              <th className="text-left px-4 py-3">Team</th>
-              <th className="text-left px-4 py-3">Joined</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(profiles as Profile[] ?? []).map(p => (
-              <tr key={p.id} className="border-b border-gray-800/50">
-                <td className="px-4 py-3 text-white">
-                  {p.full_name}
-                  {p.id === user.id && <span className="ml-2 text-xs text-gray-600">(you)</span>}
-                </td>
-                <td className="px-4 py-3 text-gray-400 text-xs">{emailMap[p.id] ?? '—'}</td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[p.role] ?? 'bg-gray-700 text-gray-300'}`}>
-                    {p.role.replace('_', ' ')}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-gray-400 text-xs">{p.team_name ?? '—'}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs">
-                  {new Date(p.created_at).toLocaleDateString('en-GB')}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <UserTable
+          initialProfiles={profiles ?? []}
+          emailMap={emailMap}
+          currentUserId={user.id}
+        />
       </div>
 
       {/* Create user form */}

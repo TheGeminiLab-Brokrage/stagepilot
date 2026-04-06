@@ -22,16 +22,24 @@ type Call = {
   status: string
   stage: string | null
   stage_corrected: string | null
+  uploaded_at: string
 }
 
 export default function StatsCards({ calls }: { calls: Call[] }) {
   const done = calls.filter(c => c.status === 'done')
   const total = done.length
   const errors = calls.filter(c => c.status === 'error').length
-  const processing = calls.filter(c => c.status === 'processing').length
 
-  const dealCount = done.filter(c => (c.stage_corrected ?? c.stage) === 'done deal').length
-  const dealPct = total > 0 ? Math.round((dealCount / total) * 100) : 0
+  // AI Accuracy: % of done calls where the AI stage was NOT corrected
+  const classifiedCalls = done.filter(c => c.stage)
+  const notCorrected = classifiedCalls.filter(c => !c.stage_corrected)
+  const accuracy = classifiedCalls.length > 0
+    ? Math.round((notCorrected.length / classifiedCalls.length) * 100)
+    : null
+
+  // This Week: calls uploaded in the last 7 days
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const thisWeek = calls.filter(c => new Date(c.uploaded_at) >= weekAgo).length
 
   // Count by stage
   const stageCounts: Record<string, number> = {}
@@ -53,12 +61,20 @@ export default function StatsCards({ calls }: { calls: Call[] }) {
           <p className="text-2xl font-bold text-white">{total}</p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
-          <p className="text-xs text-gray-500 mb-1">Done Deal</p>
-          <p className="text-2xl font-bold text-green-400">{dealCount} <span className="text-sm font-normal text-gray-500">({dealPct}%)</span></p>
+          <p className="text-xs text-gray-500 mb-1">AI Accuracy</p>
+          {accuracy !== null ? (
+            <>
+              <p className="text-2xl font-bold text-blue-400">{accuracy}%</p>
+              <p className="text-xs text-gray-600 mt-0.5">{notCorrected.length} of {classifiedCalls.length} calls</p>
+            </>
+          ) : (
+            <p className="text-2xl font-bold text-gray-600">—</p>
+          )}
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
-          <p className="text-xs text-gray-500 mb-1">Processing</p>
-          <p className="text-2xl font-bold text-yellow-400">{processing}</p>
+          <p className="text-xs text-gray-500 mb-1">This Week</p>
+          <p className="text-2xl font-bold text-purple-400">{thisWeek}</p>
+          <p className="text-xs text-gray-600 mt-0.5">last 7 days</p>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
           <p className="text-xs text-gray-500 mb-1">Errors</p>
