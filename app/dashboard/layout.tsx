@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import LogoutButton from './LogoutButton'
+import GeminiVoiceButton from './components/GeminiVoiceButton'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -60,6 +61,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
         {children}
       </main>
+
+      <GeminiVoiceButton />
     </div>
   )
 }
