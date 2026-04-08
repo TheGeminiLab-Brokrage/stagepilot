@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 const SAMPLE_TEXT = 'مرحبا، أنا جاهز للحديث معك اليوم. كيف يمكنني مساعدتك؟'
-const TTS_MODEL = 'gemini-2.5-flash-preview-05-20'
+const TTS_MODEL = 'gemini-2.5-flash-preview-tts'
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
   // gemini-3.1-flash-live-preview is WebSocket-only (Live API).
   // For REST-based TTS preview we use the dedicated TTS model.
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`
+  const endpoint = `https://generativelanguage.googleapis.com/v1alpha/models/${TTS_MODEL}:generateContent?key=${apiKey}`
 
   const geminiRes = await fetch(endpoint, {
     method: 'POST',
