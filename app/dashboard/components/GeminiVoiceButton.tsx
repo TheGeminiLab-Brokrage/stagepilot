@@ -739,32 +739,24 @@ export default function GeminiVoiceButton() {
           {/* ── Transcript (Messenger style) ── */}
           <div
             ref={transcriptRef}
-            className="flex-1 overflow-y-auto px-3 py-3 space-y-1 min-h-40 max-h-120"
+            className="flex-1 overflow-y-auto px-3 py-3 min-h-40 max-h-120"
           >
             {turns.length === 0 && !errorMsg && (
               <p className="text-gray-500 text-xs text-center mt-6">
                 {status === 'connecting' ? 'Connecting…' : 'Start speaking…'}
               </p>
             )}
-            {turns.map((t, i) => {
-              const isUser = t.role === 'user'
-              const prevSame = turns[i - 1]?.role === t.role
-              const nextSame = turns[i + 1]?.role === t.role
-              // Messenger-style bubble tails: flatten the corner closest to next/prev same-sender bubble
-              const userRadius = `rounded-2xl ${prevSame ? 'rounded-tr-md' : ''} ${nextSame ? 'rounded-br-md' : ''}`
-              const aiRadius   = `rounded-2xl ${prevSame ? 'rounded-tl-md' : ''} ${nextSame ? 'rounded-bl-md' : ''}`
-              return (
-                <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'} ${prevSame ? 'mt-0.5' : 'mt-2'}`}>
-                  <div className={`max-w-[78%] px-3.5 py-2 text-xs leading-relaxed wrap-break-word ${
-                    isUser
-                      ? `bg-violet-600 text-white ${userRadius}`
-                      : `bg-gray-700 text-gray-100 ${aiRadius}`
-                  }`}>
-                    {t.text}
-                  </div>
+            {turns.map((t, i) => (
+              <div key={i} className={`flex mb-2 ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[78%] px-3.5 py-2 text-xs leading-relaxed rounded-2xl ${
+                  t.role === 'user'
+                    ? 'bg-violet-600 text-white'
+                    : 'bg-gray-700 text-gray-100'
+                }`}>
+                  {t.text}
                 </div>
-              )
-            })}
+              </div>
+            ))}
             {errorMsg && (
               <p className="text-red-400 text-xs text-center px-2 mt-2">{errorMsg}</p>
             )}
