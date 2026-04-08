@@ -23,6 +23,7 @@ interface Turn {
 interface ScenarioOption {
   id: string
   label: string
+  defaultVoice?: string
 }
 
 // ─── Pure helpers ──────────────────────────────────────────────────────────────
@@ -160,21 +161,30 @@ export default function GeminiVoiceButton() {
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([])  // for barge-in stop
   const aiSamplesRef = useRef<Float32Array[]>([])               // AI audio for WAV (with silence gaps)
   const micSamplesRef = useRef<Float32Array[]>([])              // mic audio for WAV
-  // Fix 5: track AI recording frame count and session start time for silence gaps
+  // Track AI recording frame count and session start time for silence gaps
   const aiRecordingFramesRef = useRef(0)
   const sessionStartTimeRef = useRef(0)
-  // Fix 2: preview audio context + WS
+  // Wall-clock time when mic starts — used to align AI track with mic track
+  const micStartWallRef = useRef(0)
+  // Preview audio context
   const previewCtxRef = useRef<AudioContext | null>(null)
   const previewSourceRef = useRef<AudioBufferSourceNode | null>(null)
-  const previewWsRef = useRef<WebSocket | null>(null)
   // Suppress false WS errors when we intentionally close the session
   const intentionalCloseRef = useRef(false)
+  // True after each model turn completes — next assistant text starts a fresh bubble
+  const lastTurnCompleteRef = useRef(true)
 
   // Stable refs for values used inside WS callbacks
   const selectedVoiceRef = useRef(selectedVoice)
   const selectedScenarioRef = useRef(selectedScenario)
   useEffect(() => { selectedVoiceRef.current = selectedVoice }, [selectedVoice])
   useEffect(() => { selectedScenarioRef.current = selectedScenario }, [selectedScenario])
+
+  // Update voice to scenario default when scenario changes
+  useEffect(() => {
+    const scenario = scenarios.find(s => s.id === selectedScenario)
+    if (scenario?.defaultVoice) setSelectedVoice(scenario.defaultVoice)
+  }, [selectedScenario, scenarios])
 
   const transcriptRef = useRef<HTMLDivElement | null>(null)
 
@@ -184,7 +194,10 @@ export default function GeminiVoiceButton() {
       .then((r) => r.json())
       .then((list: ScenarioOption[]) => {
         setScenarios(list)
-        if (list.length > 0) setSelectedScenario(list[0].id)
+        if (list.length > 0) {
+          setSelectedScenario(list[0].id)
+          if (list[0].defaultVoice) setSelectedVoice(list[0].defaultVoice)
+        }
       })
       .catch(console.error)
   }, [])
@@ -247,10 +260,8 @@ export default function GeminiVoiceButton() {
   // Cleanup on unmount
   useEffect(() => { return () => closeSession() }, [closeSession])
 
-  // ── Fix 2: Voice preview (uses the same Live API as main session) ──────────────
+  // ── Voice preview (REST-based TTS) ─────────────────────────────────────────
   const stopPreview = useCallback(() => {
-    previewWsRef.current?.close()
-    previewWsRef.current = null
     try { previewSourceRef.current?.stop() } catch { /* ended */ }
     previewSourceRef.current = null
     previewCtxRef.current?.close().catch(() => {})
@@ -262,104 +273,52 @@ export default function GeminiVoiceButton() {
   const playVoicePreview = useCallback(async () => {
     if (previewPlaying || previewLoading) { stopPreview(); return }
     setPreviewLoading(true)
+    setErrorMsg('')
 
-    let token: string
     try {
-      const res = await fetch('/api/gemini-token', {
+      const res = await fetch('/api/gemini-voice-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: selectedScenarioRef.current }),
+        body: JSON.stringify({ voice: selectedVoice }),
       })
-      if (!res.ok) throw new Error('Token fetch failed')
-      token = (await res.json()).token
-    } catch (e) {
-      console.error('[VoicePreview] token error', e)
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(`Preview failed ${res.status}: ${errBody?.detail ?? errBody?.error ?? 'unknown'}`)
+      }
+      const { audio } = await res.json()
+      if (!audio) throw new Error('No audio in response')
+
+      // Decode base64 PCM to Float32 samples
+      const samples = base64ToFloat32(audio)
+      if (!samples?.length) throw new Error('Failed to decode audio')
+
+      // Create AudioContext and play
+      const ctx = new AudioContext({ sampleRate: OUT_SAMPLE_RATE })
+      previewCtxRef.current = ctx
+
+      const buf = ctx.createBuffer(1, samples.length, OUT_SAMPLE_RATE)
+      buf.copyToChannel(new Float32Array(samples), 0)
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.connect(ctx.destination)
+      src.start()
+      previewSourceRef.current = src
+
       setPreviewLoading(false)
-      return
-    }
+      setPreviewPlaying(true)
 
-    // Create AudioContext immediately (within user-gesture context)
-    const ctx = new AudioContext({ sampleRate: OUT_SAMPLE_RATE })
-    previewCtxRef.current = ctx
-    let nextPlayTime = 0
-    let setupDone = false
-    let receivedAudio = false
-
-    const ws = new WebSocket(`${WS_BASE}?key=${token}`)
-    previewWsRef.current = ws
-
-    ws.onopen = () => {
-      ws.send(JSON.stringify({
-        setup: {
-          model: MODEL,
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } } },
-          },
-        },
-      }))
-    }
-
-    ws.onmessage = async (e) => {
-      const raw = typeof e.data === 'string' ? e.data : await (e.data as Blob).text()
-      let msg: Record<string, unknown>
-      try { msg = JSON.parse(raw) } catch { return }
-
-      if ('setupComplete' in msg || 'setup_complete' in msg) {
-        setupDone = true
-        ws.send(JSON.stringify({
-          clientContent: {
-            turns: [{ role: 'user', parts: [{ text: 'Say: "Hello! I\'m ready for today\'s training session."' }] }],
-            turnComplete: true,
-          },
-        }))
-        return
+      // Cleanup when playback finishes
+      src.onended = () => {
+        setPreviewPlaying(false)
+        ctx.close().catch(() => {})
+        if (previewCtxRef.current === ctx) previewCtxRef.current = null
       }
-
-      const sc = msg.serverContent as Record<string, unknown> | undefined
-      if (!sc || !setupDone) return
-
-      // Stream audio chunks as they arrive (same pattern as main session)
-      const parts = ((sc.modelTurn as Record<string, unknown> | undefined)?.parts as Array<Record<string, unknown>>) ?? []
-      for (const p of parts) {
-        const data = ((p.inlineData as Record<string, unknown> | undefined)?.data) as string | undefined
-        if (!data) continue
-        const samples = base64ToFloat32(data)
-        if (!samples?.length) continue
-
-        if (!receivedAudio) {
-          receivedAudio = true
-          setPreviewLoading(false)
-          setPreviewPlaying(true)
-        }
-
-        const buf = ctx.createBuffer(1, samples.length, OUT_SAMPLE_RATE)
-        buf.copyToChannel(new Float32Array(samples), 0)
-        const src = ctx.createBufferSource()
-        src.buffer = buf
-        src.connect(ctx.destination)
-        const startAt = Math.max(ctx.currentTime, nextPlayTime)
-        src.start(startAt)
-        nextPlayTime = startAt + buf.duration
-        previewSourceRef.current = src
-      }
-
-      // When model turn is done, schedule cleanup after last chunk finishes
-      if (sc.turnComplete) {
-        ws.close()
-        previewWsRef.current = null
-        const msRemaining = Math.max(0, (nextPlayTime - ctx.currentTime) * 1000) + 300
-        setTimeout(() => {
-          setPreviewPlaying(false)
-          ctx.close().catch(() => {})
-          if (previewCtxRef.current === ctx) previewCtxRef.current = null
-        }, msRemaining)
-        if (!receivedAudio) { setPreviewLoading(false) }
-      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error('[VoicePreview] error', msg)
+      setPreviewLoading(false)
+      setErrorMsg(`Preview: ${msg}`)
     }
-
-    ws.onerror = () => stopPreview()
-    ws.onclose = () => { if (!receivedAudio) stopPreview() }
   }, [selectedVoice, previewPlaying, previewLoading, stopPreview])
 
   // Stop preview when voice changes
@@ -375,6 +334,16 @@ export default function GeminiVoiceButton() {
       sessionStartTimeRef.current = playbackCtxRef.current.currentTime
       nextPlayTimeRef.current = 0
       aiRecordingFramesRef.current = 0
+      // Prepend silence to AI track equal to exactly how many mic samples have
+      // been captured so far (more accurate than wall-clock; accounts for
+      // ScriptProcessor buffer latency and any setup delays).
+      const micSampleCount = micSamplesRef.current.reduce((n, a) => n + a.length, 0)
+      if (micSampleCount > 0) {
+        // Convert mic samples (16kHz) to AI track frames (24kHz)
+        const silenceFrames = Math.round((micSampleCount / MIC_SAMPLE_RATE) * OUT_SAMPLE_RATE)
+        aiSamplesRef.current.push(new Float32Array(silenceFrames))
+        aiRecordingFramesRef.current += silenceFrames
+      }
     }
     const ctx = playbackCtxRef.current
     const audioBuf = ctx.createBuffer(1, samples.length, OUT_SAMPLE_RATE)
@@ -433,8 +402,26 @@ export default function GeminiVoiceButton() {
       // Barge-in: server tells us it stopped speaking
       if (sc.interrupted) {
         stopPlayback()
+        lastTurnCompleteRef.current = true
         setStatusSync('listening')
         return
+      }
+
+      // Model turn complete — next assistant text must start a new bubble
+      if (sc.turnComplete) {
+        lastTurnCompleteRef.current = true
+      }
+
+      // Helper: append text to assistant bubbles, starting a new one when needed
+      const appendAssistant = (text: string) => {
+        setTurns((prev) => {
+          const last = prev[prev.length - 1]
+          if (last?.role === 'assistant' && !lastTurnCompleteRef.current) {
+            return [...prev.slice(0, -1), { role: 'assistant', text: last.text + text }]
+          }
+          lastTurnCompleteRef.current = false
+          return [...prev, { role: 'assistant', text }]
+        })
       }
 
       // Model audio + text
@@ -445,27 +432,15 @@ export default function GeminiVoiceButton() {
           const inlineData = part.inlineData as Record<string, unknown> | undefined
           if (inlineData?.data) playAudioChunk(inlineData.data as string)
           if (typeof part.text === 'string' && part.text.trim()) {
-            setTurns((prev) => {
-              const last = prev[prev.length - 1]
-              if (last?.role === 'assistant') {
-                return [...prev.slice(0, -1), { role: 'assistant', text: last.text + part.text }]
-              }
-              return [...prev, { role: 'assistant', text: part.text as string }]
-            })
+            appendAssistant(part.text)
           }
         }
       }
 
-      // Fix 3: outputTranscription — APPEND (was incorrectly replacing)
+      // outputTranscription — streamed transcript of model speech
       const outTx = sc.outputTranscription as Record<string, unknown> | undefined
       if (outTx?.text) {
-        setTurns((prev) => {
-          const last = prev[prev.length - 1]
-          if (last?.role === 'assistant') {
-            return [...prev.slice(0, -1), { role: 'assistant', text: last.text + (outTx.text as string) }]
-          }
-          return [...prev, { role: 'assistant', text: outTx.text as string }]
-        })
+        appendAssistant(outTx.text as string)
       }
 
       // Fix 4: inputTranscription — insert user turn BEFORE last assistant turn if AI already responded
@@ -495,6 +470,8 @@ export default function GeminiVoiceButton() {
     aiSamplesRef.current = []
     micSamplesRef.current = []
     aiRecordingFramesRef.current = 0
+    micStartWallRef.current = 0
+    lastTurnCompleteRef.current = true
     stopPlayback()
 
     // 1. Auth-gated token + system prompt
@@ -583,6 +560,7 @@ export default function GeminiVoiceButton() {
       const processor = ctx.createScriptProcessor(BUFFER_SIZE, 1, 1)
       processorRef.current = processor
 
+      micStartWallRef.current = Date.now()
       processor.onaudioprocess = (ev) => {
         const channelData = ev.inputBuffer.getChannelData(0)
         // Collect mic samples for recording
@@ -620,6 +598,7 @@ export default function GeminiVoiceButton() {
     aiSamplesRef.current = []
     micSamplesRef.current = []
     aiRecordingFramesRef.current = 0
+    lastTurnCompleteRef.current = true
     setHasRecording(false)
     setTurns([])
     setErrorMsg('')
@@ -642,7 +621,7 @@ export default function GeminiVoiceButton() {
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
       {open && (
-        <div className="w-105 rounded-xl border border-gray-700 bg-gray-900 shadow-2xl flex flex-col overflow-hidden">
+        <div className="w-105 max-h-[80vh] rounded-xl border border-gray-700 bg-gray-900 shadow-2xl flex flex-col overflow-hidden">
 
           {/* ── Header ── */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
@@ -663,6 +642,15 @@ export default function GeminiVoiceButton() {
                   title="Start new conversation"
                 >
                   ↺ New
+                </button>
+              )}
+              {!isActive && turns.length > 0 && (
+                <button
+                  onClick={() => { setTurns([]); setErrorMsg(''); setHasRecording(false); aiSamplesRef.current = []; micSamplesRef.current = []; aiRecordingFramesRef.current = 0 }}
+                  className="text-gray-400 hover:text-white text-xs transition-colors px-1.5 py-0.5 rounded border border-gray-700 hover:border-gray-500"
+                  title="Clear chat history"
+                >
+                  ✕ Clear
                 </button>
               )}
               <button

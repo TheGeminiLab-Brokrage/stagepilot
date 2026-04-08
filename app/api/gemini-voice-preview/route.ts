@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 const SAMPLE_TEXT = 'مرحبا، أنا جاهز للحديث معك اليوم. كيف يمكنني مساعدتك؟'
-const TTS_MODEL = 'gemini-2.5-flash-preview-tts'
+const TTS_MODEL = 'gemini-2.5-flash-preview-05-20'
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -32,11 +32,13 @@ export async function POST(req: Request) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: SAMPLE_TEXT }] }],
+      contents: [{ parts: [{ text: SAMPLE_TEXT }] }],
       generationConfig: {
         responseModalities: ['AUDIO'],
         speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: voice },
+          },
         },
       },
     }),
