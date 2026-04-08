@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const SAMPLE_TEXT = 'مرحبا، أنا جاهز للحديث معك اليوم. كيف يمكنني مساعدتك؟'
-const TTS_MODEL = 'gemini-2.5-flash'
+// Dedicated TTS model — supports responseModalities: ['AUDIO'] via REST
+const TTS_MODEL = 'gemini-2.5-flash-preview-tts'
+const TTS_ENDPOINT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
+
+// Short Arabic sample — enough to hear the voice character
+const SAMPLE_TEXT = 'مرحبا، أنا هنا لمساعدتك.'
+
+// ─── Server-side audio cache ──────────────────────────────────────────────────
+// Keyed by voice name. Populated on first request per voice, served instantly
+// after that. Eliminates repeated Gemini API calls and quota exhaustion.
+const audioCache = new Map<string, string>()   // voice → base64 PCM
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -24,9 +33,14 @@ export async function POST(req: Request) {
     // use default
   }
 
-  // gemini-3.1-flash-live-preview is WebSocket-only (Live API).
-  // For REST-based TTS preview we use the dedicated TTS model.
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`
+  // Return cached audio instantly if available
+  const cached = audioCache.get(voice)
+  if (cached) {
+    return NextResponse.json({ audio: cached, cached: true })
+  }
+
+  // First request for this voice — call Gemini TTS
+  const endpoint = `${TTS_ENDPOINT_BASE}/${TTS_MODEL}:generateContent?key=${apiKey}`
 
   const geminiRes = await fetch(endpoint, {
     method: 'POST',
@@ -46,22 +60,23 @@ export async function POST(req: Request) {
 
   if (!geminiRes.ok) {
     const errText = await geminiRes.text()
-    console.error('[gemini-voice-preview] Gemini TTS error:', errText)
+    console.error('[gemini-voice-preview] Gemini error:', errText)
     return NextResponse.json({ error: 'Gemini TTS failed', detail: errText }, { status: 502 })
   }
 
   const json = await geminiRes.json()
 
   // Extract audio from response
-  const parts = json?.candidates?.[0]?.content?.parts ?? []
+  const parts = (json?.candidates?.[0]?.content?.parts ?? []) as Array<Record<string, unknown>>
   for (const part of parts) {
-    if (part?.inlineData?.data) {
-      return NextResponse.json({
-        audio: part.inlineData.data as string,
-        mimeType: (part.inlineData.mimeType as string) ?? 'audio/pcm;rate=24000',
-      })
+    const inlineData = part.inlineData as Record<string, unknown> | undefined
+    if (inlineData?.data) {
+      const audio = inlineData.data as string
+      audioCache.set(voice, audio)   // cache for all future requests
+      return NextResponse.json({ audio })
     }
   }
 
-  return NextResponse.json({ error: 'No audio in response' }, { status: 502 })
+  console.error('[gemini-voice-preview] No audio in response:', JSON.stringify(json).slice(0, 500))
+  return NextResponse.json({ error: 'No audio in Gemini response' }, { status: 502 })
 }
