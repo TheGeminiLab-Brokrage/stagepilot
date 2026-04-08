@@ -189,6 +189,7 @@ export default function GeminiVoiceButton() {
   // Preview audio context
   const previewCtxRef = useRef<AudioContext | null>(null)
   const previewSourceRef = useRef<AudioBufferSourceNode | null>(null)
+  const previewAbortRef = useRef(false)  // set true to cancel retry countdown
   // Suppress false WS errors when we intentionally close the session
   const intentionalCloseRef = useRef(false)
   // True after each model turn completes — next assistant text starts a fresh bubble
@@ -281,16 +282,19 @@ export default function GeminiVoiceButton() {
 
   // ── Voice preview (REST-based TTS) ─────────────────────────────────────────
   const stopPreview = useCallback(() => {
+    previewAbortRef.current = true   // cancels any in-progress retry countdown
     try { previewSourceRef.current?.stop() } catch { /* ended */ }
     previewSourceRef.current = null
     previewCtxRef.current?.close().catch(() => {})
     previewCtxRef.current = null
     setPreviewPlaying(false)
     setPreviewLoading(false)
+    setErrorMsg('')
   }, [])
 
   const playVoicePreview = useCallback(async (attempt = 0) => {
     if (previewPlaying || previewLoading) { stopPreview(); return }
+    previewAbortRef.current = false   // reset abort flag for this run
     setPreviewLoading(true)
     setErrorMsg('')
 
@@ -306,9 +310,11 @@ export default function GeminiVoiceButton() {
         const body = await res.json().catch(() => ({}))
         const waitSec = (body?.retryDelay ?? 30) as number
         for (let s = waitSec; s > 0; s--) {
+          if (previewAbortRef.current) { setPreviewLoading(false); return }  // cancelled
           setErrorMsg(`Rate limited — retrying in ${s}s…`)
           await new Promise(r => setTimeout(r, 1000))
         }
+        if (previewAbortRef.current) { setPreviewLoading(false); return }
         setErrorMsg('')
         return playVoicePreview(attempt + 1)
       }
@@ -455,16 +461,21 @@ export default function GeminiVoiceButton() {
         appendAssistant(outTx.text as string)
       }
 
-      // Fix 4: inputTranscription — insert user turn BEFORE last assistant turn if AI already responded
+      // inputTranscription — merge into current user bubble; start new one after AI turn
       const inTx = sc.inputTranscription as Record<string, unknown> | undefined
       if (inTx?.text) {
+        const text = inTx.text as string
         setTurns((prev) => {
           const last = prev[prev.length - 1]
-          if (last?.role === 'assistant') {
-            // AI already responded — place user turn before the AI turn
-            return [...prev.slice(0, -1), { role: 'user', text: inTx.text as string }, last]
+          if (last?.role === 'user') {
+            // Ongoing user utterance — append to same bubble
+            return [...prev.slice(0, -1), { role: 'user', text: last.text + ' ' + text }]
           }
-          return [...prev, { role: 'user', text: inTx.text as string }]
+          if (last?.role === 'assistant') {
+            // AI already spoke — place fresh user bubble before the AI bubble
+            return [...prev.slice(0, -1), { role: 'user', text }, last]
+          }
+          return [...prev, { role: 'user', text }]
         })
       }
     },
@@ -708,8 +719,8 @@ export default function GeminiVoiceButton() {
                   </select>
                   {/* Fix 2: Preview button */}
                   <button
-                    onClick={() => playVoicePreview()}
-                    disabled={previewLoading}
+                    onClick={() => previewLoading ? stopPreview() : playVoicePreview()}
+                    disabled={false}
                     title={previewPlaying ? 'Stop preview' : 'Preview this voice'}
                     className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-800 border border-gray-700 hover:border-violet-500 text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                   >
