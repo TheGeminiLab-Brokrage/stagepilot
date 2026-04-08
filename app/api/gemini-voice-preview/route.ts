@@ -61,6 +61,20 @@ export async function POST(req: Request) {
   if (!geminiRes.ok) {
     const errText = await geminiRes.text()
     console.error('[gemini-voice-preview] Gemini error:', errText)
+
+    // Pass quota errors through with the retry delay Gemini tells us to use
+    if (geminiRes.status === 429) {
+      let retryDelay = 30
+      try {
+        const errJson = JSON.parse(errText)
+        const retryInfo = (errJson?.error?.details ?? []).find(
+          (d: Record<string, unknown>) => String(d['@type'] ?? '').includes('RetryInfo')
+        ) as Record<string, unknown> | undefined
+        if (retryInfo?.retryDelay) retryDelay = parseInt(String(retryInfo.retryDelay)) || 30
+      } catch { /* use default */ }
+      return NextResponse.json({ error: 'Rate limited', retryDelay }, { status: 429 })
+    }
+
     return NextResponse.json({ error: 'Gemini TTS failed', detail: errText }, { status: 502 })
   }
 

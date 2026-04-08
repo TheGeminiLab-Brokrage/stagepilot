@@ -289,7 +289,7 @@ export default function GeminiVoiceButton() {
     setPreviewLoading(false)
   }, [])
 
-  const playVoicePreview = useCallback(async () => {
+  const playVoicePreview = useCallback(async (attempt = 0) => {
     if (previewPlaying || previewLoading) { stopPreview(); return }
     setPreviewLoading(true)
     setErrorMsg('')
@@ -300,6 +300,19 @@ export default function GeminiVoiceButton() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ voice: selectedVoice }),
       })
+
+      // Rate limited — count down and auto-retry (max 3 attempts)
+      if (res.status === 429 && attempt < 3) {
+        const body = await res.json().catch(() => ({}))
+        const waitSec = (body?.retryDelay ?? 30) as number
+        for (let s = waitSec; s > 0; s--) {
+          setErrorMsg(`Rate limited — retrying in ${s}s…`)
+          await new Promise(r => setTimeout(r, 1000))
+        }
+        setErrorMsg('')
+        return playVoicePreview(attempt + 1)
+      }
+
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}))
         throw new Error(`Preview failed ${res.status}: ${errBody?.detail ?? errBody?.error ?? 'unknown'}`)
@@ -307,11 +320,9 @@ export default function GeminiVoiceButton() {
       const { audio } = await res.json()
       if (!audio) throw new Error('No audio in response')
 
-      // Decode base64 PCM to Float32 samples
       const samples = base64ToFloat32(audio)
       if (!samples?.length) throw new Error('Failed to decode audio')
 
-      // Create AudioContext and play
       const ctx = new AudioContext({ sampleRate: OUT_SAMPLE_RATE })
       previewCtxRef.current = ctx
 
@@ -326,7 +337,6 @@ export default function GeminiVoiceButton() {
       setPreviewLoading(false)
       setPreviewPlaying(true)
 
-      // Cleanup when playback finishes
       src.onended = () => {
         setPreviewPlaying(false)
         ctx.close().catch(() => {})
@@ -698,7 +708,7 @@ export default function GeminiVoiceButton() {
                   </select>
                   {/* Fix 2: Preview button */}
                   <button
-                    onClick={playVoicePreview}
+                    onClick={() => playVoicePreview()}
                     disabled={previewLoading}
                     title={previewPlaying ? 'Stop preview' : 'Preview this voice'}
                     className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-800 border border-gray-700 hover:border-violet-500 text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
