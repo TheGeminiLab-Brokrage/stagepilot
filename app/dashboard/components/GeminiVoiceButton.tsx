@@ -83,13 +83,34 @@ function resampleLinear(input: Float32Array, fromRate: number, toRate: number): 
   return output
 }
 
+// Each AI audio chunk with its wall-clock arrival time (ms)
+interface AiChunk {
+  wallStart: number   // Date.now() equivalent when this chunk should start playing
+  samples: Float32Array
+}
+
 // Stereo WAV: channel 0 = AI (left), channel 1 = mic (right), both at sampleRate
+// sessionStartMs = micStartWallRef value — the anchor for both tracks
 function createStereoWavBlob(
-  aiSamples: Float32Array[],
+  aiChunks: AiChunk[],
   micSamples: Float32Array[],
+  sessionStartMs: number,
   sampleRate: number,
 ): Blob {
-  const ai = concatFloat32(aiSamples)
+  // Build AI track: place each chunk at its wall-clock position
+  let aiTrackLen = 0
+  for (const chunk of aiChunks) {
+    const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
+    if (offset >= 0) aiTrackLen = Math.max(aiTrackLen, offset + chunk.samples.length)
+  }
+  const ai = new Float32Array(Math.max(aiTrackLen, 1))
+  for (const chunk of aiChunks) {
+    const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
+    if (offset >= 0 && offset + chunk.samples.length <= ai.length) {
+      ai.set(chunk.samples, offset)
+    }
+  }
+
   const micRaw = concatFloat32(micSamples)
   // Resample mic from MIC_SAMPLE_RATE → sampleRate
   const mic = resampleLinear(micRaw, MIC_SAMPLE_RATE, sampleRate)
@@ -159,13 +180,12 @@ export default function GeminiVoiceButton() {
   const playbackCtxRef = useRef<AudioContext | null>(null)
   const nextPlayTimeRef = useRef(0)
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([])  // for barge-in stop
-  const aiSamplesRef = useRef<Float32Array[]>([])               // AI audio for WAV (with silence gaps)
+  const aiChunksRef = useRef<AiChunk[]>([])                    // AI audio chunks with wall-clock timestamps
   const micSamplesRef = useRef<Float32Array[]>([])              // mic audio for WAV
-  // Track AI recording frame count and session start time for silence gaps
-  const aiRecordingFramesRef = useRef(0)
-  const sessionStartTimeRef = useRef(0)
-  // Wall-clock time when mic starts — used to align AI track with mic track
+  // Wall-clock time when mic starts — WAV timeline anchor
   const micStartWallRef = useRef(0)
+  // Wall-clock time when playback AudioContext was created — used to convert ctx time → wall time
+  const ctxCreatedAtWallRef = useRef(0)
   // Preview audio context
   const previewCtxRef = useRef<AudioContext | null>(null)
   const previewSourceRef = useRef<AudioBufferSourceNode | null>(null)
@@ -232,20 +252,19 @@ export default function GeminiVoiceButton() {
 
   // ── Save recording and trigger download ───────────────────────────────────────
   const saveRecording = useCallback(() => {
-    if (aiSamplesRef.current.length === 0) return
-    const blob = createStereoWavBlob(aiSamplesRef.current, micSamplesRef.current, OUT_SAMPLE_RATE)
+    if (aiChunksRef.current.length === 0) return
+    const blob = createStereoWavBlob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
     triggerDownload(blob, `gemini-session-${ts}.wav`)
-    aiSamplesRef.current = []
+    aiChunksRef.current = []
     micSamplesRef.current = []
-    aiRecordingFramesRef.current = 0
     setHasRecording(false)
   }, [])
 
   // ── Close session ─────────────────────────────────────────────────────────────
   const closeSession = useCallback(() => {
     // Save recording before tearing down
-    if (aiSamplesRef.current.length > 0) saveRecording()
+    if (aiChunksRef.current.length > 0) saveRecording()
     intentionalCloseRef.current = true
     wsRef.current?.close()
     wsRef.current = null
@@ -331,19 +350,8 @@ export default function GeminiVoiceButton() {
 
     if (!playbackCtxRef.current || playbackCtxRef.current.state === 'closed') {
       playbackCtxRef.current = new AudioContext({ sampleRate: OUT_SAMPLE_RATE })
-      sessionStartTimeRef.current = playbackCtxRef.current.currentTime
+      ctxCreatedAtWallRef.current = Date.now()
       nextPlayTimeRef.current = 0
-      aiRecordingFramesRef.current = 0
-      // Prepend silence to AI track equal to exactly how many mic samples have
-      // been captured so far (more accurate than wall-clock; accounts for
-      // ScriptProcessor buffer latency and any setup delays).
-      const micSampleCount = micSamplesRef.current.reduce((n, a) => n + a.length, 0)
-      if (micSampleCount > 0) {
-        // Convert mic samples (16kHz) to AI track frames (24kHz)
-        const silenceFrames = Math.round((micSampleCount / MIC_SAMPLE_RATE) * OUT_SAMPLE_RATE)
-        aiSamplesRef.current.push(new Float32Array(silenceFrames))
-        aiRecordingFramesRef.current += silenceFrames
-      }
     }
     const ctx = playbackCtxRef.current
     const audioBuf = ctx.createBuffer(1, samples.length, OUT_SAMPLE_RATE)
@@ -357,15 +365,9 @@ export default function GeminiVoiceButton() {
     src.start(startAt)
     nextPlayTimeRef.current = startAt + audioBuf.duration
 
-    // Fix 5: insert silence into AI recording track to match playback timing
-    const startFrame = Math.round((startAt - sessionStartTimeRef.current) * OUT_SAMPLE_RATE)
-    const silenceNeeded = startFrame - aiRecordingFramesRef.current
-    if (silenceNeeded > 0) {
-      aiSamplesRef.current.push(new Float32Array(silenceNeeded))
-      aiRecordingFramesRef.current += silenceNeeded
-    }
-    aiSamplesRef.current.push(new Float32Array(samples))
-    aiRecordingFramesRef.current += samples.length
+    // Record chunk with its wall-clock start time for WAV assembly
+    const wallStart = ctxCreatedAtWallRef.current + startAt * 1000
+    aiChunksRef.current.push({ wallStart, samples: new Float32Array(samples) })
     setHasRecording(true)
 
     // Track for barge-in
@@ -467,10 +469,10 @@ export default function GeminiVoiceButton() {
     setErrorMsg('')
     setTurns([])
     setHasRecording(false)
-    aiSamplesRef.current = []
+    aiChunksRef.current = []
     micSamplesRef.current = []
-    aiRecordingFramesRef.current = 0
     micStartWallRef.current = 0
+    ctxCreatedAtWallRef.current = 0
     lastTurnCompleteRef.current = true
     stopPlayback()
 
@@ -595,9 +597,9 @@ export default function GeminiVoiceButton() {
     stopPlayback()
     playbackCtxRef.current?.close().catch(() => {})
     playbackCtxRef.current = null
-    aiSamplesRef.current = []
+    aiChunksRef.current = []
     micSamplesRef.current = []
-    aiRecordingFramesRef.current = 0
+    ctxCreatedAtWallRef.current = 0
     lastTurnCompleteRef.current = true
     setHasRecording(false)
     setTurns([])
@@ -646,7 +648,7 @@ export default function GeminiVoiceButton() {
               )}
               {!isActive && turns.length > 0 && (
                 <button
-                  onClick={() => { setTurns([]); setErrorMsg(''); setHasRecording(false); aiSamplesRef.current = []; micSamplesRef.current = []; aiRecordingFramesRef.current = 0 }}
+                  onClick={() => { setTurns([]); setErrorMsg(''); setHasRecording(false); aiChunksRef.current = []; micSamplesRef.current = [] }}
                   className="text-gray-400 hover:text-white text-xs transition-colors px-1.5 py-0.5 rounded border border-gray-700 hover:border-gray-500"
                   title="Clear chat history"
                 >
@@ -735,30 +737,34 @@ export default function GeminiVoiceButton() {
           )}
 
           {/* ── Transcript ── */}
-          <div
-            ref={transcriptRef}
-            className="flex-1 overflow-y-auto p-3 space-y-2 min-h-40 max-h-120 text-sm"
-          >
-            {turns.length === 0 && !errorMsg && (
-              <p className="text-gray-500 text-xs text-center mt-6">
-                {status === 'connecting' ? 'Connecting…' : 'Start speaking…'}
-              </p>
-            )}
-            {turns.map((t, i) => (
-              <div key={i} className={`flex ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`rounded-lg px-3 py-2 text-xs leading-relaxed ${
-                  t.role === 'user'
-                    ? 'max-w-[75%] bg-violet-700 text-white'
-                    : 'w-full bg-gray-700 text-gray-100'
-                }`}>
-                  {t.text}
-                </div>
+          {(() => {
+            const scenarioLabel = scenarios.find(s => s.id === selectedScenario)?.label?.split('—')[0]?.trim() ?? 'Assistant'
+            return (
+              <div
+                ref={transcriptRef}
+                className="flex-1 overflow-y-auto p-3 space-y-3 min-h-40 max-h-120 text-sm"
+              >
+                {turns.length === 0 && !errorMsg && (
+                  <p className="text-gray-500 text-xs text-center mt-6">
+                    {status === 'connecting' ? 'Connecting…' : 'Start speaking…'}
+                  </p>
+                )}
+                {turns.map((t, i) => (
+                  <div key={i} className="space-y-1">
+                    <span className="text-xs font-medium text-gray-400">
+                      {t.role === 'user' ? 'You' : scenarioLabel}
+                    </span>
+                    <div className="w-full bg-gray-700 text-gray-100 rounded-lg px-3 py-2 text-xs leading-relaxed">
+                      {t.text}
+                    </div>
+                  </div>
+                ))}
+                {errorMsg && (
+                  <p className="text-red-400 text-xs text-center px-2">{errorMsg}</p>
+                )}
               </div>
-            ))}
-            {errorMsg && (
-              <p className="text-red-400 text-xs text-center px-2">{errorMsg}</p>
-            )}
-          </div>
+            )
+          })()}
 
           {/* ── Footer ── */}
           <div className="px-4 py-3 border-t border-gray-700 flex items-center justify-between gap-2">
