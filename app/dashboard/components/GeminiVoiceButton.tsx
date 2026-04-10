@@ -67,7 +67,6 @@ function concatFloat32(arrays: Float32Array[]): Float32Array {
   return out
 }
 
-// Linear resample — used to bring mic (16kHz) up to AI sample rate (24kHz)
 function resampleLinear(input: Float32Array, fromRate: number, toRate: number): Float32Array {
   const ratio = fromRate / toRate
   const outputLen = Math.floor(input.length / ratio)
@@ -83,21 +82,17 @@ function resampleLinear(input: Float32Array, fromRate: number, toRate: number): 
   return output
 }
 
-// Each AI audio chunk with its wall-clock arrival time (ms)
 interface AiChunk {
-  wallStart: number   // Date.now() equivalent when this chunk should start playing
+  wallStart: number
   samples: Float32Array
 }
 
-// Stereo WAV: channel 0 = AI (left), channel 1 = mic (right), both at sampleRate
-// sessionStartMs = micStartWallRef value — the anchor for both tracks
 function createStereoWavBlob(
   aiChunks: AiChunk[],
   micSamples: Float32Array[],
   sessionStartMs: number,
   sampleRate: number,
 ): Blob {
-  // Build AI track: place each chunk at its wall-clock position
   let aiTrackLen = 0
   for (const chunk of aiChunks) {
     const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
@@ -112,11 +107,10 @@ function createStereoWavBlob(
   }
 
   const micRaw = concatFloat32(micSamples)
-  // Resample mic from MIC_SAMPLE_RATE → sampleRate
   const mic = resampleLinear(micRaw, MIC_SAMPLE_RATE, sampleRate)
 
   const len = Math.max(ai.length, mic.length)
-  const interleaved = new Int16Array(len * 2)  // stereo interleaved
+  const interleaved = new Int16Array(len * 2)
   for (let i = 0; i < len; i++) {
     const aiVal = ai[i] ?? 0
     const micVal = mic[i] ?? 0
@@ -127,18 +121,18 @@ function createStereoWavBlob(
   const dataLen = interleaved.buffer.byteLength
   const buf = new ArrayBuffer(44 + dataLen)
   const v = new DataView(buf)
-  v.setUint32(0, 0x52494646, false)        // 'RIFF'
+  v.setUint32(0, 0x52494646, false)
   v.setUint32(4, 36 + dataLen, true)
-  v.setUint32(8, 0x57415645, false)        // 'WAVE'
-  v.setUint32(12, 0x666d7420, false)       // 'fmt '
+  v.setUint32(8, 0x57415645, false)
+  v.setUint32(12, 0x666d7420, false)
   v.setUint32(16, 16, true)
-  v.setUint16(20, 1, true)                 // PCM
-  v.setUint16(22, 2, true)                 // stereo
+  v.setUint16(20, 1, true)
+  v.setUint16(22, 2, true)
   v.setUint32(24, sampleRate, true)
-  v.setUint32(28, sampleRate * 2 * 2, true) // byte rate
-  v.setUint16(32, 4, true)                 // block align (2ch × 2 bytes)
+  v.setUint32(28, sampleRate * 2 * 2, true)
+  v.setUint16(32, 4, true)
   v.setUint16(34, 16, true)
-  v.setUint32(36, 0x64617461, false)       // 'data'
+  v.setUint32(36, 0x64617461, false)
   v.setUint32(40, dataLen, true)
   new Int16Array(buf, 44).set(interleaved)
   return new Blob([buf], { type: 'audio/wav' })
@@ -163,15 +157,13 @@ export default function GeminiVoiceButton() {
   const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
   const [selectedScenario, setSelectedScenario] = useState<string>('')
   const [hasRecording, setHasRecording] = useState(false)
-  // Fix 2: voice preview state
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewPlaying, setPreviewPlaying] = useState(false)
+  const [previewErrorMsg, setPreviewErrorMsg] = useState('')
 
-  // Ref mirrors for stale-closure-safe WS handlers
   const statusRef = useRef<Status>('idle')
   const setStatusSync = useCallback((s: Status) => { statusRef.current = s; setStatus(s) }, [])
 
-  // Audio refs
   const wsRef = useRef<WebSocket | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
@@ -179,29 +171,22 @@ export default function GeminiVoiceButton() {
   const streamRef = useRef<MediaStream | null>(null)
   const playbackCtxRef = useRef<AudioContext | null>(null)
   const nextPlayTimeRef = useRef(0)
-  const activeSourcesRef = useRef<AudioBufferSourceNode[]>([])  // for barge-in stop
-  const aiChunksRef = useRef<AiChunk[]>([])                    // AI audio chunks with wall-clock timestamps
-  const micSamplesRef = useRef<Float32Array[]>([])              // mic audio for WAV
-  // Wall-clock time when mic starts — WAV timeline anchor
+  const activeSourcesRef = useRef<AudioBufferSourceNode[]>([])
+  const aiChunksRef = useRef<AiChunk[]>([])
+  const micSamplesRef = useRef<Float32Array[]>([])
   const micStartWallRef = useRef(0)
-  // Wall-clock time when playback AudioContext was created — used to convert ctx time → wall time
   const ctxCreatedAtWallRef = useRef(0)
-  // Preview audio context
   const previewCtxRef = useRef<AudioContext | null>(null)
   const previewSourceRef = useRef<AudioBufferSourceNode | null>(null)
-  const previewAbortRef = useRef(false)  // set true to cancel retry countdown
-  // Suppress false WS errors when we intentionally close the session
+  const previewAbortRef = useRef(false)
   const intentionalCloseRef = useRef(false)
-  // True after each model turn completes — next assistant text starts a fresh bubble
   const lastTurnCompleteRef = useRef(true)
 
-  // Stable refs for values used inside WS callbacks
   const selectedVoiceRef = useRef(selectedVoice)
   const selectedScenarioRef = useRef(selectedScenario)
   useEffect(() => { selectedVoiceRef.current = selectedVoice }, [selectedVoice])
   useEffect(() => { selectedScenarioRef.current = selectedScenario }, [selectedScenario])
 
-  // Update voice to scenario default when scenario changes
   useEffect(() => {
     const scenario = scenarios.find(s => s.id === selectedScenario)
     if (scenario?.defaultVoice) setSelectedVoice(scenario.defaultVoice)
@@ -209,7 +194,6 @@ export default function GeminiVoiceButton() {
 
   const transcriptRef = useRef<HTMLDivElement | null>(null)
 
-  // Load scenarios on mount
   useEffect(() => {
     fetch('/api/gemini-scenarios')
       .then((r) => r.json())
@@ -223,14 +207,12 @@ export default function GeminiVoiceButton() {
       .catch(console.error)
   }, [])
 
-  // Auto-scroll transcript
   useEffect(() => {
     if (transcriptRef.current) {
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight
     }
   }, [turns])
 
-  // ── Stop mic ──────────────────────────────────────────────────────────────────
   const stopMic = useCallback(() => {
     processorRef.current?.disconnect()
     sourceRef.current?.disconnect()
@@ -242,7 +224,6 @@ export default function GeminiVoiceButton() {
     streamRef.current = null
   }, [])
 
-  // ── Stop all scheduled playback (barge-in) ────────────────────────────────────
   const stopPlayback = useCallback(() => {
     for (const src of activeSourcesRef.current) {
       try { src.stop() } catch { /* already ended */ }
@@ -251,7 +232,6 @@ export default function GeminiVoiceButton() {
     nextPlayTimeRef.current = 0
   }, [])
 
-  // ── Save recording and trigger download ───────────────────────────────────────
   const saveRecording = useCallback(() => {
     if (aiChunksRef.current.length === 0) return
     const blob = createStereoWavBlob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
@@ -262,9 +242,7 @@ export default function GeminiVoiceButton() {
     setHasRecording(false)
   }, [])
 
-  // ── Close session ─────────────────────────────────────────────────────────────
   const closeSession = useCallback(() => {
-    // Save recording before tearing down
     if (aiChunksRef.current.length > 0) saveRecording()
     intentionalCloseRef.current = true
     wsRef.current?.close()
@@ -277,26 +255,24 @@ export default function GeminiVoiceButton() {
     setOpen(false)
   }, [stopMic, stopPlayback, saveRecording, setStatusSync])
 
-  // Cleanup on unmount
   useEffect(() => { return () => closeSession() }, [closeSession])
 
-  // ── Voice preview (REST-based TTS) ─────────────────────────────────────────
   const stopPreview = useCallback(() => {
-    previewAbortRef.current = true   // cancels any in-progress retry countdown
+    previewAbortRef.current = true
     try { previewSourceRef.current?.stop() } catch { /* ended */ }
     previewSourceRef.current = null
     previewCtxRef.current?.close().catch(() => {})
     previewCtxRef.current = null
     setPreviewPlaying(false)
     setPreviewLoading(false)
-    setErrorMsg('')
+    setPreviewErrorMsg('')
   }, [])
 
   const playVoicePreview = useCallback(async (attempt = 0) => {
     if (previewPlaying || previewLoading) { stopPreview(); return }
-    previewAbortRef.current = false   // reset abort flag for this run
+    previewAbortRef.current = false
     setPreviewLoading(true)
-    setErrorMsg('')
+    setPreviewErrorMsg('')
 
     try {
       const res = await fetch('/api/gemini-voice-preview', {
@@ -305,17 +281,16 @@ export default function GeminiVoiceButton() {
         body: JSON.stringify({ voice: selectedVoice }),
       })
 
-      // Rate limited — count down and auto-retry (max 3 attempts)
       if (res.status === 429 && attempt < 3) {
         const body = await res.json().catch(() => ({}))
         const waitSec = (body?.retryDelay ?? 30) as number
         for (let s = waitSec; s > 0; s--) {
-          if (previewAbortRef.current) { setPreviewLoading(false); return }  // cancelled
-          setErrorMsg(`Rate limited — retrying in ${s}s…`)
+          if (previewAbortRef.current) { setPreviewLoading(false); return }
+          setPreviewErrorMsg(`Rate limited — retrying in ${s}s…`)
           await new Promise(r => setTimeout(r, 1000))
         }
         if (previewAbortRef.current) { setPreviewLoading(false); return }
-        setErrorMsg('')
+        setPreviewErrorMsg('')
         return playVoicePreview(attempt + 1)
       }
 
@@ -342,6 +317,7 @@ export default function GeminiVoiceButton() {
 
       setPreviewLoading(false)
       setPreviewPlaying(true)
+      setPreviewErrorMsg('')
 
       src.onended = () => {
         setPreviewPlaying(false)
@@ -352,14 +328,12 @@ export default function GeminiVoiceButton() {
       const msg = e instanceof Error ? e.message : String(e)
       console.error('[VoicePreview] error', msg)
       setPreviewLoading(false)
-      setErrorMsg(`Preview: ${msg}`)
+      setPreviewErrorMsg(msg)
     }
   }, [selectedVoice, previewPlaying, previewLoading, stopPreview])
 
-  // Stop preview when voice changes
   useEffect(() => { stopPreview() }, [selectedVoice, stopPreview])
 
-  // ── Audio playback ─────────────────────────────────────────────────────────────
   const playAudioChunk = useCallback((b64: string) => {
     const samples = base64ToFloat32(b64)
     if (!samples || samples.length === 0) return
@@ -381,12 +355,10 @@ export default function GeminiVoiceButton() {
     src.start(startAt)
     nextPlayTimeRef.current = startAt + audioBuf.duration
 
-    // Record chunk with its wall-clock start time for WAV assembly
     const wallStart = ctxCreatedAtWallRef.current + startAt * 1000
     aiChunksRef.current.push({ wallStart, samples: new Float32Array(samples) })
     setHasRecording(true)
 
-    // Track for barge-in
     activeSourcesRef.current.push(src)
     src.onended = () => {
       activeSourcesRef.current = activeSourcesRef.current.filter((s) => s !== src)
@@ -398,7 +370,6 @@ export default function GeminiVoiceButton() {
     setStatus((prev) => (prev === 'listening' || prev === 'connecting' ? 'speaking' : prev))
   }, [])
 
-  // ── WebSocket message handler ─────────────────────────────────────────────────
   const handleMessage = useCallback(
     (raw: string) => {
       let msg: Record<string, unknown>
@@ -417,7 +388,6 @@ export default function GeminiVoiceButton() {
       const sc = msg.serverContent as Record<string, unknown> | undefined
       if (!sc) return
 
-      // Barge-in: server tells us it stopped speaking
       if (sc.interrupted) {
         stopPlayback()
         lastTurnCompleteRef.current = true
@@ -425,12 +395,10 @@ export default function GeminiVoiceButton() {
         return
       }
 
-      // Model turn complete — next assistant text must start a new bubble
       if (sc.turnComplete) {
         lastTurnCompleteRef.current = true
       }
 
-      // Helper: append text to assistant bubbles, starting a new one when needed
       const appendAssistant = (text: string) => {
         setTurns((prev) => {
           const last = prev[prev.length - 1]
@@ -442,7 +410,6 @@ export default function GeminiVoiceButton() {
         })
       }
 
-      // Model audio + text
       const modelTurn = sc.modelTurn as Record<string, unknown> | undefined
       if (modelTurn) {
         const parts = (modelTurn.parts as Array<Record<string, unknown>>) ?? []
@@ -455,25 +422,18 @@ export default function GeminiVoiceButton() {
         }
       }
 
-      // outputTranscription — streamed transcript of model speech
       const outTx = sc.outputTranscription as Record<string, unknown> | undefined
       if (outTx?.text) {
         appendAssistant(outTx.text as string)
       }
 
-      // inputTranscription — merge into current user bubble; start new one after AI turn
       const inTx = sc.inputTranscription as Record<string, unknown> | undefined
       if (inTx?.text) {
         const text = inTx.text as string
         setTurns((prev) => {
           const last = prev[prev.length - 1]
           if (last?.role === 'user') {
-            // Ongoing user utterance — append to same bubble
             return [...prev.slice(0, -1), { role: 'user', text: last.text + ' ' + text }]
-          }
-          if (last?.role === 'assistant') {
-            // AI already spoke — place fresh user bubble before the AI bubble
-            return [...prev.slice(0, -1), { role: 'user', text }, last]
           }
           return [...prev, { role: 'user', text }]
         })
@@ -482,7 +442,6 @@ export default function GeminiVoiceButton() {
     [playAudioChunk, stopPlayback, setStatusSync]
   )
 
-  // ── Start session ─────────────────────────────────────────────────────────────
   const startSession = useCallback(async () => {
     stopPreview()
     setStatusSync('connecting')
@@ -497,7 +456,6 @@ export default function GeminiVoiceButton() {
     lastTurnCompleteRef.current = true
     stopPlayback()
 
-    // 1. Auth-gated token + system prompt
     let token: string
     let systemPrompt: string
     try {
@@ -517,7 +475,6 @@ export default function GeminiVoiceButton() {
       return
     }
 
-    // 2. WebSocket
     const ws = new WebSocket(`${WS_BASE}?key=${token}`)
     wsRef.current = ws
 
@@ -546,7 +503,7 @@ export default function GeminiVoiceButton() {
     }
 
     ws.onerror = (e) => {
-      if (intentionalCloseRef.current) return  // suppress errors from deliberate close
+      if (intentionalCloseRef.current) return
       console.error('[GeminiVoice] WS error', e)
       setStatusSync('error')
       setErrorMsg('WebSocket error — check browser console.')
@@ -555,7 +512,7 @@ export default function GeminiVoiceButton() {
     ws.onclose = (e) => {
       const wasIntentional = intentionalCloseRef.current
       intentionalCloseRef.current = false
-      if (wasIntentional) { stopMic(); return }  // clean exit, no error state
+      if (wasIntentional) { stopMic(); return }
       console.warn(`[GeminiVoice] closed code=${e.code} reason=${e.reason}`)
       if (statusRef.current !== 'error') {
         if (e.code !== 1000) {
@@ -568,7 +525,6 @@ export default function GeminiVoiceButton() {
       stopMic()
     }
 
-    // 3. Microphone
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
       streamRef.current = stream
@@ -586,7 +542,6 @@ export default function GeminiVoiceButton() {
       micStartWallRef.current = Date.now()
       processor.onaudioprocess = (ev) => {
         const channelData = ev.inputBuffer.getChannelData(0)
-        // Collect mic samples for recording
         micSamplesRef.current.push(new Float32Array(channelData))
         if (ws.readyState !== WebSocket.OPEN) return
         const pcm = floatTo16BitPCM(channelData)
@@ -610,7 +565,6 @@ export default function GeminiVoiceButton() {
     }
   }, [handleMessage, stopMic, stopPlayback, stopPreview, setStatusSync])
 
-  // ── New conversation — reset to idle+open so user can change scenario/voice ───
   const newConversation = useCallback(() => {
     wsRef.current?.close()
     wsRef.current = null
@@ -626,10 +580,9 @@ export default function GeminiVoiceButton() {
     setTurns([])
     setErrorMsg('')
     setStatusSync('idle')
-    setOpen(true)   // keep panel open — controls reappear, user picks scenario/voice then clicks mic
+    setOpen(true)
   }, [stopMic, stopPlayback, setStatusSync])
 
-  // ── Status helpers ────────────────────────────────────────────────────────────
   const isActive = status === 'listening' || status === 'speaking'
   const statusLabel: Record<Status, string> = {
     idle: 'Start session',
@@ -640,28 +593,35 @@ export default function GeminiVoiceButton() {
   }
   const isPulsing = status === 'listening' || status === 'speaking'
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  const getScenarioLabel = () => {
+    const scenario = scenarios.find(s => s.id === selectedScenario)
+    return scenario?.label || 'Voice'
+  }
+
+  // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
       {open && (
-        <div className="w-105 max-h-[80vh] rounded-xl border border-gray-700 bg-gray-900 shadow-2xl flex flex-col overflow-hidden">
+        <div className="w-[400px] max-h-[80vh] rounded-2xl border border-white/10 bg-gray-950 shadow-2xl flex flex-col overflow-hidden">
 
-          {/* ── Header ── */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${
+          {/* ─── HEADER ─── */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-gray-900/50">
+            <div className="flex items-center gap-2.5">
+              <span className={`w-2 h-2 rounded-full transition-colors ${
                 status === 'listening' ? 'bg-green-400' :
                 status === 'speaking'  ? 'bg-blue-400' :
                 status === 'connecting' ? 'bg-yellow-400 animate-pulse' :
                 status === 'error'     ? 'bg-red-400' : 'bg-gray-500'
               }`} />
-              <span className="text-sm font-medium text-white">Gemini Voice</span>
+              <span className="text-sm font-semibold text-white truncate max-w-[200px]">
+                {getScenarioLabel()}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               {isActive && (
                 <button
                   onClick={newConversation}
-                  className="text-gray-400 hover:text-white text-xs transition-colors px-1.5 py-0.5 rounded border border-gray-700 hover:border-gray-500"
+                  className="text-gray-400 hover:text-white text-xs transition-colors px-2 py-1 rounded border border-gray-700 hover:border-gray-500"
                   title="Start new conversation"
                 >
                   ↺ New
@@ -670,7 +630,7 @@ export default function GeminiVoiceButton() {
               {!isActive && turns.length > 0 && (
                 <button
                   onClick={() => { setTurns([]); setErrorMsg(''); setHasRecording(false); aiChunksRef.current = []; micSamplesRef.current = [] }}
-                  className="text-gray-400 hover:text-white text-xs transition-colors px-1.5 py-0.5 rounded border border-gray-700 hover:border-gray-500"
+                  className="text-gray-400 hover:text-white text-xs transition-colors px-2 py-1 rounded border border-gray-700 hover:border-gray-500"
                   title="Clear chat history"
                 >
                   ✕ Clear
@@ -686,17 +646,16 @@ export default function GeminiVoiceButton() {
             </div>
           </div>
 
-          {/* ── Controls (shown when idle) ── */}
+          {/* ─── CONTROLS ─── */}
           {!isActive && status !== 'connecting' && (
-            <div className="px-4 py-3 border-b border-gray-700 space-y-2">
-              {/* Scenario selector */}
+            <div className="px-4 py-4 border-b border-white/10 bg-gray-900/50 space-y-3">
               {scenarios.length > 0 && (
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Scenario</label>
+                  <label className="block text-xs text-gray-400 mb-1.5 font-medium">Scenario</label>
                   <select
                     value={selectedScenario}
                     onChange={(e) => setSelectedScenario(e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500 transition-colors"
                   >
                     {scenarios.map((s) => (
                       <option key={s.id} value={s.id}>{s.label}</option>
@@ -704,49 +663,48 @@ export default function GeminiVoiceButton() {
                   </select>
                 </div>
               )}
-              {/* Voice selector with preview button */}
+
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Voice</label>
+                <label className="block text-xs text-gray-400 mb-1.5 font-medium">Voice</label>
                 <div className="flex gap-2">
                   <select
                     value={selectedVoice}
                     onChange={(e) => setSelectedVoice(e.target.value)}
-                    className="flex-1 bg-gray-800 border border-gray-700 rounded-md px-2 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500 transition-colors"
                   >
                     {VOICES.map((v) => (
                       <option key={v} value={v}>{v}</option>
                     ))}
                   </select>
-                  {/* Fix 2: Preview button */}
                   <button
-                    onClick={() => previewLoading ? stopPreview() : playVoicePreview()}
-                    disabled={false}
-                    title={previewPlaying ? 'Stop preview' : 'Preview this voice'}
-                    className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-800 border border-gray-700 hover:border-violet-500 text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                    onClick={() => (previewLoading || previewPlaying) ? stopPreview() : playVoicePreview()}
+                    title={previewPlaying ? 'Stop preview' : previewLoading ? 'Cancel' : 'Preview this voice'}
+                    className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-800 border border-gray-700 hover:border-violet-500 text-gray-400 hover:text-white transition-colors shrink-0"
                   >
                     {previewLoading ? (
-                      <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
                       </svg>
                     ) : previewPlaying ? (
-                      // Stop icon
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                         <rect x="4" y="4" width="16" height="16" rx="2"/>
                       </svg>
                     ) : (
-                      // Play icon
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M8 5v14l11-7z"/>
                       </svg>
                     )}
                   </button>
                 </div>
               </div>
-              {/* Fix 1: Prominent Start button in controls area */}
+
+              {previewErrorMsg && (
+                <p className="text-yellow-400 text-xs px-2">{previewErrorMsg}</p>
+              )}
+
               <button
                 onClick={startSession}
-                className="w-full mt-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 mt-2"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
                   <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
@@ -757,35 +715,60 @@ export default function GeminiVoiceButton() {
             </div>
           )}
 
-          {/* ── Transcript (Messenger style) ── */}
+          {/* ─── TRANSCRIPT ─── */}
           <div
             ref={transcriptRef}
-            className="flex-1 overflow-y-auto px-3 py-3 min-h-40 max-h-120"
+            className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-[160px]"
           >
             {turns.length === 0 && !errorMsg && (
-              <p className="text-gray-500 text-xs text-center mt-6">
+              <div className="flex flex-col items-center justify-center h-full text-gray-500 text-xs text-center">
                 {status === 'connecting' ? 'Connecting…' : 'Start speaking…'}
-              </p>
+              </div>
             )}
+
             {turns.map((t, i) => (
-              <div key={i} className={`flex mb-2 ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[78%] px-3.5 py-2 text-xs leading-relaxed rounded-2xl ${
+              <div key={i} className={`flex gap-2 ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {t.role === 'assistant' && (
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center">
+                    <svg className="w-3.5 h-3.5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
+                    </svg>
+                  </div>
+                )}
+                <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed ${
                   t.role === 'user'
-                    ? 'bg-violet-600 text-white'
-                    : 'bg-gray-700 text-gray-100'
+                    ? 'bg-violet-600 text-white rounded-br-none'
+                    : 'bg-gray-800 border border-gray-700 text-gray-100 rounded-bl-none'
                 }`}>
                   {t.text}
                 </div>
               </div>
             ))}
+
+            {status === 'speaking' && turns.length > 0 && turns[turns.length - 1]?.role === 'assistant' && (
+              <div className="flex gap-2 justify-start">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center">
+                  <svg className="w-3.5 h-3.5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
+                  </svg>
+                </div>
+                <div className="bg-gray-800 border border-gray-700 rounded-2xl rounded-bl-none px-4 py-2.5">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {errorMsg && (
-              <p className="text-red-400 text-xs text-center px-2 mt-2">{errorMsg}</p>
+              <p className="text-red-400 text-xs text-center px-2 py-2 bg-red-500/10 rounded">{errorMsg}</p>
             )}
           </div>
 
-          {/* ── Footer ── */}
-          <div className="px-4 py-3 border-t border-gray-700 flex items-center justify-between gap-2">
-            {/* Fix 1: Prominent Stop button when session is active */}
+          {/* ─── FOOTER ─── */}
+          <div className="px-4 py-3 border-t border-white/10 bg-gray-900/50 flex items-center justify-between gap-2">
             {isActive || status === 'connecting' ? (
               <button
                 onClick={closeSession}
@@ -795,7 +778,7 @@ export default function GeminiVoiceButton() {
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
                   <rect x="4" y="4" width="16" height="16" rx="2"/>
                 </svg>
-                Stop Session
+                Stop
               </button>
             ) : (
               <span className="text-xs text-gray-400">{statusLabel[status]}</span>
@@ -803,17 +786,17 @@ export default function GeminiVoiceButton() {
             {hasRecording && isActive && (
               <button
                 onClick={saveRecording}
-                className="text-xs text-gray-400 hover:text-white transition-colors ml-auto"
+                className="text-xs text-gray-400 hover:text-white transition-colors"
                 title="Download recording now"
               >
-                ⬇ Save recording
+                ⬇ Save
               </button>
             )}
           </div>
         </div>
       )}
 
-      {/* ── Floating button: mic to open/start, red stop square when active ── */}
+      {/* ─── FLOATING MIC BUTTON ─── */}
       <button
         onClick={() => {
           if (isActive || status === 'connecting') {
@@ -836,12 +819,10 @@ export default function GeminiVoiceButton() {
           <span className="absolute inset-0 rounded-full animate-ping opacity-40 bg-current" />
         )}
         {isActive || status === 'connecting' ? (
-          // Stop icon (square)
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 relative">
             <rect x="5" y="5" width="14" height="14" rx="2"/>
           </svg>
         ) : (
-          // Mic icon
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 relative">
             <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
             <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.93V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.07A7 7 0 0 0 19 11Z" />
