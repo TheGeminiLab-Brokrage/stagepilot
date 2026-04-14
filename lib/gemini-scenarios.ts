@@ -5,6 +5,7 @@
 import { DR_YASMINE_PROMPT } from './scenario-prompts/prompt_dr_yasmine'
 import { ENG_KHALED_PROMPT } from './scenario-prompts/prompt_eng_khaled'
 import { MRS_NADIA_PROMPT } from './scenario-prompts/prompt_mrs_nadia'
+import { DR_MARIAM_PROMPT } from './scenario-prompts/prompt_dr_mariam'
 
 export interface Scenario {
   id: string;
@@ -35,6 +36,13 @@ export const SCENARIOS: Scenario[] = [
     defaultVoice: "Kore",
     prompt: MRS_NADIA_PROMPT,
     description: "Mrs. Nadia is a boutique owner. She is looking into investment properties. (Investment Buyer)",
+  },
+  {
+    id: "dr_mariam",
+    label: "Dr. Mariam — Cosmetic Clinic",
+    defaultVoice: "Aoede",
+    prompt: DR_MARIAM_PROMPT,
+    description: "Dr. Mariam is an aesthetic medicine doctor looking for a cosmetic clinic unit. Only considers Mercon VX 90 or Golden Square. (Cold Call)",
   },
 ]
 

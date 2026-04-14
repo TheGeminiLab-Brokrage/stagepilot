@@ -81,7 +81,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {children}
       </main>
 
-      {role !== 'trainee' && <GeminiVoiceButton />}
+      <GeminiVoiceButton />
     </div>
   )
 }
