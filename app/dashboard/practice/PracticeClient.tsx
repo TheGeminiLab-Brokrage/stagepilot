@@ -267,17 +267,11 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     playbackCtxRef.current = null
 
     // Save recording to server if there's any audio (AI or mic)
-    const hasAI = aiChunksRef.current.length > 0
-    const hasMic = micSamplesRef.current.length > 0
-    console.log('[PracticeClient] closeSession:', { sessionStartMs, hasAI, hasMic, selectedScenario: selectedScenarioRef.current })
-
-    if (sessionStartMs > 0 && (hasAI || hasMic)) {
-      const durationSeconds = Math.round((Date.now() - sessionStartMs) / 1000)
+    if (aiChunksRef.current.length > 0 || micSamplesRef.current.length > 0) {
+      const durationSeconds = Math.round((Date.now() - micStartWallRef.current) / 1000)
       const blob = createStereoWavBlob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
       console.log('[PracticeClient] Saving session:', { durationSeconds, scenarioId: selectedScenarioRef.current })
       saveSessionToServer(blob, durationSeconds)
-    } else {
-      console.log('[PracticeClient] No audio to save')
     }
 
     aiChunksRef.current = []
@@ -434,9 +428,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
     ws.onopen = () => {
       console.log('[PracticeClient] WS open')
-      const now = Date.now()
-      setSessionStartMs(now)
-      micStartWallRef.current = now
+      micStartWallRef.current = Date.now()
       ws.send(JSON.stringify({
         setup: {
           model: MODEL,
