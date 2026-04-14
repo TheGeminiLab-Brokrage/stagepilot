@@ -13,11 +13,13 @@ export default async function PracticePage() {
     .eq('id', user.id)
     .single()
 
+  if (!profile) redirect('/auth/login')
+
   return (
     <PracticeClient
       userId={user.id}
-      companyId={profile?.company_id ?? ''}
-      userName={profile?.full_name ?? ''}
+      companyId={profile.company_id}
+      userName={profile.full_name}
     />
   )
 }
