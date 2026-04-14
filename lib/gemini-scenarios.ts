@@ -42,7 +42,7 @@ export const SCENARIOS: Scenario[] = [
     label: "Dr. Mariam — Cosmetic Clinic",
     defaultVoice: "Aoede",
     prompt: DR_MARIAM_PROMPT,
-    description: "Dr. Mariam is an aesthetic medicine doctor looking for a cosmetic clinic unit. Only considers Mercon VX 90 or Golden Square. (Cold Call)",
+    description: "Dr. Mariam is an aesthetic medicine doctor looking for a cosmetic clinic unit. (Cold Call)",
   },
 ]
 
