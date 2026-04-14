@@ -28,13 +28,20 @@ export default async function AdminPage() {
   const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers()
   const emailMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u.email ?? '']))
 
-  // Fetch practice sessions
-  const { data: practiceSessions } = await adminClient
+  // Fetch practice sessions with trainee names
+  const { data: rawSessions } = await adminClient
     .from('practice_sessions')
     .select(`id, scenario_id, audio_path, duration_seconds, created_at, profiles!user_id(full_name)`)
     .eq('company_id', profile.company_id)
     .order('created_at', { ascending: false })
     .limit(100)
+
+  // Flatten the profiles object
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const practiceSessions = (rawSessions ?? []).map((s: any) => ({
+    ...s,
+    profiles: Array.isArray(s.profiles) ? s.profiles[0] : s.profiles,
+  }))
 
   return (
     <div className="max-w-4xl">

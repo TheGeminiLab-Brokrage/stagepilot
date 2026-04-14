@@ -10,7 +10,7 @@ interface PracticeSession {
   created_at: string
   profiles: {
     full_name: string
-  }
+  } | null
 }
 
 const SCENARIO_LABELS: Record<string, string> = {
