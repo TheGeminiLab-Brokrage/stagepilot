@@ -4,16 +4,21 @@ import PracticeClient from './PracticeClient'
 
 export default async function PracticePage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  const { data: profile } = await supabase
+  if (!user || authError) {
+    redirect('/auth/login')
+  }
+
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('full_name, company_id')
     .eq('id', user.id)
     .single()
 
-  if (!profile) redirect('/auth/login')
+  if (!profile || profileError) {
+    redirect('/auth/login')
+  }
 
   return (
     <PracticeClient
