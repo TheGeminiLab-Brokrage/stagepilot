@@ -17,6 +17,9 @@ export default async function DashboardPage() {
   const role = profile?.role ?? 'agent'
   const isLeader = role === 'team_leader' || role === 'super_admin'
 
+  // Trainees only access /dashboard/practice
+  if (role === 'trainee') redirect('/dashboard/practice')
+
   // Fetch calls — RLS enforces scope automatically
   const { data: rawCalls } = await supabase
     .from('call_records')

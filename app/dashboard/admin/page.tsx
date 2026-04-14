@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import CreateUserForm from './CreateUserForm'
 import UserTable from './UserTable'
+import PracticeSessionsTable from './PracticeSessionsTable'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -27,8 +28,16 @@ export default async function AdminPage() {
   const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers()
   const emailMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u.email ?? '']))
 
+  // Fetch practice sessions
+  const { data: practiceSessions } = await adminClient
+    .from('practice_sessions')
+    .select(`id, scenario_id, audio_path, duration_seconds, created_at, profiles!user_id(full_name)`)
+    .eq('company_id', profile.company_id)
+    .order('created_at', { ascending: false })
+    .limit(100)
+
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-white">User Management</h1>
@@ -46,13 +55,27 @@ export default async function AdminPage() {
       </div>
 
       {/* Create user form */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl px-6 py-5">
+      <div className="bg-gray-900 border border-gray-800 rounded-xl px-6 py-5 mb-8">
         <h2 className="text-white font-medium mb-4">Add New User</h2>
         <CreateUserForm
           teamLeaders={(profiles ?? [])
             .filter(p => p.role === 'team_leader')
             .map(p => p.full_name)}
         />
+      </div>
+
+      {/* Practice Sessions */}
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-xl font-semibold text-white">Practice Sessions</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{practiceSessions?.length ?? 0} sessions recorded</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <PracticeSessionsTable sessions={practiceSessions ?? []} />
+        </div>
       </div>
     </div>
   )

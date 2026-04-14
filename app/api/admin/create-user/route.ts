@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  if (!['agent', 'team_leader', 'super_admin'].includes(role)) {
+  if (!['agent', 'team_leader', 'super_admin', 'trainee'].includes(role)) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
   }
 

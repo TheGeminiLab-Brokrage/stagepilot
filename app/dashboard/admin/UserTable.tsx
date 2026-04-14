@@ -14,12 +14,14 @@ const ROLE_COLORS: Record<string, string> = {
   super_admin: 'bg-purple-500/20 text-purple-300',
   team_leader: 'bg-blue-500/20 text-blue-300',
   agent: 'bg-gray-500/20 text-gray-400',
+  trainee: 'bg-green-500/20 text-green-300',
 }
 
 const ROLE_ORDER: Record<string, number> = {
   super_admin: 0,
   team_leader: 1,
   agent: 2,
+  trainee: 3,
 }
 
 export default function UserTable({

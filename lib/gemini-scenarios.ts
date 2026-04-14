@@ -11,6 +11,7 @@ export interface Scenario {
   label: string;
   prompt: string;
   defaultVoice: string;
+  description: string;
 }
 
 export const SCENARIOS: Scenario[] = [
@@ -19,18 +20,21 @@ export const SCENARIOS: Scenario[] = [
     label: "Dr. Yasmine — Cold Call",
     defaultVoice: "Aoede",
     prompt: DR_YASMINE_PROMPT,
+    description: "Dr. Yasmine is a dentist. She applied for a clinic unit campaign in Tagamoa El Khames. (Cold Call)",
   },
   {
     id: "eng_khaled",
     label: "Eng. Khaled — Objection Handling",
     defaultVoice: "Charon",
     prompt: ENG_KHALED_PROMPT,
+    description: "Eng. Khaled is a civil engineer. He is looking for an investment opportunity if it seems right. (Tests Objections)",
   },
   {
     id: "mrs_nadia",
     label: "Mrs. Nadia — Investment Buyer",
     defaultVoice: "Kore",
     prompt: MRS_NADIA_PROMPT,
+    description: "Mrs. Nadia is a boutique owner. She is looking into investment properties. (Investment Buyer)",
   },
 ]
 

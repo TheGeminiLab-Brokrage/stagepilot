@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import LogoutButton from './LogoutButton'
 import GeminiVoiceButton from './components/GeminiVoiceButton'
@@ -18,36 +19,54 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const role = profile?.role ?? 'agent'
   const isLeader = role === 'team_leader' || role === 'super_admin'
 
+  // Trainee redirect: they only access /dashboard/practice
+  const headersList = await headers()
+  const pathname = headersList.get('x-pathname') ?? ''
+  if (role === 'trainee' && !pathname.startsWith('/dashboard/practice')) {
+    redirect('/dashboard/practice')
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-gray-800 bg-gray-900">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <span className="text-white font-bold tracking-tight">StagePilot</span>
-            <nav className="flex gap-1">
-              <a
-                href="/dashboard"
-                className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
-              >
-                {role === 'agent' ? 'My Calls' : 'Team Calls'}
-              </a>
-              {role === 'agent' && (
+            {role === 'trainee' ? (
+              <nav className="flex gap-1">
                 <a
-                  href="/dashboard/upload"
+                  href="/dashboard/practice"
                   className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
                 >
-                  Upload Call
+                  AI Practice
                 </a>
-              )}
-              {role === 'super_admin' && (
+              </nav>
+            ) : (
+              <nav className="flex gap-1">
                 <a
-                  href="/dashboard/admin"
+                  href="/dashboard"
                   className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
                 >
-                  Admin
+                  {role === 'agent' ? 'My Calls' : 'Team Calls'}
                 </a>
-              )}
-            </nav>
+                {role === 'agent' && (
+                  <a
+                    href="/dashboard/upload"
+                    className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
+                  >
+                    Upload Call
+                  </a>
+                )}
+                {role === 'super_admin' && (
+                  <a
+                    href="/dashboard/admin"
+                    className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
+                  >
+                    Admin
+                  </a>
+                )}
+              </nav>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500">
@@ -62,7 +81,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {children}
       </main>
 
-      <GeminiVoiceButton />
+      {role !== 'trainee' && <GeminiVoiceButton />}
     </div>
   )
 }

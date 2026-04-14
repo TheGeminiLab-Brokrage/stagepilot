@@ -81,7 +81,7 @@ export default function CallDetailModal({
   const tripleCItems = tripleC ? [
     { key: 'clear_need', label: 'Clear Need', description: 'Did the prospect articulate a specific pain point?', data: tripleC.clear_need },
     { key: 'clear_budget', label: 'Clear Budget', description: 'Was budget or willingness to invest confirmed?', data: tripleC.clear_budget },
-    { key: 'clear_path', label: 'Clear Path', description: 'Were decision-makers and sign-off process identified?', data: tripleC.clear_path },
+    { key: 'clear_path', label: 'Clear Path', description: 'Did the agent lock in a clear next step — a follow-up call, meeting, or any confirmed action with the client?', data: tripleC.clear_path },
   ] : []
 
   return (
