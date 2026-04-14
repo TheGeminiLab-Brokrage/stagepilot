@@ -489,6 +489,11 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       const ctx = new AudioContext({ sampleRate: MIC_SAMPLE_RATE })
       audioCtxRef.current = ctx
 
+      // Resume audio context — required for modern browsers
+      if (ctx.state === 'suspended') {
+        await ctx.resume()
+      }
+
       const source = ctx.createMediaStreamSource(stream)
       sourceRef.current = source
 
