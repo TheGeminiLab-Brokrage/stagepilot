@@ -136,65 +136,6 @@ function createStereoWavBlob(
   return new Blob([buf], { type: 'audio/wav' })
 }
 
-async function createMP3Blob(
-  aiChunks: AiChunk[],
-  micSamples: Float32Array[],
-  sessionStartMs: number,
-  sampleRate: number,
-): Promise<Blob> {
-  try {
-    // Dynamically import lamejs
-    const lamejs = (await import('lamejs')).default
-
-    // Create stereo: left=AI, right=mic
-    let aiTrackLen = 0
-    for (const chunk of aiChunks) {
-      const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
-      if (offset >= 0) aiTrackLen = Math.max(aiTrackLen, offset + chunk.samples.length)
-    }
-    const ai = new Float32Array(Math.max(aiTrackLen, 1))
-    for (const chunk of aiChunks) {
-      const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
-      if (offset >= 0 && offset + chunk.samples.length <= ai.length) {
-        ai.set(chunk.samples, offset)
-      }
-    }
-
-    const micRaw = concatFloat32(micSamples)
-    const mic = resampleLinear(micRaw, MIC_SAMPLE_RATE, sampleRate)
-
-    const len = Math.max(ai.length, mic.length)
-    const left = new Int16Array(len)
-    const right = new Int16Array(len)
-    for (let i = 0; i < len; i++) {
-      left[i] = Math.max(-32768, Math.min(32767, Math.round((ai[i] ?? 0) * 32767)))
-      right[i] = Math.max(-32768, Math.min(32767, Math.round((mic[i] ?? 0) * 32767)))
-    }
-
-    // Encode to stereo MP3 at 96 kbps (compressed stereo)
-    const encoder = new lamejs.Mp3Encoder(2, sampleRate, 96)
-    const mp3Data: Uint8Array[] = []
-
-    const chunkSize = 256
-    for (let i = 0; i < len; i += chunkSize) {
-      const chunk = Math.min(chunkSize, len - i)
-      const leftChunk = left.slice(i, i + chunk)
-      const rightChunk = right.slice(i, i + chunk)
-      const encoded = encoder.encodeBuffer(leftChunk, rightChunk)
-      if (encoded.length > 0) mp3Data.push(encoded)
-    }
-
-    const final = encoder.flush()
-    if (final.length > 0) mp3Data.push(final)
-
-    console.log('[PracticeClient] MP3 encoding succeeded')
-    return new Blob(mp3Data, { type: 'audio/mpeg' })
-  } catch (e) {
-    console.error('[PracticeClient] MP3 encoding failed, falling back to WAV:', e)
-    // Fallback: create WAV (larger but guaranteed to work)
-    return createStereoWavBlob(aiChunks, micSamples, sessionStartMs, sampleRate)
-  }
-}
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 interface PracticeClientProps {
@@ -275,29 +216,41 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     setSaveStatus('saving')
     setSaveError('')
 
-    const form = new FormData()
-    form.append('audioBlob', blob, `practice-${Date.now()}.mp3`)
-    form.append('scenarioId', selectedScenarioRef.current)
-    form.append('durationSeconds', String(durationSeconds))
-
-    console.log('[PracticeClient] saveSessionToServer (MP3):', {
-      blobSize: blob.size,
-      scenarioId: selectedScenarioRef.current,
-      durationSeconds
-    })
-
     try {
-      const res = await fetch('/api/save-practice-session', {
+      // Step 1: Get signed upload URL from server
+      console.log('[PracticeClient] Step 1: Getting signed upload URL...')
+      const urlRes = await fetch('/api/practice-signed-upload', {
         method: 'POST',
-        body: form,
+        headers: { 'Content-Type': 'application/json' },
       })
+      if (!urlRes.ok) throw new Error('Could not get upload URL')
+      const { signedUrl, audioPath } = await urlRes.json()
+      console.log('[PracticeClient] Got signed URL:', { audioPath })
 
-      const responseText = await res.text()
-      console.log('[PracticeClient] API response:', { status: res.status, body: responseText })
+      // Step 2: PUT blob directly to Supabase Storage (no size limit)
+      console.log('[PracticeClient] Step 2: Uploading blob directly to storage...', { blobSize: blob.size })
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'audio/wav' },
+        body: blob,
+      })
+      if (!uploadRes.ok) throw new Error(`Storage upload failed: ${uploadRes.status}`)
+      console.log('[PracticeClient] Blob uploaded successfully')
 
-      if (!res.ok) {
-        throw new Error(`Failed to save session: ${res.status} - ${responseText}`)
-      }
+      // Step 3: Save metadata to DB
+      console.log('[PracticeClient] Step 3: Saving metadata...')
+      const metaRes = await fetch('/api/save-practice-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioPath,
+          scenarioId: selectedScenarioRef.current,
+          durationSeconds,
+        }),
+      })
+      const metaText = await metaRes.text()
+      if (!metaRes.ok) throw new Error(`Metadata save failed: ${metaRes.status} - ${metaText}`)
+      console.log('[PracticeClient] Metadata saved successfully')
 
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
@@ -308,10 +261,11 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       console.error('[PracticeClient] Save failed:', msg)
 
       // Fallback: trigger local download so recording is never lost
+      console.log('[PracticeClient] Falling back to local download...')
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `practice-session-${Date.now()}.mp3`
+      a.download = `practice-session-${Date.now()}.wav`
       a.click()
       URL.revokeObjectURL(url)
     }
@@ -326,14 +280,12 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     playbackCtxRef.current?.close().catch(() => {})
     playbackCtxRef.current = null
 
-    // Save recording to server (stereo MP3: AI + trainee voice)
+    // Save recording to server (stereo WAV: AI + trainee voice)
     if (aiChunksRef.current.length > 0 || micSamplesRef.current.length > 0) {
-      (async () => {
-        const durationSeconds = Math.round((Date.now() - micStartWallRef.current) / 1000)
-        const blob = await createMP3Blob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
-        console.log('[PracticeClient] Saving session:', { durationSeconds, blobSize: blob.size, blobType: blob.type, scenarioId: selectedScenarioRef.current })
-        saveSessionToServer(blob, durationSeconds)
-      })()
+      const durationSeconds = Math.round((Date.now() - micStartWallRef.current) / 1000)
+      const blob = createStereoWavBlob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
+      console.log('[PracticeClient] Saving session:', { durationSeconds, blobSize: blob.size, scenarioId: selectedScenarioRef.current })
+      saveSessionToServer(blob, durationSeconds)
     }
 
     aiChunksRef.current = []
