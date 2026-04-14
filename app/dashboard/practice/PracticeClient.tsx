@@ -220,14 +220,23 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     form.append('scenarioId', selectedScenarioRef.current)
     form.append('durationSeconds', String(durationSeconds))
 
+    console.log('[PracticeClient] saveSessionToServer:', {
+      blobSize: blob.size,
+      scenarioId: selectedScenarioRef.current,
+      durationSeconds
+    })
+
     try {
       const res = await fetch('/api/save-practice-session', {
         method: 'POST',
         body: form,
       })
 
+      const responseText = await res.text()
+      console.log('[PracticeClient] API response:', { status: res.status, body: responseText })
+
       if (!res.ok) {
-        throw new Error(`Failed to save session: ${res.status}`)
+        throw new Error(`Failed to save session: ${res.status} - ${responseText}`)
       }
 
       setSaveStatus('saved')
@@ -257,11 +266,18 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     playbackCtxRef.current?.close().catch(() => {})
     playbackCtxRef.current = null
 
-    // Save recording to server
-    if (aiChunksRef.current.length > 0 && sessionStartMs > 0) {
+    // Save recording to server if there's any audio (AI or mic)
+    const hasAI = aiChunksRef.current.length > 0
+    const hasMic = micSamplesRef.current.length > 0
+    console.log('[PracticeClient] closeSession:', { sessionStartMs, hasAI, hasMic, selectedScenario: selectedScenarioRef.current })
+
+    if (sessionStartMs > 0 && (hasAI || hasMic)) {
       const durationSeconds = Math.round((Date.now() - sessionStartMs) / 1000)
       const blob = createStereoWavBlob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
+      console.log('[PracticeClient] Saving session:', { durationSeconds, scenarioId: selectedScenarioRef.current })
       saveSessionToServer(blob, durationSeconds)
+    } else {
+      console.log('[PracticeClient] No audio to save')
     }
 
     aiChunksRef.current = []
