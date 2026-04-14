@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   const { error: uploadError } = await admin.storage
     .from('practice-recordings')
     .upload(audioPath, arrayBuffer, {
-      contentType: 'audio/wav',
+      contentType: audioBlob.type || 'audio/mpeg',
       upsert: false,
     })
 

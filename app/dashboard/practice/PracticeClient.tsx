@@ -136,6 +136,60 @@ function createStereoWavBlob(
   return new Blob([buf], { type: 'audio/wav' })
 }
 
+async function createMP3Blob(
+  aiChunks: AiChunk[],
+  micSamples: Float32Array[],
+  sessionStartMs: number,
+  sampleRate: number,
+): Promise<Blob> {
+  // Dynamically import lamejs to avoid build issues
+  const lamejs = (await import('lamejs')).default
+
+  // Create stereo interleaved Int16 array (left=AI, right=mic)
+  let aiTrackLen = 0
+  for (const chunk of aiChunks) {
+    const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
+    if (offset >= 0) aiTrackLen = Math.max(aiTrackLen, offset + chunk.samples.length)
+  }
+  const ai = new Float32Array(Math.max(aiTrackLen, 1))
+  for (const chunk of aiChunks) {
+    const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
+    if (offset >= 0 && offset + chunk.samples.length <= ai.length) {
+      ai.set(chunk.samples, offset)
+    }
+  }
+
+  const micRaw = concatFloat32(micSamples)
+  const mic = resampleLinear(micRaw, MIC_SAMPLE_RATE, sampleRate)
+
+  const len = Math.max(ai.length, mic.length)
+  const left = new Int16Array(len)
+  const right = new Int16Array(len)
+  for (let i = 0; i < len; i++) {
+    left[i] = Math.max(-32768, Math.min(32767, Math.round((ai[i] ?? 0) * 32767)))
+    right[i] = Math.max(-32768, Math.min(32767, Math.round((mic[i] ?? 0) * 32767)))
+  }
+
+  // Encode to MP3 (128 kbps, mono would be fine but stereo is better for AI+mic separation)
+  const encoder = new lamejs.Mp3Encoder(2, sampleRate, 128)
+  const mp3Data: Uint8Array[] = []
+
+  // Process in chunks (256 samples at a time)
+  const chunkSize = 256
+  for (let i = 0; i < len; i += chunkSize) {
+    const chunk = Math.min(chunkSize, len - i)
+    const leftChunk = left.slice(i, i + chunk)
+    const rightChunk = right.slice(i, i + chunk)
+    const encoded = encoder.encodeBuffer(leftChunk, rightChunk)
+    if (encoded.length > 0) mp3Data.push(encoded)
+  }
+
+  const final = encoder.flush()
+  if (final.length > 0) mp3Data.push(final)
+
+  return new Blob(mp3Data, { type: 'audio/mpeg' })
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 interface PracticeClientProps {
   userId: string
@@ -216,11 +270,11 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     setSaveError('')
 
     const form = new FormData()
-    form.append('audioBlob', blob, `practice-${Date.now()}.wav`)
+    form.append('audioBlob', blob, `practice-${Date.now()}.mp3`)
     form.append('scenarioId', selectedScenarioRef.current)
     form.append('durationSeconds', String(durationSeconds))
 
-    console.log('[PracticeClient] saveSessionToServer:', {
+    console.log('[PracticeClient] saveSessionToServer (MP3):', {
       blobSize: blob.size,
       scenarioId: selectedScenarioRef.current,
       durationSeconds
@@ -251,7 +305,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `practice-session-${Date.now()}.wav`
+      a.download = `practice-session-${Date.now()}.mp3`
       a.click()
       URL.revokeObjectURL(url)
     }
@@ -268,10 +322,12 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
     // Save recording to server if there's any audio (AI or mic)
     if (aiChunksRef.current.length > 0 || micSamplesRef.current.length > 0) {
-      const durationSeconds = Math.round((Date.now() - micStartWallRef.current) / 1000)
-      const blob = createStereoWavBlob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
-      console.log('[PracticeClient] Saving session:', { durationSeconds, scenarioId: selectedScenarioRef.current })
-      saveSessionToServer(blob, durationSeconds)
+      (async () => {
+        const durationSeconds = Math.round((Date.now() - micStartWallRef.current) / 1000)
+        const blob = await createMP3Blob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
+        console.log('[PracticeClient] Saving session (MP3):', { durationSeconds, blobSize: blob.size, scenarioId: selectedScenarioRef.current })
+        saveSessionToServer(blob, durationSeconds)
+      })()
     }
 
     aiChunksRef.current = []
