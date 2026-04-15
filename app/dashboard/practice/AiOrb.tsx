@@ -9,17 +9,49 @@ interface AiOrbProps {
   audioLevel?: number // 0–1 RMS volume
 }
 
-// Simple deterministic noise for blob morphing
+interface Particle {
+  x: number
+  y: number
+  baseX: number
+  baseY: number
+  size: number
+  phase: number     // unique phase offset for sin/cos drift
+  speed: number     // drift speed multiplier
+  opacity: number
+}
+
 function noise(x: number, y: number, t: number): number {
   const s = Math.sin(x * 2.3 + t) * Math.cos(y * 1.7 + t * 0.8)
   const s2 = Math.sin(x * 3.1 - t * 1.2) * Math.cos(y * 2.9 + t * 0.5)
   return (s + s2) * 0.5
 }
 
+function initParticles(count: number, size: number): Particle[] {
+  const particles: Particle[] = []
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2
+    const dist = 0.3 + Math.random() * 0.65 // normalized 0–1 from center
+    const bx = size / 2 + Math.cos(angle) * dist * size * 0.48
+    const by = size / 2 + Math.sin(angle) * dist * size * 0.48
+    particles.push({
+      x: bx,
+      y: by,
+      baseX: bx,
+      baseY: by,
+      size: 0.8 + Math.random() * 1.5,
+      phase: Math.random() * Math.PI * 2,
+      speed: 0.3 + Math.random() * 0.7,
+      opacity: 0.15 + Math.random() * 0.35,
+    })
+  }
+  return particles
+}
+
 export default function AiOrb({ status, audioLevel = 0 }: AiOrbProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number>(0)
   const tRef = useRef(0)
+  const particlesRef = useRef<Particle[] | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -30,6 +62,12 @@ export default function AiOrb({ status, audioLevel = 0 }: AiOrbProps) {
     const SIZE = canvas.width
     const cx = SIZE / 2
     const cy = SIZE / 2
+
+    // Initialize particles once
+    if (!particlesRef.current) {
+      particlesRef.current = initParticles(20, SIZE)
+    }
+    const particles = particlesRef.current
 
     function draw() {
       tRef.current += getSpeed(status)
@@ -43,6 +81,24 @@ export default function AiOrb({ status, audioLevel = 0 }: AiOrbProps) {
       const morphStrength = getMorphStrength(status, level)
       const glowAlpha = getGlowAlpha(status)
       const coreAlpha = getCoreAlpha(status)
+
+      // ── Stardust particles (canvas-drawn, smooth drift) ───────────
+      for (const p of particles) {
+        // Smooth sinusoidal drift around base position
+        const driftX = Math.sin(t * p.speed + p.phase) * 8
+        const driftY = Math.cos(t * p.speed * 0.7 + p.phase + 1.3) * 8
+        p.x = p.baseX + driftX
+        p.y = p.baseY + driftY
+
+        // Smooth opacity breathing
+        const breathe = 0.5 + 0.5 * Math.sin(t * p.speed * 0.5 + p.phase)
+        const alpha = p.opacity * breathe
+
+        ctx!.beginPath()
+        ctx!.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+        ctx!.fillStyle = `rgba(255,255,255,${alpha})`
+        ctx!.fill()
+      }
 
       // ── Outer atmospheric glow rings ──────────────────────────────
       if (status !== 'error') {
@@ -81,7 +137,6 @@ export default function AiOrb({ status, audioLevel = 0 }: AiOrbProps) {
       }
       ctx!.closePath()
 
-      // Blob fill gradient
       const blobGrad = ctx!.createRadialGradient(cx - baseRadius * 0.2, cy - baseRadius * 0.2, 0, cx, cy, baseRadius * 1.2)
       if (status === 'error') {
         blobGrad.addColorStop(0, `rgba(255,80,80,${coreAlpha})`)
@@ -97,7 +152,6 @@ export default function AiOrb({ status, audioLevel = 0 }: AiOrbProps) {
       ctx!.fillStyle = blobGrad
       ctx!.fill()
 
-      // Blob edge glow
       if (status !== 'error') {
         ctx!.strokeStyle = `rgba(215,255,0,${glowAlpha * 0.9})`
         ctx!.lineWidth = status === 'speaking' ? 2.5 : 1.5
@@ -149,33 +203,11 @@ export default function AiOrb({ status, audioLevel = 0 }: AiOrbProps) {
   }, [status, audioLevel])
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: 240, height: 240 }}>
-      {/* Stardust background particles */}
-      <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
-        {[...Array(18)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full bg-white"
-            style={{
-              width: Math.random() * 2 + 1,
-              height: Math.random() * 2 + 1,
-              left: `${10 + Math.random() * 80}%`,
-              top: `${10 + Math.random() * 80}%`,
-              opacity: 0.15 + Math.random() * 0.3,
-              animation: `stardust-drift ${3 + Math.random() * 4}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 4}s`,
-            }}
-          />
-        ))}
-      </div>
-      <canvas
-        ref={canvasRef}
-        width={240}
-        height={240}
-        className="relative z-10"
-        style={{ imageRendering: 'crisp-edges' }}
-      />
-    </div>
+    <canvas
+      ref={canvasRef}
+      width={240}
+      height={240}
+    />
   )
 }
 
@@ -185,21 +217,18 @@ function getSpeed(status: OrbStatus): number {
     case 'listening':   return 0.022
     case 'connecting':  return 0.028
     case 'error':       return 0.015
-    default:            return 0.008 // idle: slow
+    default:            return 0.008
   }
 }
 
 function getMorphStrength(status: OrbStatus, level: number): number {
-  const base = status === 'speaking'
+  return status === 'speaking'
     ? 22 + level * 28
     : status === 'listening'
     ? 14 + level * 22
     : status === 'connecting'
     ? 10
-    : status === 'error'
-    ? 8
-    : 8 // idle: subtle morph
-  return base
+    : 8
 }
 
 function getGlowAlpha(status: OrbStatus): number {

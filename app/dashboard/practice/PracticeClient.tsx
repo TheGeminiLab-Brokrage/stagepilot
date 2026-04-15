@@ -605,7 +605,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       </div>
 
       {/* ── ORB SECTION (center) ────────────────────────────────────────────── */}
-      <div className="flex flex-col items-center justify-center py-6" style={{ flex: '0 0 auto' }}>
+      <div className="flex flex-col items-center justify-center py-4" style={{ flex: '1 1 auto', minHeight: 0 }}>
         <AiOrb status={status} audioLevel={audioLevel} />
 
         {/* Status label under orb */}
@@ -658,29 +658,6 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
         className="flex-1 overflow-y-auto px-6 space-y-3 pb-4"
         style={{ minHeight: 0 }}
       >
-        {turns.length === 0 && !errorMsg && !isActive && (
-          <div className="flex flex-col items-center justify-center h-full text-center py-8">
-            <div className="w-10 h-10 mb-3 opacity-25" style={{ color: '#D7FF00' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-                <path d="M19 11a7 7 0 0 1-14 0" />
-                <line x1="12" y1="19" x2="12" y2="22" />
-              </svg>
-            </div>
-            <p className="text-xs uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.25)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.12em' }}>
-              Select a scenario and start
-            </p>
-          </div>
-        )}
-
-        {turns.length === 0 && status === 'connecting' && (
-          <div className="flex items-center justify-center h-full py-8">
-            <p className="text-xs uppercase tracking-widest" style={{ color: 'rgba(215,255,0,0.5)', fontFamily: "'Space Grotesk', sans-serif" }}>
-              Establishing connection…
-            </p>
-          </div>
-        )}
-
         {turns.map((t, i) => (
           <div key={i} className={`flex gap-2 ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {t.role === 'assistant' && (
