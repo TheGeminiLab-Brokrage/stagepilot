@@ -27,50 +27,62 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b border-gray-800 bg-gray-900">
+    <div className="min-h-screen flex flex-col" style={{ background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
+      <header style={{ borderBottom: '1px solid rgba(215,255,0,0.15)', background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 50 }}>
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <span className="text-white font-bold tracking-tight">StagePilot</span>
+            {/* TGL Logo */}
+            <a href="/dashboard" className="flex items-center gap-2.5 group">
+              <img
+                src="/tgl-logo-white.png"
+                alt="TGL"
+                className="h-7 w-auto"
+                style={{ filter: 'brightness(1) drop-shadow(0 0 8px rgba(215,255,0,0.3))', transition: 'filter 0.2s' }}
+                onMouseEnter={e => ((e.target as HTMLImageElement).style.filter = 'brightness(1.1) drop-shadow(0 0 14px rgba(215,255,0,0.6))')}
+                onMouseLeave={e => ((e.target as HTMLImageElement).style.filter = 'brightness(1) drop-shadow(0 0 8px rgba(215,255,0,0.3))')}
+              />
+            </a>
+
             {role === 'trainee' ? (
               <nav className="flex gap-1">
                 <a
                   href="/dashboard/practice"
-                  className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
+                  className="text-xs font-semibold uppercase px-3 py-1.5 rounded-md transition-all"
+                  style={{ color: 'rgba(215,255,0,0.7)', letterSpacing: '0.1em', fontFamily: "'Space Grotesk', sans-serif" }}
+                  onMouseEnter={e => { const el = e.currentTarget; el.style.color = '#D7FF00'; el.style.background = 'rgba(215,255,0,0.08)' }}
+                  onMouseLeave={e => { const el = e.currentTarget; el.style.color = 'rgba(215,255,0,0.7)'; el.style.background = 'transparent' }}
                 >
                   AI Practice
                 </a>
               </nav>
             ) : (
               <nav className="flex gap-1">
-                <a
-                  href="/dashboard"
-                  className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
-                >
-                  {role === 'agent' ? 'My Calls' : 'Team Calls'}
-                </a>
-                {role === 'agent' && (
+                {[
+                  { href: '/dashboard', label: role === 'agent' ? 'My Calls' : 'Team Calls' },
+                  ...(role === 'agent' ? [{ href: '/dashboard/upload', label: 'Upload Call' }] : []),
+                  ...(role === 'super_admin' ? [{ href: '/dashboard/admin', label: 'Admin' }] : []),
+                ].map(({ href, label }) => (
                   <a
-                    href="/dashboard/upload"
-                    className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
+                    key={href}
+                    href={href}
+                    className="text-xs font-semibold uppercase px-3 py-1.5 rounded-md transition-all"
+                    style={{ color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', fontFamily: "'Space Grotesk', sans-serif" }}
+                    onMouseEnter={e => { const el = e.currentTarget; el.style.color = '#D7FF00'; el.style.background = 'rgba(215,255,0,0.08)' }}
+                    onMouseLeave={e => { const el = e.currentTarget; el.style.color = 'rgba(255,255,255,0.45)'; el.style.background = 'transparent' }}
                   >
-                    Upload Call
+                    {label}
                   </a>
-                )}
-                {role === 'super_admin' && (
-                  <a
-                    href="/dashboard/admin"
-                    className="text-sm text-gray-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
-                  >
-                    Admin
-                  </a>
-                )}
+                ))}
               </nav>
             )}
           </div>
+
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">
-              {profile?.full_name} · <span className="capitalize">{role.replace('_', ' ')}</span>
+            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: "'Montserrat', sans-serif" }}>
+              {profile?.full_name}
+              <span className="ml-1 px-1.5 py-0.5 rounded text-xs font-semibold capitalize" style={{ background: 'rgba(215,255,0,0.1)', color: 'rgba(215,255,0,0.7)', fontFamily: "'Space Grotesk', sans-serif" }}>
+                {role.replace('_', ' ')}
+              </span>
             </span>
             <LogoutButton />
           </div>

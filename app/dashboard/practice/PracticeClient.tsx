@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import AiOrb from './AiOrb'
 
 // ─── Gemini Live API constants ─────────────────────────────────────────────────
 const MODEL = 'models/gemini-3.1-flash-live-preview'
@@ -153,6 +154,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
   const [sessionStartMs, setSessionStartMs] = useState(0)
+  const [audioLevel, setAudioLevel] = useState(0)
 
   const statusRef = useRef<Status>('idle')
   const setStatusSync = useCallback((s: Status) => { statusRef.current = s; setStatus(s) }, [])
@@ -171,6 +173,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   const ctxCreatedAtWallRef = useRef(0)
   const intentionalCloseRef = useRef(false)
   const lastTurnCompleteRef = useRef(true)
+  const audioLevelRafRef = useRef<number>(0)
 
   const selectedScenarioRef = useRef(selectedScenario)
   useEffect(() => { selectedScenarioRef.current = selectedScenario }, [selectedScenario])
@@ -194,6 +197,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   }, [turns])
 
   const stopMic = useCallback(() => {
+    cancelAnimationFrame(audioLevelRafRef.current)
     processorRef.current?.disconnect()
     sourceRef.current?.disconnect()
     audioCtxRef.current?.close().catch(() => {})
@@ -202,6 +206,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     sourceRef.current = null
     audioCtxRef.current = null
     streamRef.current = null
+    setAudioLevel(0)
   }, [])
 
   const stopPlayback = useCallback(() => {
@@ -217,28 +222,20 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     setSaveError('')
 
     try {
-      // Step 1: Get signed upload URL from server
-      console.log('[PracticeClient] Step 1: Getting signed upload URL...')
       const urlRes = await fetch('/api/practice-signed-upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
       if (!urlRes.ok) throw new Error('Could not get upload URL')
       const { signedUrl, audioPath } = await urlRes.json()
-      console.log('[PracticeClient] Got signed URL:', { audioPath })
 
-      // Step 2: PUT blob directly to Supabase Storage (no size limit)
-      console.log('[PracticeClient] Step 2: Uploading blob directly to storage...', { blobSize: blob.size })
       const uploadRes = await fetch(signedUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'audio/wav' },
         body: blob,
       })
       if (!uploadRes.ok) throw new Error(`Storage upload failed: ${uploadRes.status}`)
-      console.log('[PracticeClient] Blob uploaded successfully')
 
-      // Step 3: Save metadata to DB
-      console.log('[PracticeClient] Step 3: Saving metadata...')
       const metaRes = await fetch('/api/save-practice-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -250,7 +247,6 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       })
       const metaText = await metaRes.text()
       if (!metaRes.ok) throw new Error(`Metadata save failed: ${metaRes.status} - ${metaText}`)
-      console.log('[PracticeClient] Metadata saved successfully')
 
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
@@ -260,8 +256,6 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       setSaveError(msg)
       console.error('[PracticeClient] Save failed:', msg)
 
-      // Fallback: trigger local download so recording is never lost
-      console.log('[PracticeClient] Falling back to local download...')
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -280,11 +274,9 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     playbackCtxRef.current?.close().catch(() => {})
     playbackCtxRef.current = null
 
-    // Save recording to server (stereo WAV: AI + trainee voice)
     if (aiChunksRef.current.length > 0 || micSamplesRef.current.length > 0) {
       const durationSeconds = Math.round((Date.now() - micStartWallRef.current) / 1000)
       const blob = createStereoWavBlob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
-      console.log('[PracticeClient] Saving session:', { durationSeconds, blobSize: blob.size, scenarioId: selectedScenarioRef.current })
       saveSessionToServer(blob, durationSeconds)
     }
 
@@ -327,10 +319,17 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       activeSourcesRef.current = activeSourcesRef.current.filter((s) => s !== src)
       if (activeSourcesRef.current.length === 0) {
         setStatus((prev) => (prev === 'speaking' ? 'listening' : prev))
+        setAudioLevel(0)
       }
     }
 
     setStatus((prev) => (prev === 'listening' || prev === 'connecting' ? 'speaking' : prev))
+
+    // Compute RMS for speaking audio level
+    let sum = 0
+    for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i]
+    const rms = Math.sqrt(sum / samples.length)
+    setAudioLevel(Math.min(1, rms * 4))
   }, [])
 
   const handleMessage = useCallback(
@@ -495,10 +494,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       const ctx = new AudioContext({ sampleRate: MIC_SAMPLE_RATE })
       audioCtxRef.current = ctx
 
-      // Resume audio context — required for modern browsers
-      if (ctx.state === 'suspended') {
-        await ctx.resume()
-      }
+      if (ctx.state === 'suspended') await ctx.resume()
 
       const source = ctx.createMediaStreamSource(stream)
       sourceRef.current = source
@@ -510,6 +506,13 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       processor.onaudioprocess = (ev) => {
         const channelData = ev.inputBuffer.getChannelData(0)
         micSamplesRef.current.push(new Float32Array(channelData))
+
+        // Compute mic RMS for orb reactivity
+        let sum = 0
+        for (let i = 0; i < channelData.length; i++) sum += channelData[i] * channelData[i]
+        const rms = Math.sqrt(sum / channelData.length)
+        setAudioLevel(Math.min(1, rms * 6))
+
         if (ws.readyState !== WebSocket.OPEN) return
         const pcm = floatTo16BitPCM(channelData)
         ws.send(JSON.stringify({
@@ -547,95 +550,169 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     setErrorMsg('')
     setStatusSync('idle')
     setSessionStartMs(0)
+    setAudioLevel(0)
   }, [stopMic, stopPlayback, setStatusSync])
 
   const isActive = status === 'listening' || status === 'speaking'
-  const statusLabel: Record<Status, string> = {
-    idle: 'Start Session',
-    connecting: 'Connecting…',
-    listening: 'Listening…',
-    speaking: 'Speaking…',
-    error: 'Error',
-  }
-
   const currentScenario = scenarios.find(s => s.id === selectedScenario)
+
+  const statusLabel: Record<Status, string> = {
+    idle:       'Ready to Practice',
+    connecting: 'Connecting…',
+    listening:  'Listening',
+    speaking:   'Speaking',
+    error:      'Connection Error',
+  }
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col bg-gray-950">
-      {/* ─── HEADER ─── */}
-      <div className="border-b border-gray-800 bg-gray-900/50 px-6 py-4">
-        <h1 className="text-xl font-bold text-white">AI Practice Session</h1>
-        <p className="text-xs text-gray-400 mt-1">{userName}</p>
-      </div>
+    <div className="h-full flex flex-col" style={{ background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
 
-      {/* ─── TOP SECTION: Scenario Selector + Info ─── */}
-      <div className="px-6 py-4 border-b border-gray-800 bg-gray-900/30 space-y-4">
-        <div>
-          <label className="block text-xs text-gray-400 mb-2 font-medium">Select Scenario</label>
-          <select
-            value={selectedScenario}
-            onChange={(e) => setSelectedScenario(e.target.value)}
-            disabled={isActive || status === 'connecting'}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>{s.label}</option>
-            ))}
-          </select>
-        </div>
+      {/* ── SCENARIO SELECTOR (top) ─────────────────────────────────────────── */}
+      <div className="px-6 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(215,255,0,0.12)' }}>
+        <label
+          className="block text-xs font-semibold mb-2 uppercase"
+          style={{ color: 'rgba(215,255,0,0.6)', letterSpacing: '0.1em', fontFamily: "'Space Grotesk', sans-serif" }}
+        >
+          Select Scenario
+        </label>
+        <select
+          value={selectedScenario}
+          onChange={(e) => setSelectedScenario(e.target.value)}
+          disabled={isActive || status === 'connecting'}
+          className="w-full rounded-lg px-4 py-2.5 text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none"
+          style={{
+            background: 'rgba(215,255,0,0.05)',
+            border: '1px solid rgba(215,255,0,0.25)',
+            color: '#fff',
+            fontFamily: "'Montserrat', sans-serif",
+          }}
+          onFocus={e => (e.target.style.borderColor = 'rgba(215,255,0,0.7)')}
+          onBlur={e => (e.target.style.borderColor = 'rgba(215,255,0,0.25)')}
+        >
+          {scenarios.map((s) => (
+            <option key={s.id} value={s.id} style={{ background: '#111', color: '#fff' }}>
+              {s.label}
+            </option>
+          ))}
+        </select>
 
-        {/* ─── Scenario Description Card ─── */}
         {currentScenario && !isActive && (
-          <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-white mb-2">{currentScenario.label}</h3>
-            <p className="text-xs text-gray-300 leading-relaxed">{currentScenario.description}</p>
-          </div>
+          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            {currentScenario.description}
+          </p>
         )}
       </div>
 
-      {/* ─── MAIN TRANSCRIPT AREA ─── */}
+      {/* ── ORB SECTION (center) ────────────────────────────────────────────── */}
+      <div className="flex flex-col items-center justify-center py-6" style={{ flex: '0 0 auto' }}>
+        <AiOrb status={status} audioLevel={audioLevel} />
+
+        {/* Status label under orb */}
+        <div className="mt-4 flex items-center gap-2">
+          <span
+            className="w-2 h-2 rounded-full"
+            style={{
+              background: status === 'error' ? '#ef4444' : '#D7FF00',
+              boxShadow: status === 'error'
+                ? '0 0 8px rgba(239,68,68,0.8)'
+                : status === 'idle'
+                ? 'none'
+                : '0 0 10px rgba(215,255,0,0.9)',
+              animation: status === 'connecting' ? 'orb-breathe 1s ease-in-out infinite' : 'none',
+            }}
+          />
+          <span
+            className="text-sm font-semibold tracking-widest uppercase"
+            style={{
+              color: status === 'error'
+                ? '#ef4444'
+                : status === 'idle'
+                ? 'rgba(255,255,255,0.4)'
+                : '#D7FF00',
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: '0.15em',
+              textShadow: status !== 'idle' && status !== 'error'
+                ? '0 0 16px rgba(215,255,0,0.6)'
+                : 'none',
+            }}
+          >
+            {statusLabel[status]}
+          </span>
+        </div>
+
+        {saveStatus === 'saving' && (
+          <p className="mt-2 text-xs" style={{ color: 'rgba(215,255,0,0.5)' }}>Saving session…</p>
+        )}
+        {saveStatus === 'saved' && (
+          <p className="mt-2 text-xs" style={{ color: '#26D701' }}>✓ Session saved</p>
+        )}
+        {saveStatus === 'error' && (
+          <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>Save failed — downloaded locally</p>
+        )}
+      </div>
+
+      {/* ── TRANSCRIPT (scrollable middle) ──────────────────────────────────── */}
       <div
         ref={transcriptRef}
-        className="flex-1 overflow-y-auto px-6 py-4 space-y-4"
+        className="flex-1 overflow-y-auto px-6 space-y-3 pb-4"
+        style={{ minHeight: 0 }}
       >
         {turns.length === 0 && !errorMsg && !isActive && (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500 text-sm text-center">
-            <svg className="w-12 h-12 mb-3 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-              <polyline points="13 2 13 9 20 9" />
-            </svg>
-            Select a scenario and start the session to begin practicing.
+          <div className="flex flex-col items-center justify-center h-full text-center py-8">
+            <div className="w-10 h-10 mb-3 opacity-25" style={{ color: '#D7FF00' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
+                <path d="M19 11a7 7 0 0 1-14 0" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+              </svg>
+            </div>
+            <p className="text-xs uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.25)', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.12em' }}>
+              Select a scenario and start
+            </p>
           </div>
         )}
 
         {turns.length === 0 && status === 'connecting' && (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400">
-            <div className="animate-spin mb-3">
-              <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2v4m0 12v4M2 12h4m12 0h4" />
-                <circle cx="12" cy="12" r="8" />
-              </svg>
-            </div>
-            <p className="text-sm">Connecting…</p>
+          <div className="flex items-center justify-center h-full py-8">
+            <p className="text-xs uppercase tracking-widest" style={{ color: 'rgba(215,255,0,0.5)', fontFamily: "'Space Grotesk', sans-serif" }}>
+              Establishing connection…
+            </p>
           </div>
         )}
 
         {turns.map((t, i) => (
-          <div key={i} className={`flex gap-3 ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={i} className={`flex gap-2 ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {t.role === 'assistant' && (
-              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" />
-                </svg>
+              <div
+                className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mt-0.5"
+                style={{
+                  background: 'rgba(215,255,0,0.1)',
+                  border: '1px solid rgba(215,255,0,0.3)',
+                  color: '#D7FF00',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                AI
               </div>
             )}
             <div
-              className={`max-w-[80%] px-4 py-3 rounded-lg text-sm leading-relaxed ${
+              className="max-w-[78%] px-3 py-2 rounded-lg text-xs leading-relaxed"
+              style={
                 t.role === 'user'
-                  ? 'bg-violet-600 text-white rounded-tr-none'
-                  : 'bg-gray-800 border border-gray-700 text-gray-100 rounded-tl-none'
-              }`}
+                  ? {
+                      background: 'rgba(215,255,0,0.12)',
+                      border: '1px solid rgba(215,255,0,0.3)',
+                      color: '#fff',
+                      borderRadius: '12px 12px 4px 12px',
+                    }
+                  : {
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: 'rgba(255,255,255,0.8)',
+                      borderRadius: '12px 12px 12px 4px',
+                    }
+              }
             >
               {t.text}
             </div>
@@ -643,91 +720,112 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
         ))}
 
         {status === 'speaking' && turns.length > 0 && turns[turns.length - 1]?.role === 'assistant' && (
-          <div className="flex gap-3 justify-start">
-            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
-              </svg>
+          <div className="flex gap-2 justify-start">
+            <div
+              className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mt-0.5"
+              style={{ background: 'rgba(215,255,0,0.1)', border: '1px solid rgba(215,255,0,0.3)', color: '#D7FF00', fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              AI
             </div>
-            <div className="bg-gray-800 border border-gray-700 rounded-lg rounded-tl-none px-4 py-3">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+            <div
+              className="px-3 py-2 rounded-lg"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px 12px 12px 4px' }}
+            >
+              <div className="flex gap-1 items-center">
+                {[0, 0.15, 0.3].map((delay, i) => (
+                  <span
+                    key={i}
+                    className="w-1.5 h-1.5 rounded-full animate-bounce"
+                    style={{ background: '#D7FF00', animationDelay: `${delay}s`, boxShadow: '0 0 6px rgba(215,255,0,0.8)' }}
+                  />
+                ))}
               </div>
             </div>
           </div>
         )}
 
         {errorMsg && (
-          <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm text-center">
+          <div
+            className="px-4 py-3 rounded-lg text-xs text-center"
+            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#fca5a5' }}
+          >
             {errorMsg}
-          </div>
-        )}
-
-        {saveStatus === 'saved' && (
-          <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm text-center">
-            ✓ Session saved to server
-          </div>
-        )}
-
-        {saveStatus === 'error' && saveError && (
-          <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm text-center">
-            {saveError}
           </div>
         )}
       </div>
 
-      {/* ─── FOOTER: Controls ─── */}
-      <div className="border-t border-gray-800 bg-gray-900/50 px-6 py-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span
-            className={`w-2.5 h-2.5 rounded-full ${
-              status === 'listening' ? 'bg-green-400' :
-              status === 'speaking' ? 'bg-blue-400' :
-              status === 'connecting' ? 'bg-yellow-400 animate-pulse' :
-              status === 'error' ? 'bg-red-400' : 'bg-gray-500'
-            }`}
-          />
-          <span className="text-sm text-gray-300 font-medium">
-            {status === 'connecting' ? 'Connecting…' : statusLabel[status]}
-          </span>
-        </div>
+      {/* ── FOOTER CONTROLS ─────────────────────────────────────────────────── */}
+      <div
+        className="px-6 py-4 flex items-center justify-between gap-4"
+        style={{ borderTop: '1px solid rgba(215,255,0,0.12)', background: 'rgba(0,0,0,0.6)' }}
+      >
+        {isActive ? (
+          <button
+            onClick={newConversation}
+            className="text-xs px-3 py-2 rounded-lg font-medium transition-all"
+            style={{
+              border: '1px solid rgba(255,255,255,0.15)',
+              color: 'rgba(255,255,255,0.5)',
+              background: 'transparent',
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: '0.05em',
+            }}
+            onMouseEnter={e => { (e.target as HTMLButtonElement).style.borderColor = 'rgba(215,255,0,0.4)'; (e.target as HTMLButtonElement).style.color = '#D7FF00' }}
+            onMouseLeave={e => { (e.target as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.15)'; (e.target as HTMLButtonElement).style.color = 'rgba(255,255,255,0.5)' }}
+          >
+            ↺ New
+          </button>
+        ) : (
+          <div />
+        )}
 
-        <div className="flex items-center gap-2">
-          {isActive && (
-            <button
-              onClick={newConversation}
-              className="text-xs px-3 py-2 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-400 hover:text-white transition-colors"
-            >
-              ↺ New
-            </button>
-          )}
-
-          {!isActive && status !== 'connecting' ? (
-            <button
-              onClick={startSession}
-              disabled={!selectedScenario || saveStatus === 'saving'}
-              className="px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors flex items-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
-                <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.93V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.07A7 7 0 0 0 19 11Z" />
-              </svg>
-              {saveStatus === 'saving' ? 'Saving…' : 'Start'}
-            </button>
-          ) : (
-            <button
-              onClick={closeSession}
-              className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition-colors flex items-center gap-2"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                <rect x="4" y="4" width="16" height="16" rx="2" />
-              </svg>
-              Stop
-            </button>
-          )}
-        </div>
+        {!isActive && status !== 'connecting' ? (
+          <button
+            onClick={startSession}
+            disabled={!selectedScenario || saveStatus === 'saving'}
+            className="tgl-btn-glow flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              background: '#D7FF00',
+              color: '#000',
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: '0.05em',
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+              <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
+              <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.93V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.07A7 7 0 0 0 19 11Z" />
+            </svg>
+            {saveStatus === 'saving' ? 'Saving…' : 'Start'}
+          </button>
+        ) : status === 'connecting' ? (
+          <button
+            disabled
+            className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm opacity-60 cursor-not-allowed"
+            style={{ background: 'rgba(215,255,0,0.2)', color: '#D7FF00', border: '1px solid rgba(215,255,0,0.3)', fontFamily: "'Space Grotesk', sans-serif" }}
+          >
+            <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+            Connecting
+          </button>
+        ) : (
+          <button
+            onClick={closeSession}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all"
+            style={{
+              background: 'rgba(239,68,68,0.15)',
+              border: '1px solid rgba(239,68,68,0.4)',
+              color: '#fca5a5',
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: '0.05em',
+            }}
+            onMouseEnter={e => { const b = e.currentTarget; b.style.background = 'rgba(239,68,68,0.25)'; b.style.borderColor = 'rgba(239,68,68,0.7)' }}
+            onMouseLeave={e => { const b = e.currentTarget; b.style.background = 'rgba(239,68,68,0.15)'; b.style.borderColor = 'rgba(239,68,68,0.4)' }}
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+            </svg>
+            End Session
+          </button>
+        )}
       </div>
     </div>
   )
