@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import LogoutButton from './LogoutButton'
-import GeminiVoiceButton from './components/GeminiVoiceButton'
 import Navbar from './Navbar'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -27,14 +26,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
+    <div className="flex flex-col" style={{ height: '100vh', background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
       <Navbar role={role} fullName={profile?.full_name} rightSlot={<LogoutButton />} />
 
-      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-6 overflow-hidden flex flex-col">
         {children}
       </main>
-
-      <GeminiVoiceButton />
     </div>
   )
 }
