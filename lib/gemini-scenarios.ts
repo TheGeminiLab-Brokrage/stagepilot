@@ -6,6 +6,7 @@ import { DR_YASMINE_PROMPT } from './scenario-prompts/prompt_dr_yasmine'
 import { ENG_KHALED_PROMPT } from './scenario-prompts/prompt_eng_khaled'
 import { MRS_NADIA_PROMPT } from './scenario-prompts/prompt_mrs_nadia'
 import { DR_MARIAM_PROMPT } from './scenario-prompts/prompt_dr_mariam'
+import { GENERAL_KNOWLEDGE_CLINICS_PROMPT } from './scenario-prompts/prompt_general_knowledge_clinics'
 
 export interface Scenario {
   id: string;
@@ -43,6 +44,13 @@ export const SCENARIOS: Scenario[] = [
     defaultVoice: "Aoede",
     prompt: DR_MARIAM_PROMPT,
     description: "Dr. Mariam is an aesthetic medicine doctor looking for a cosmetic clinic unit. (Cold Call)",
+  },
+  {
+    id: "general_knowledge_clinics",
+    label: "General Knowledge — Clinics",
+    defaultVoice: "Charon",
+    prompt: GENERAL_KNOWLEDGE_CLINICS_PROMPT,
+    description: "محمد — TGL's internal sales strategist. Ask anything about the 68 clinic projects in the portfolio. Strategy, comparisons, buyer targeting.",
   },
 ]
 
