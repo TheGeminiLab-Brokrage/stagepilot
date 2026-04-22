@@ -198,17 +198,21 @@ export default function ExamPhase3({ onComplete }: Props) {
         }))
       }
 
-      ws.onmessage = (e) => {
+      const processMessage = (text: string) => {
         let msg: Record<string, unknown>
-        try { msg = JSON.parse(e.data) } catch { return }
+        try { msg = JSON.parse(text) } catch { return }
         if (msg.setupComplete) {
           setStatusSync('listening')
           startMic()
-          // allow finish after 30 seconds
           finishTimerRef.current = setTimeout(() => setCanFinish(true), 30000)
           return
         }
-        handleMessage(e)
+        handleMessage({ data: text } as MessageEvent)
+      }
+
+      ws.onmessage = (e) => {
+        if (typeof e.data === 'string') processMessage(e.data)
+        else if (e.data instanceof Blob) e.data.text().then(processMessage).catch(() => {})
       }
 
       ws.onerror = () => {
