@@ -7,6 +7,7 @@ import { ENG_KHALED_PROMPT } from './scenario-prompts/prompt_eng_khaled'
 import { MRS_NADIA_PROMPT } from './scenario-prompts/prompt_mrs_nadia'
 import { DR_MARIAM_PROMPT } from './scenario-prompts/prompt_dr_mariam'
 import { GENERAL_KNOWLEDGE_CLINICS_PROMPT } from './scenario-prompts/prompt_general_knowledge_clinics'
+import { SALES_KNOWLEDGE_ASSISTANT_PROMPT } from './scenario-prompts/prompt_sales_knowledge_assistant'
 
 export interface Scenario {
   id: string;
@@ -51,6 +52,13 @@ export const SCENARIOS: Scenario[] = [
     defaultVoice: "Charon",
     prompt: GENERAL_KNOWLEDGE_CLINICS_PROMPT,
     description: "محمد — TGL's internal sales strategist. Ask anything about the 68 clinic projects in the portfolio. Strategy, comparisons, buyer targeting.",
+  },
+  {
+    id: "sales_knowledge_assistant_demo",
+    label: "Sales Knowledge Assistant Demo",
+    defaultVoice: "Charon",
+    prompt: SALES_KNOWLEDGE_ASSISTANT_PROMPT,
+    description: "Talk to محمد — TGL's AI sales strategist — and practice asking about clinic projects, comparing options, and sharpening your pitch before a real call.",
   },
 ]
 
