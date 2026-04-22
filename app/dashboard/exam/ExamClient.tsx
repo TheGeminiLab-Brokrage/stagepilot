@@ -100,6 +100,21 @@ export default function ExamClient({ userId, companyId, userName }: Props) {
     setPhase('results')
   }
 
+  function handleReset() {
+    setPhase('phase1')
+    setPhase1Answers([])
+    setPhase1Results([])
+    setPhase1Score(0)
+    setPhase1Max(0)
+    setPhase1Questions([])
+    setPhase2Answers([])
+    setPhase2Results([])
+    setPhase2Score(0)
+    setPhase2Max(0)
+    setPhase2Questions([])
+    setPhase3Completed(false)
+  }
+
   const phaseOrder: ExamPhase[] = ['phase1', 'phase2', 'phase3', 'results']
   const currentIdx = phaseOrder.indexOf(phase)
 
@@ -168,6 +183,7 @@ export default function ExamClient({ userId, companyId, userName }: Props) {
             phase2Questions={phase2Questions}
             phase3Completed={phase3Completed}
             userName={userName}
+            onReset={handleReset}
           />
         )}
       </div>

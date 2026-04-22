@@ -20,6 +20,7 @@ interface Props {
   phase2Questions: { id: string; scenario: string }[]
   phase3Completed: boolean
   userName: string
+  onReset: () => void
 }
 
 function ScoreRing({ score, max, label, color }: { score: number; max: number; label: string; color: string }) {
@@ -60,7 +61,7 @@ function ScoreRing({ score, max, label, color }: { score: number; max: number; l
 export default function ExamResults({
   phase1Score, phase1Max, phase1Results, phase1Questions,
   phase2Score, phase2Max, phase2Results, phase2Questions,
-  phase3Completed, userName,
+  phase3Completed, userName, onReset,
 }: Props) {
   const total = phase1Score + phase2Score
   const totalMax = phase1Max + phase2Max
@@ -216,6 +217,22 @@ export default function ExamResults({
             })}
           </div>
         </div>
+      </div>
+
+      {/* Reset button */}
+      <div className="flex justify-center mt-10 pb-4">
+        <button
+          onClick={onReset}
+          style={{
+            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)',
+            border: '1px solid rgba(255,255,255,0.12)', fontWeight: 700, borderRadius: 10,
+            padding: '12px 36px', fontSize: 14, cursor: 'pointer', transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; (e.target as HTMLButtonElement).style.color = '#fff' }}
+          onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; (e.target as HTMLButtonElement).style.color = 'rgba(255,255,255,0.6)' }}
+        >
+          إعادة الامتحان من البداية ↺
+        </button>
       </div>
     </div>
   )
