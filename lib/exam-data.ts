@@ -1,9 +1,8 @@
 // ─── SERVER-ONLY ──────────────────────────────────────────────────────────────
 // Never imported by client components. Used only in /api/exam/* routes.
 
-import * as XLSX from 'xlsx'
-import path from 'path'
-import { randomUUID } from 'crypto'
+import phase1Raw from '../data/phase1-questions.json'
+import phase2Raw from '../data/phase2-questions.json'
 
 export type Phase1Type = 'mcq' | 'truefalse' | 'essay'
 
@@ -25,105 +24,12 @@ export interface Phase2Question {
   reasoning: string
 }
 
-function parsePhase1(): Phase1Question[] {
-  const filePath = path.join(process.cwd(), 'data', 'phase1-questions.xlsx')
-  const wb = XLSX.readFile(filePath)
-  const ws = wb.Sheets[wb.SheetNames[0]]
-  const rows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 }) as string[][]
-
-  const questions: Phase1Question[] = []
-
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i]
-    if (!row || !row[0] || !row[1]) continue
-
-    const typeRaw = String(row[0]).trim()
-    const question = String(row[1]).trim()
-    const choicesRaw = row[2] ? String(row[2]).trim() : ''
-    const answer = row[3] ? String(row[3]).trim() : ''
-    const points = row[4] ? Number(row[4]) : 0
-
-    let type: Phase1Type
-    let choices: string[] | undefined
-
-    if (typeRaw === 'اختيار من متعدد') {
-      type = 'mcq'
-      // choices are newline-separated "أ) ...\nب) ...\nج) ...\nد) ..."
-      choices = choicesRaw
-        .split('\n')
-        .map(c => c.trim())
-        .filter(c => c.length > 0)
-    } else if (typeRaw === 'صح أو غلط') {
-      type = 'truefalse'
-      choices = ['صح', 'غلط']
-    } else if (typeRaw === 'سؤال مقالي') {
-      type = 'essay'
-    } else {
-      continue
-    }
-
-    questions.push({ id: randomUUID(), type, question, choices, answer, points })
-  }
-
-  return questions
-}
-
-function parsePhase2(): Phase2Question[] {
-  const filePath = path.join(process.cwd(), 'data', 'phase2-questions.xlsx')
-  const wb = XLSX.readFile(filePath)
-  const ws = wb.Sheets[wb.SheetNames[0]]
-  const rows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 }) as string[][]
-
-  const questions: Phase2Question[] = []
-
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i]
-    if (!row || !row[0]) continue
-
-    const scenario = String(row[0]).trim()
-    const choicesRaw = row[1] ? String(row[1]).trim() : ''
-    const answer = row[2] ? String(row[2]).trim() : ''
-    const reasoning = row[3] ? String(row[3]).trim() : ''
-
-    if (!scenario || !choicesRaw || !answer) continue
-
-    // Choices: "أ) Ozone (Catalyst)\nب) N Square\nج) Twins Mall"
-    const choiceLines = choicesRaw
-      .split('\n')
-      .map(c => c.trim())
-      .filter(c => c.length > 0)
-
-    const choices = choiceLines.map(line => {
-      const match = line.match(/^([أبج])\)\s*(.+)$/)
-      if (match) return { label: match[1], text: match[2].trim() }
-      return { label: '', text: line }
-    }).filter(c => c.label)
-
-    // Extract just the label letter from answer like "أ) Ozone (Catalyst)"
-    const answerMatch = answer.match(/^([أبج])/)
-    const answerLabel = answerMatch ? answerMatch[1] : answer
-
-    // Determine subtype: budget questions start with "عندنا د."
-    const subtype: 'narrative' | 'budget' = scenario.startsWith('عندنا د.') ? 'budget' : 'narrative'
-
-    questions.push({ id: randomUUID(), subtype, scenario, choices, answer: answerLabel, reasoning })
-  }
-
-  return questions
-}
-
-// Parse once at module load (server startup)
-let _phase1: Phase1Question[] | null = null
-let _phase2: Phase2Question[] | null = null
-
 export function getPhase1Questions(): Phase1Question[] {
-  if (!_phase1) _phase1 = parsePhase1()
-  return _phase1
+  return phase1Raw as Phase1Question[]
 }
 
 export function getPhase2Questions(): Phase2Question[] {
-  if (!_phase2) _phase2 = parsePhase2()
-  return _phase2
+  return phase2Raw as Phase2Question[]
 }
 
 export function shuffle<T>(arr: T[]): T[] {
