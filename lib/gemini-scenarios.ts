@@ -8,6 +8,7 @@ import { MRS_NADIA_PROMPT } from './scenario-prompts/prompt_mrs_nadia'
 import { DR_MARIAM_PROMPT } from './scenario-prompts/prompt_dr_mariam'
 import { GENERAL_KNOWLEDGE_CLINICS_PROMPT } from './scenario-prompts/prompt_general_knowledge_clinics'
 import { SALES_KNOWLEDGE_ASSISTANT_PROMPT } from './scenario-prompts/prompt_sales_knowledge_assistant'
+import { MR_TAREK_PROMPT } from './scenario-prompts/prompt_mr_tarek'
 
 export interface Scenario {
   id: string;
@@ -52,6 +53,13 @@ export const SCENARIOS: Scenario[] = [
     defaultVoice: "Charon",
     prompt: GENERAL_KNOWLEDGE_CLINICS_PROMPT,
     description: "محمد — TGL's internal sales strategist. Ask anything about the 68 clinic projects in the portfolio. Strategy, comparisons, buyer targeting.",
+  },
+  {
+    id: "mr_tarek",
+    label: "Mr. Tarek — Competitive Buyer",
+    defaultVoice: "Charon",
+    prompt: MR_TAREK_PROMPT,
+    description: "Mr. Tarek is a business owner looking for a commercial unit in Madinat Nasr. He has competitor offers and will challenge wrong claims. (Discovery + Competitor Comparison + Meeting Resistance)",
   },
   {
     id: "sales_knowledge_assistant_demo",
