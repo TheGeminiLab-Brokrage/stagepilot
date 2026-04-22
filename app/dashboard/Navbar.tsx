@@ -10,6 +10,8 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
   const navLinks =
     role === 'trainee'
       ? [{ href: '/dashboard/practice', label: 'AI Practice' }]
+      : role === 'exam'
+      ? [{ href: '/dashboard/exam', label: 'الامتحان' }]
       : [
           { href: '/dashboard', label: role === 'agent' ? 'My Calls' : 'Team Calls' },
           ...(role === 'agent' ? [{ href: '/dashboard/upload', label: 'Upload Call' }] : []),
@@ -59,7 +61,7 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
                 }}
                 onMouseLeave={e => {
                   const el = e.currentTarget
-                  el.style.color = role === 'trainee' ? 'rgba(215,255,0,0.7)' : 'rgba(255,255,255,0.45)'
+                  el.style.color = (role === 'trainee' || role === 'exam') ? 'rgba(215,255,0,0.7)' : 'rgba(255,255,255,0.45)'
                   el.style.background = 'transparent'
                 }}
               >

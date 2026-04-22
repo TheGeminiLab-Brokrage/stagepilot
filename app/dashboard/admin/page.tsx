@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import CreateUserForm from './CreateUserForm'
 import UserTable from './UserTable'
 import PracticeSessionsTable from './PracticeSessionsTable'
+import ExamResultsTable from './ExamResultsTable'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -27,6 +28,20 @@ export default async function AdminPage() {
 
   const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers()
   const emailMap = Object.fromEntries((authUsers ?? []).map(u => [u.id, u.email ?? '']))
+
+  // Fetch exam results with user names
+  const { data: rawExamResults } = await adminClient
+    .from('exam_results')
+    .select(`id, phase1_score, phase1_max, phase2_score, phase2_max, phase3_completed, created_at, profiles!user_id(full_name)`)
+    .eq('company_id', profile.company_id)
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const examResults = (rawExamResults ?? []).map((r: any) => ({
+    ...r,
+    user_name: (Array.isArray(r.profiles) ? r.profiles[0] : r.profiles)?.full_name ?? 'Unknown',
+  }))
 
   // Fetch practice sessions with trainee names
   const { data: rawSessions } = await adminClient
@@ -69,6 +84,19 @@ export default async function AdminPage() {
             .filter(p => p.role === 'team_leader')
             .map(p => p.full_name)}
         />
+      </div>
+
+      {/* Exam Results */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-xl font-semibold text-white">Exam Results</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{examResults.length} exams completed</p>
+          </div>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <ExamResultsTable results={examResults} />
+        </div>
       </div>
 
       {/* Practice Sessions */}

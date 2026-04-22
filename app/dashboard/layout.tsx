@@ -25,6 +25,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (role === 'trainee' && !pathname.startsWith('/dashboard/practice')) {
     redirect('/dashboard/practice')
   }
+  if (role === 'exam' && !pathname.startsWith('/dashboard/exam')) {
+    redirect('/dashboard/exam')
+  }
 
   return (
     <div className="flex flex-col" style={{ height: '100vh', background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
@@ -34,7 +37,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {children}
       </main>
 
-      {role !== 'trainee' && <GeminiVoiceButton />}
+      {role !== 'trainee' && role !== 'exam' && <GeminiVoiceButton />}
     </div>
   )
 }

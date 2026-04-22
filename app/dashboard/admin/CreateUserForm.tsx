@@ -87,6 +87,7 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
             <option value="agent">Agent</option>
             <option value="team_leader">Team Leader</option>
             <option value="trainee">Trainee</option>
+            <option value="exam">Exam</option>
             <option value="super_admin">Super Admin</option>
           </select>
         </div>
