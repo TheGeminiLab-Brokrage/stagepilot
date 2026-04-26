@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['lamejs'],
   outputFileTracingIncludes: {
     '/api/exam/phase1-questions': ['./data/**'],
     '/api/exam/phase2-questions': ['./data/**'],
