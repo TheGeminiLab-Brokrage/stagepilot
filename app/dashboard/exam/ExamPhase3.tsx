@@ -184,6 +184,7 @@ export default function ExamPhase3({ onComplete }: Props) {
   const ringCtxRef = useRef<AudioContext | null>(null)
   const ringStoppedRef = useRef(true)
   const goodbyeTriggeredRef = useRef(false)
+  const closeSessionRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     if (transcriptRef.current) {
@@ -314,13 +315,15 @@ export default function ExamPhase3({ onComplete }: Props) {
     }
   }, [closeSession])
 
-  // Phone ring during connecting state
+  // Stop ring when no longer connecting (ring is started directly in startSession)
   useEffect(() => {
-    if (status === 'connecting') startRingSound()
-    else stopRingSound()
-  }, [status, startRingSound, stopRingSound])
+    if (status !== 'connecting') stopRingSound()
+  }, [status, stopRingSound])
 
   const isActive = status === 'listening' || status === 'speaking'
+
+  // Keep ref current so the goodbye timer always calls the latest closeSession
+  useEffect(() => { closeSessionRef.current = closeSession }, [closeSession])
 
   // Auto-close when AI says goodbye
   useEffect(() => {
@@ -328,9 +331,8 @@ export default function ExamPhase3({ onComplete }: Props) {
     const lastAI = [...turns].reverse().find((t) => t.role === 'assistant')
     if (!lastAI || !isGoodbye(lastAI.text) || goodbyeTriggeredRef.current) return
     goodbyeTriggeredRef.current = true
-    const t = setTimeout(() => closeSession(), 1500)
-    return () => clearTimeout(t)
-  }, [turns, isActive, closeSession])
+    setTimeout(() => closeSessionRef.current(), 1500)
+  }, [turns, isActive])
 
   const playAudioChunk = useCallback((b64: string) => {
     const samples = base64ToFloat32(b64)
@@ -468,6 +470,7 @@ export default function ExamPhase3({ onComplete }: Props) {
 
   const startSession = useCallback(async () => {
     setStatusSync('connecting')
+    startRingSound()
     setErrorMsg('')
     setTurns([])
     setSaveStatus('idle')
@@ -534,7 +537,7 @@ export default function ExamPhase3({ onComplete }: Props) {
       setStatusSync('error')
       setErrorMsg(e instanceof Error ? e.message : 'Failed to start session')
     }
-  }, [setStatusSync, handleMessage, startMic, stopMic, stopPlayback])
+  }, [setStatusSync, handleMessage, startMic, stopMic, stopPlayback, startRingSound])
 
   const statusLabels: Record<Status, string> = {
     idle: 'جاهز للمرحلة الثالثة',

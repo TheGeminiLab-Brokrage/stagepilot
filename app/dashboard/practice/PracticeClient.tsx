@@ -188,6 +188,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   const ringCtxRef = useRef<AudioContext | null>(null)
   const ringStoppedRef = useRef(true)
   const goodbyeTriggeredRef = useRef(false)
+  const closeSessionRef = useRef<() => void>(() => {})
 
   const selectedScenarioRef = useRef(selectedScenario)
   useEffect(() => { selectedScenarioRef.current = selectedScenario }, [selectedScenario])
@@ -349,11 +350,13 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
   useEffect(() => { return () => closeSession() }, [closeSession])
 
-  // Phone ring during connecting state
+  // Stop ring when no longer connecting (ring is started directly in startSession)
   useEffect(() => {
-    if (status === 'connecting') startRingSound()
-    else stopRingSound()
-  }, [status, startRingSound, stopRingSound])
+    if (status !== 'connecting') stopRingSound()
+  }, [status, stopRingSound])
+
+  // Keep ref current so the goodbye timer always calls the latest closeSession
+  useEffect(() => { closeSessionRef.current = closeSession }, [closeSession])
 
   // Auto-close when AI says goodbye
   useEffect(() => {
@@ -361,9 +364,8 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     const lastAI = [...turns].reverse().find((t) => t.role === 'assistant')
     if (!lastAI || !isGoodbye(lastAI.text) || goodbyeTriggeredRef.current) return
     goodbyeTriggeredRef.current = true
-    const t = setTimeout(() => closeSession(), 1500)
-    return () => clearTimeout(t)
-  }, [turns, status, closeSession])
+    setTimeout(() => closeSessionRef.current(), 1500)
+  }, [turns, status])
 
   const playAudioChunk = useCallback((b64: string) => {
     const samples = base64ToFloat32(b64)
@@ -419,6 +421,43 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
       if ('setupComplete' in msg || 'setup_complete' in msg) {
         setStatusSync('listening')
+        return
+      }
+
+      // Handle real-time tool calls from Gemini (e.g. search_clinic_projects)
+      const toolCall = msg.toolCall as Record<string, unknown> | undefined
+      if (toolCall) {
+        const functionCalls = (toolCall.functionCalls as Array<Record<string, unknown>>) ?? []
+        void (async () => {
+          const responses = await Promise.all(
+            functionCalls.map(async (call) => {
+              const callId = call.id as string
+              const name = call.name as string
+              const args = call.args as Record<string, unknown>
+
+              if (name === 'search_clinic_projects') {
+                try {
+                  const res = await fetch('/api/knowledge/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: args.query }),
+                  })
+                  const json = await res.json()
+                  return { id: callId, response: { output: json.result ?? 'No results found.' } }
+                } catch {
+                  return { id: callId, response: { output: 'Search unavailable.' } }
+                }
+              }
+              return { id: callId, response: { output: 'Unknown tool.' } }
+            })
+          )
+
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({
+              toolResponse: { functionResponses: responses },
+            }))
+          }
+        })()
         return
       }
 
@@ -481,6 +520,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
   const startSession = useCallback(async () => {
     setStatusSync('connecting')
+    startRingSound()
     setErrorMsg('')
     setTurns([])
     setSaveStatus('idle')
@@ -495,6 +535,8 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
     let token: string
     let systemPrompt: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let tools: any[] = []
     try {
       const res = await fetch('/api/gemini-token', {
         method: 'POST',
@@ -505,6 +547,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       const json = await res.json()
       token = json.token
       systemPrompt = json.systemPrompt
+      tools = json.tools ?? []
     } catch (e) {
       setStatusSync('error')
       setErrorMsg('Could not get auth token. Are you logged in?')
@@ -530,6 +573,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
             automaticActivityDetection: {},
           },
           systemInstruction: { parts: [{ text: systemPrompt }] },
+          ...(tools.length > 0 ? { tools } : {}),
         },
       }))
     }
@@ -609,7 +653,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       console.error(e)
       ws.close()
     }
-  }, [handleMessage, stopMic, stopPlayback, setStatusSync, scenarios])
+  }, [handleMessage, stopMic, stopPlayback, setStatusSync, scenarios, startRingSound])
 
   const newConversation = useCallback(() => {
     wsRef.current?.close()
