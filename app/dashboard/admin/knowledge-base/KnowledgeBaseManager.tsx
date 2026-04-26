@@ -227,7 +227,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
       </div>
 
       {/* Table */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
         {filtered.length === 0 ? (
           <div className="py-12 text-center text-sm text-gray-600">
             No {CATEGORY_LABELS[activeTab].toLowerCase()} yet. Click &ldquo;+ Add Entry&rdquo; to add the first one.
