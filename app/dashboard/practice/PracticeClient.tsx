@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Mp3Encoder } from 'lamejs'
 import AiOrb from './AiOrb'
 
 // ─── Gemini Live API constants ─────────────────────────────────────────────────
@@ -86,7 +87,7 @@ function resampleLinear(input: Float32Array, fromRate: number, toRate: number): 
   return output
 }
 
-function createStereoWavBlob(
+function createStereoMp3Blob(
   aiChunks: AiChunk[],
   micSamples: Float32Array[],
   sessionStartMs: number,
@@ -109,34 +110,44 @@ function createStereoWavBlob(
   const mic = resampleLinear(micRaw, MIC_SAMPLE_RATE, sampleRate)
 
   const len = Math.max(ai.length, mic.length)
-  const interleaved = new Int16Array(len * 2)
+  const leftInt16 = new Int16Array(len)
+  const rightInt16 = new Int16Array(len)
   for (let i = 0; i < len; i++) {
-    const aiVal = ai[i] ?? 0
-    const micVal = mic[i] ?? 0
-    interleaved[i * 2] = Math.max(-32768, Math.min(32767, Math.round(aiVal * 32767)))
-    interleaved[i * 2 + 1] = Math.max(-32768, Math.min(32767, Math.round(micVal * 32767)))
+    leftInt16[i] = Math.max(-32768, Math.min(32767, Math.round((ai[i] ?? 0) * 32767)))
+    rightInt16[i] = Math.max(-32768, Math.min(32767, Math.round((mic[i] ?? 0) * 32767)))
   }
 
-  const dataLen = interleaved.buffer.byteLength
-  const buf = new ArrayBuffer(44 + dataLen)
-  const v = new DataView(buf)
-  v.setUint32(0, 0x52494646, false)
-  v.setUint32(4, 36 + dataLen, true)
-  v.setUint32(8, 0x57415645, false)
-  v.setUint32(12, 0x666d7420, false)
-  v.setUint32(16, 16, true)
-  v.setUint16(20, 1, true)
-  v.setUint16(22, 2, true)
-  v.setUint32(24, sampleRate, true)
-  v.setUint32(28, sampleRate * 2 * 2, true)
-  v.setUint16(32, 4, true)
-  v.setUint16(34, 16, true)
-  v.setUint32(36, 0x64617461, false)
-  v.setUint32(40, dataLen, true)
-  new Int16Array(buf, 44).set(interleaved)
-  return new Blob([buf], { type: 'audio/wav' })
+  const encoder = new Mp3Encoder(2, sampleRate, 128)
+  const chunkSize = 1152
+  const mp3Parts: Uint8Array[] = []
+  for (let i = 0; i < len; i += chunkSize) {
+    const encoded = encoder.encodeBuffer(leftInt16.subarray(i, i + chunkSize), rightInt16.subarray(i, i + chunkSize))
+    if (encoded.length > 0) mp3Parts.push(new Uint8Array(encoded.buffer as ArrayBuffer))
+  }
+  const flushed = encoder.flush()
+  if (flushed.length > 0) mp3Parts.push(new Uint8Array(flushed.buffer as ArrayBuffer))
+
+  return new Blob(mp3Parts as unknown as BlobPart[], { type: 'audio/mpeg' })
 }
 
+
+// ─── Goodbye detection ────────────────────────────────────────────────────────
+
+const GOODBYE_PATTERNS = [
+  /مع السلام/,
+  /وداعاً?/,
+  /إلى اللقاء/,
+  /الى اللقاء/,
+  /\bgoodbye\b/i,
+  /\bfarеwell\b/i,
+  /\bbye\b/i,
+]
+
+function isGoodbye(text: string): boolean {
+  if (GOODBYE_PATTERNS.some((r) => r.test(text))) return true
+  // standalone سلام (not preceded by ل as in السلام عليكم)
+  return /(?<!ل)سلام[.!،؟\s]*$/.test(text.trim())
+}
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 interface PracticeClientProps {
@@ -174,6 +185,9 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   const intentionalCloseRef = useRef(false)
   const lastTurnCompleteRef = useRef(true)
   const audioLevelRafRef = useRef<number>(0)
+  const ringCtxRef = useRef<AudioContext | null>(null)
+  const ringStoppedRef = useRef(true)
+  const goodbyeTriggeredRef = useRef(false)
 
   const selectedScenarioRef = useRef(selectedScenario)
   useEffect(() => { selectedScenarioRef.current = selectedScenario }, [selectedScenario])
@@ -217,6 +231,51 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     nextPlayTimeRef.current = 0
   }, [])
 
+  const stopRingSound = useCallback(() => {
+    ringStoppedRef.current = true
+    if (ringCtxRef.current) {
+      ringCtxRef.current.close().catch(() => {})
+      ringCtxRef.current = null
+    }
+  }, [])
+
+  const startRingSound = useCallback(() => {
+    stopRingSound()
+    ringStoppedRef.current = false
+    const ctx = new AudioContext()
+    ringCtxRef.current = ctx
+
+    const scheduleRing = () => {
+      if (ringStoppedRef.current || !ringCtxRef.current || ringCtxRef.current.state === 'closed') return
+
+      const gain = ctx.createGain()
+      gain.gain.value = 0.22
+      gain.connect(ctx.destination)
+
+      const o1 = ctx.createOscillator()
+      const o2 = ctx.createOscillator()
+      o1.type = 'sine'
+      o2.type = 'sine'
+      o1.frequency.value = 440
+      o2.frequency.value = 480
+      o1.connect(gain)
+      o2.connect(gain)
+      o1.start()
+      o2.start()
+
+      setTimeout(() => {
+        if (ringStoppedRef.current) return
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.1)
+        setTimeout(() => {
+          try { o1.stop(); o2.stop() } catch { /* already stopped */ }
+          setTimeout(scheduleRing, 3000)
+        }, 150)
+      }, 1200)
+    }
+
+    scheduleRing()
+  }, [stopRingSound])
+
   const saveSessionToServer = useCallback(async (blob: Blob, durationSeconds: number) => {
     setSaveStatus('saving')
     setSaveError('')
@@ -231,7 +290,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
       const uploadRes = await fetch(signedUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': 'audio/wav' },
+        headers: { 'Content-Type': 'audio/mpeg' },
         body: blob,
       })
       if (!uploadRes.ok) throw new Error(`Storage upload failed: ${uploadRes.status}`)
@@ -259,7 +318,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `practice-session-${Date.now()}.wav`
+      a.download = `practice-session-${Date.now()}.mp3`
       a.click()
       URL.revokeObjectURL(url)
     }
@@ -276,7 +335,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
     if (aiChunksRef.current.length > 0 || micSamplesRef.current.length > 0) {
       const durationSeconds = Math.round((Date.now() - micStartWallRef.current) / 1000)
-      const blob = createStereoWavBlob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
+      const blob = createStereoMp3Blob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
       saveSessionToServer(blob, durationSeconds)
     }
 
@@ -289,6 +348,22 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   }, [stopMic, stopPlayback, saveSessionToServer, setStatusSync])
 
   useEffect(() => { return () => closeSession() }, [closeSession])
+
+  // Phone ring during connecting state
+  useEffect(() => {
+    if (status === 'connecting') startRingSound()
+    else stopRingSound()
+  }, [status, startRingSound, stopRingSound])
+
+  // Auto-close when AI says goodbye
+  useEffect(() => {
+    if (status !== 'listening' && status !== 'speaking') return
+    const lastAI = [...turns].reverse().find((t) => t.role === 'assistant')
+    if (!lastAI || !isGoodbye(lastAI.text) || goodbyeTriggeredRef.current) return
+    goodbyeTriggeredRef.current = true
+    const t = setTimeout(() => closeSession(), 1500)
+    return () => clearTimeout(t)
+  }, [turns, status, closeSession])
 
   const playAudioChunk = useCallback((b64: string) => {
     const samples = base64ToFloat32(b64)
@@ -415,6 +490,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     micStartWallRef.current = 0
     ctxCreatedAtWallRef.current = 0
     lastTurnCompleteRef.current = true
+    goodbyeTriggeredRef.current = false
     stopPlayback()
 
     let token: string
@@ -441,7 +517,6 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
     ws.onopen = () => {
       console.log('[PracticeClient] WS open')
-      micStartWallRef.current = Date.now()
       ws.send(JSON.stringify({
         setup: {
           model: MODEL,
@@ -525,6 +600,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
         }))
       }
 
+      micStartWallRef.current = Date.now()
       source.connect(processor)
       processor.connect(ctx.destination)
     } catch (e) {
@@ -546,6 +622,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     micSamplesRef.current = []
     ctxCreatedAtWallRef.current = 0
     lastTurnCompleteRef.current = true
+    goodbyeTriggeredRef.current = false
     setTurns([])
     setErrorMsg('')
     setStatusSync('idle')

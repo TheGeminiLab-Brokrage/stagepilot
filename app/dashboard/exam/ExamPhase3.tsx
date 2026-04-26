@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Mp3Encoder } from 'lamejs'
 import AiOrb from '../practice/AiOrb'
 
 const MODEL = 'models/gemini-3.1-flash-live-preview'
@@ -12,6 +13,13 @@ const BUFFER_SIZE = 4096
 type Status = 'idle' | 'connecting' | 'listening' | 'speaking' | 'error'
 
 interface Turn { role: 'user' | 'assistant'; text: string }
+
+interface AiChunk {
+  wallStart: number
+  samples: Float32Array
+}
+
+// ─── Pure helpers ───────────────────────────────────────────────────────────
 
 function floatTo16BitPCM(input: Float32Array): ArrayBuffer {
   const buf = new ArrayBuffer(input.length * 2)
@@ -42,6 +50,106 @@ function base64ToFloat32(b64: string): Float32Array | null {
   } catch { return null }
 }
 
+function concatFloat32(arrays: Float32Array[]): Float32Array {
+  const total = arrays.reduce((n, a) => n + a.length, 0)
+  const out = new Float32Array(total)
+  let offset = 0
+  for (const a of arrays) { out.set(a, offset); offset += a.length }
+  return out
+}
+
+function resampleLinear(input: Float32Array, fromRate: number, toRate: number): Float32Array {
+  const ratio = fromRate / toRate
+  const outputLen = Math.floor(input.length / ratio)
+  const output = new Float32Array(outputLen)
+  for (let i = 0; i < outputLen; i++) {
+    const pos = i * ratio
+    const idx = Math.floor(pos)
+    const frac = pos - idx
+    const a = input[idx] ?? 0
+    const b = input[Math.min(idx + 1, input.length - 1)] ?? 0
+    output[i] = a + (b - a) * frac
+  }
+  return output
+}
+
+function createStereoMp3Blob(
+  aiChunks: AiChunk[],
+  micSamples: Float32Array[],
+  sessionStartMs: number,
+  sampleRate: number,
+): Blob {
+  // Build AI track with proper wall-clock offsets
+  let aiTrackLen = 0
+  for (const chunk of aiChunks) {
+    const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
+    if (offset >= 0) aiTrackLen = Math.max(aiTrackLen, offset + chunk.samples.length)
+  }
+  const ai = new Float32Array(Math.max(aiTrackLen, 1))
+  for (const chunk of aiChunks) {
+    const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
+    if (offset >= 0 && offset + chunk.samples.length <= ai.length) {
+      ai.set(chunk.samples, offset)
+    }
+  }
+
+  const micRaw = concatFloat32(micSamples)
+  const mic = resampleLinear(micRaw, MIC_SAMPLE_RATE, sampleRate)
+
+  const len = Math.max(ai.length, mic.length)
+
+  // Convert to Int16 for lamejs
+  const leftInt16 = new Int16Array(len)
+  const rightInt16 = new Int16Array(len)
+  for (let i = 0; i < len; i++) {
+    leftInt16[i] = Math.max(-32768, Math.min(32767, Math.round((ai[i] ?? 0) * 32767)))
+    rightInt16[i] = Math.max(-32768, Math.min(32767, Math.round((mic[i] ?? 0) * 32767)))
+  }
+
+  const encoder = new Mp3Encoder(2, sampleRate, 128)
+  const chunkSize = 1152
+  const mp3Parts: Uint8Array[] = []
+
+  for (let i = 0; i < len; i += chunkSize) {
+    const left = leftInt16.subarray(i, i + chunkSize)
+    const right = rightInt16.subarray(i, i + chunkSize)
+    const encoded = encoder.encodeBuffer(left, right)
+    if (encoded.length > 0) mp3Parts.push(new Uint8Array(encoded.buffer as ArrayBuffer))
+  }
+  const flushed = encoder.flush()
+  if (flushed.length > 0) mp3Parts.push(new Uint8Array(flushed.buffer as ArrayBuffer))
+
+  return new Blob(mp3Parts as unknown as BlobPart[], { type: 'audio/mpeg' })
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Goodbye detection ─────────────────────────────────────────────────────
+
+const GOODBYE_PATTERNS = [
+  /مع السلام/,
+  /وداعاً?/,
+  /إلى اللقاء/,
+  /الى اللقاء/,
+  /\bgoodbye\b/i,
+  /\bfarеwell\b/i,
+  /\bbye\b/i,
+]
+
+function isGoodbye(text: string): boolean {
+  if (GOODBYE_PATTERNS.some((r) => r.test(text))) return true
+  return /(?<!ل)سلام[.!،؟\s]*$/.test(text.trim())
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 interface Props {
   onComplete: () => void
 }
@@ -52,6 +160,7 @@ export default function ExamPhase3({ onComplete }: Props) {
   const [errorMsg, setErrorMsg] = useState('')
   const [audioLevel, setAudioLevel] = useState(0)
   const [canFinish, setCanFinish] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   const statusRef = useRef<Status>('idle')
   const setStatusSync = useCallback((s: Status) => { statusRef.current = s; setStatus(s) }, [])
@@ -64,11 +173,17 @@ export default function ExamPhase3({ onComplete }: Props) {
   const playbackCtxRef = useRef<AudioContext | null>(null)
   const nextPlayTimeRef = useRef(0)
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([])
+  const aiChunksRef = useRef<AiChunk[]>([])
+  const micSamplesRef = useRef<Float32Array[]>([])
+  const micStartWallRef = useRef(0)
+  const ctxCreatedAtWallRef = useRef(0)
   const intentionalCloseRef = useRef(false)
   const lastTurnCompleteRef = useRef(true)
-  const audioLevelRafRef = useRef<number>(0)
   const transcriptRef = useRef<HTMLDivElement | null>(null)
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const ringCtxRef = useRef<AudioContext | null>(null)
+  const ringStoppedRef = useRef(true)
+  const goodbyeTriggeredRef = useRef(false)
 
   useEffect(() => {
     if (transcriptRef.current) {
@@ -77,7 +192,6 @@ export default function ExamPhase3({ onComplete }: Props) {
   }, [turns])
 
   const stopMic = useCallback(() => {
-    cancelAnimationFrame(audioLevelRafRef.current)
     processorRef.current?.disconnect()
     sourceRef.current?.disconnect()
     audioCtxRef.current?.close().catch(() => {})
@@ -91,10 +205,86 @@ export default function ExamPhase3({ onComplete }: Props) {
 
   const stopPlayback = useCallback(() => {
     for (const src of activeSourcesRef.current) {
-      try { src.stop() } catch { /* ended */ }
+      try { src.stop() } catch { /* already ended */ }
     }
     activeSourcesRef.current = []
     nextPlayTimeRef.current = 0
+  }, [])
+
+  const stopRingSound = useCallback(() => {
+    ringStoppedRef.current = true
+    if (ringCtxRef.current) {
+      ringCtxRef.current.close().catch(() => {})
+      ringCtxRef.current = null
+    }
+  }, [])
+
+  const startRingSound = useCallback(() => {
+    stopRingSound()
+    ringStoppedRef.current = false
+    const ctx = new AudioContext()
+    ringCtxRef.current = ctx
+
+    const scheduleRing = () => {
+      if (ringStoppedRef.current || !ringCtxRef.current || ringCtxRef.current.state === 'closed') return
+
+      const gain = ctx.createGain()
+      gain.gain.value = 0.22
+      gain.connect(ctx.destination)
+
+      const o1 = ctx.createOscillator()
+      const o2 = ctx.createOscillator()
+      o1.type = 'sine'
+      o2.type = 'sine'
+      o1.frequency.value = 440
+      o2.frequency.value = 480
+      o1.connect(gain)
+      o2.connect(gain)
+      o1.start()
+      o2.start()
+
+      setTimeout(() => {
+        if (ringStoppedRef.current) return
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.1)
+        setTimeout(() => {
+          try { o1.stop(); o2.stop() } catch { /* already stopped */ }
+          setTimeout(scheduleRing, 3000)
+        }, 150)
+      }, 1200)
+    }
+
+    scheduleRing()
+  }, [stopRingSound])
+
+  const saveRecording = useCallback(async () => {
+    if (aiChunksRef.current.length === 0 && micSamplesRef.current.length === 0) return
+    setSaveStatus('saving')
+    const durationSeconds = Math.round((Date.now() - micStartWallRef.current) / 1000)
+    const blob = createStereoMp3Blob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
+
+    try {
+      const urlRes = await fetch('/api/exam/signed-upload', { method: 'POST' })
+      if (!urlRes.ok) throw new Error('Could not get upload URL')
+      const { signedUrl, audioPath } = await urlRes.json()
+
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'audio/mpeg' },
+        body: blob,
+      })
+      if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`)
+
+      await fetch('/api/exam/save-recording', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioPath, durationSeconds }),
+      })
+      setSaveStatus('saved')
+    } catch {
+      setSaveStatus('error')
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      triggerDownload(blob, `exam-session-${ts}.mp3`)
+    }
   }, [])
 
   const closeSession = useCallback(() => {
@@ -105,12 +295,42 @@ export default function ExamPhase3({ onComplete }: Props) {
     stopPlayback()
     playbackCtxRef.current?.close().catch(() => {})
     playbackCtxRef.current = null
+
+    if (aiChunksRef.current.length > 0 || micSamplesRef.current.length > 0) {
+      saveRecording()
+    }
+
+    aiChunksRef.current = []
+    micSamplesRef.current = []
     setStatusSync('idle')
     setTurns([])
     setErrorMsg('')
-  }, [stopMic, stopPlayback, setStatusSync])
+  }, [stopMic, stopPlayback, saveRecording, setStatusSync])
 
-  useEffect(() => { return () => { closeSession(); if (finishTimerRef.current) clearTimeout(finishTimerRef.current) } }, [closeSession])
+  useEffect(() => {
+    return () => {
+      closeSession()
+      if (finishTimerRef.current) clearTimeout(finishTimerRef.current)
+    }
+  }, [closeSession])
+
+  // Phone ring during connecting state
+  useEffect(() => {
+    if (status === 'connecting') startRingSound()
+    else stopRingSound()
+  }, [status, startRingSound, stopRingSound])
+
+  const isActive = status === 'listening' || status === 'speaking'
+
+  // Auto-close when AI says goodbye
+  useEffect(() => {
+    if (!isActive) return
+    const lastAI = [...turns].reverse().find((t) => t.role === 'assistant')
+    if (!lastAI || !isGoodbye(lastAI.text) || goodbyeTriggeredRef.current) return
+    goodbyeTriggeredRef.current = true
+    const t = setTimeout(() => closeSession(), 1500)
+    return () => clearTimeout(t)
+  }, [turns, isActive, closeSession])
 
   const playAudioChunk = useCallback((b64: string) => {
     const samples = base64ToFloat32(b64)
@@ -118,62 +338,147 @@ export default function ExamPhase3({ onComplete }: Props) {
 
     if (!playbackCtxRef.current || playbackCtxRef.current.state === 'closed') {
       playbackCtxRef.current = new AudioContext({ sampleRate: OUT_SAMPLE_RATE })
+      ctxCreatedAtWallRef.current = Date.now()
       nextPlayTimeRef.current = 0
     }
     const ctx = playbackCtxRef.current
     const audioBuf = ctx.createBuffer(1, samples.length, OUT_SAMPLE_RATE)
     audioBuf.copyToChannel(new Float32Array(samples), 0)
+
     const src = ctx.createBufferSource()
     src.buffer = audioBuf
     src.connect(ctx.destination)
+
     const startAt = Math.max(ctx.currentTime, nextPlayTimeRef.current)
     src.start(startAt)
     nextPlayTimeRef.current = startAt + audioBuf.duration
+
+    const wallStart = ctxCreatedAtWallRef.current + startAt * 1000
+    aiChunksRef.current.push({ wallStart, samples: new Float32Array(samples) })
+
     activeSourcesRef.current.push(src)
     src.onended = () => {
       activeSourcesRef.current = activeSourcesRef.current.filter((s) => s !== src)
-      if (activeSourcesRef.current.length === 0 && statusRef.current === 'speaking') {
-        setStatusSync('listening')
+      if (activeSourcesRef.current.length === 0) {
+        setStatus((prev) => (prev === 'speaking' ? 'listening' : prev))
+        setAudioLevel(0)
       }
     }
-  }, [setStatusSync])
 
-  const handleMessage = useCallback((event: MessageEvent) => {
-    let msg: Record<string, unknown>
-    try { msg = JSON.parse(event.data) } catch { return }
+    setStatus((prev) => (prev === 'listening' || prev === 'connecting' ? 'speaking' : prev))
+  }, [])
 
-    const sc = msg.serverContent as Record<string, unknown> | undefined
-    if (!sc) return
+  const handleMessage = useCallback(
+    (raw: string) => {
+      let msg: Record<string, unknown>
+      try { msg = JSON.parse(raw) } catch { return }
 
-    const modelTurn = sc.modelTurn as Record<string, unknown> | undefined
-    if (modelTurn) {
-      const parts = (modelTurn.parts as Record<string, unknown>[]) ?? []
-      for (const part of parts) {
-        const inlineData = part.inlineData as Record<string, unknown> | undefined
-        if (inlineData?.data) {
-          setStatusSync('speaking')
-          playAudioChunk(inlineData.data as string)
+      if ('setupComplete' in msg || 'setup_complete' in msg) {
+        setStatusSync('listening')
+        return
+      }
+
+      const sc = msg.serverContent as Record<string, unknown> | undefined
+      if (!sc) return
+
+      if (sc.interrupted) {
+        stopPlayback()
+        lastTurnCompleteRef.current = true
+        setStatusSync('listening')
+        return
+      }
+
+      if (sc.turnComplete) {
+        lastTurnCompleteRef.current = true
+      }
+
+      const appendAssistant = (text: string) => {
+        setTurns((prev) => {
+          const last = prev[prev.length - 1]
+          if (last?.role === 'assistant' && !lastTurnCompleteRef.current) {
+            return [...prev.slice(0, -1), { role: 'assistant', text: last.text + text }]
+          }
+          lastTurnCompleteRef.current = false
+          return [...prev, { role: 'assistant', text }]
+        })
+      }
+
+      const modelTurn = sc.modelTurn as Record<string, unknown> | undefined
+      if (modelTurn) {
+        const parts = (modelTurn.parts as Array<Record<string, unknown>>) ?? []
+        for (const part of parts) {
+          const inlineData = part.inlineData as Record<string, unknown> | undefined
+          if (inlineData?.data) playAudioChunk(inlineData.data as string)
+          if (typeof part.text === 'string' && part.text.trim()) appendAssistant(part.text)
         }
       }
-    }
 
-    const inputTx = sc.inputTranscription as Record<string, unknown> | undefined
-    const outputTx = sc.outputTranscription as Record<string, unknown> | undefined
-    if (inputTx?.text) setTurns(t => [...t, { role: 'user', text: inputTx.text as string }])
-    if (outputTx?.text) setTurns(t => [...t, { role: 'assistant', text: outputTx.text as string }])
+      const outTx = sc.outputTranscription as Record<string, unknown> | undefined
+      if (outTx?.text) appendAssistant(outTx.text as string)
 
-    if (sc.turnComplete) {
-      lastTurnCompleteRef.current = true
-      if (statusRef.current !== 'speaking') setStatusSync('listening')
-    }
-    if (sc.interrupted) lastTurnCompleteRef.current = false
-  }, [setStatusSync, playAudioChunk])
+      const inTx = sc.inputTranscription as Record<string, unknown> | undefined
+      if (inTx?.text) {
+        const text = inTx.text as string
+        setTurns((prev) => {
+          const last = prev[prev.length - 1]
+          if (last?.role === 'user') {
+            return [...prev.slice(0, -1), { role: 'user', text: last.text + ' ' + text }]
+          }
+          return [...prev, { role: 'user', text }]
+        })
+      }
+    },
+    [playAudioChunk, stopPlayback, setStatusSync]
+  )
+
+  const startMic = useCallback((ws: WebSocket) => {
+    navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
+      streamRef.current = stream
+      const ctx = new AudioContext({ sampleRate: MIC_SAMPLE_RATE })
+      audioCtxRef.current = ctx
+      const source = ctx.createMediaStreamSource(stream)
+      sourceRef.current = source
+      // eslint-disable-next-line @typescript-eslint/no-deprecated
+      const processor = ctx.createScriptProcessor(BUFFER_SIZE, 1, 1)
+      processorRef.current = processor
+
+      micStartWallRef.current = Date.now()
+
+      processor.onaudioprocess = (e) => {
+        const channelData = e.inputBuffer.getChannelData(0)
+        micSamplesRef.current.push(new Float32Array(channelData))
+
+        let sum = 0
+        for (let i = 0; i < channelData.length; i++) sum += channelData[i] * channelData[i]
+        const rms = Math.sqrt(sum / channelData.length)
+        setAudioLevel(Math.min(1, rms * 8))
+
+        if (ws.readyState !== WebSocket.OPEN) return
+        const pcm = floatTo16BitPCM(channelData)
+        ws.send(JSON.stringify({ realtimeInput: { audio: { data: arrayBufferToBase64(pcm), mimeType: `audio/pcm;rate=${MIC_SAMPLE_RATE}` } } }))
+      }
+
+      source.connect(processor)
+      processor.connect(ctx.destination)
+    }).catch(() => {
+      setErrorMsg('Microphone access denied')
+      setStatusSync('error')
+    })
+  }, [setStatusSync])
 
   const startSession = useCallback(async () => {
     setStatusSync('connecting')
     setErrorMsg('')
     setTurns([])
+    setSaveStatus('idle')
     intentionalCloseRef.current = false
+    aiChunksRef.current = []
+    micSamplesRef.current = []
+    micStartWallRef.current = 0
+    ctxCreatedAtWallRef.current = 0
+    lastTurnCompleteRef.current = true
+    goodbyeTriggeredRef.current = false
+    stopPlayback()
 
     try {
       const tokenRes = await fetch('/api/gemini-token', {
@@ -191,35 +496,37 @@ export default function ExamPhase3({ onComplete }: Props) {
         ws.send(JSON.stringify({
           setup: {
             model: MODEL,
-            generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } } } },
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } } },
+            },
             systemInstruction: { parts: [{ text: systemPrompt }] },
             realtimeInputConfig: { automaticActivityDetection: {} },
           }
         }))
       }
 
-      const processMessage = (text: string) => {
-        let msg: Record<string, unknown>
-        try { msg = JSON.parse(text) } catch { return }
-        if (msg.setupComplete) {
-          setStatusSync('listening')
-          startMic()
-          finishTimerRef.current = setTimeout(() => setCanFinish(true), 30000)
-          return
-        }
-        handleMessage({ data: text } as MessageEvent)
-      }
-
       ws.onmessage = (e) => {
-        if (typeof e.data === 'string') processMessage(e.data)
-        else if (e.data instanceof Blob) e.data.text().then(processMessage).catch(() => {})
+        const process = (text: string) => {
+          let msg: Record<string, unknown>
+          try { msg = JSON.parse(text) } catch { return }
+          if ('setupComplete' in msg || 'setup_complete' in msg) {
+            setStatusSync('listening')
+            startMic(ws)
+            finishTimerRef.current = setTimeout(() => setCanFinish(true), 30000)
+            return
+          }
+          handleMessage(text)
+        }
+        if (typeof e.data === 'string') process(e.data)
+        else if (e.data instanceof Blob) e.data.text().then(process).catch(() => {})
       }
 
       ws.onerror = () => {
         if (!intentionalCloseRef.current) { setStatusSync('error'); setErrorMsg('Connection error') }
       }
       ws.onclose = () => {
-        if (!intentionalCloseRef.current) { setStatusSync('idle') }
+        if (!intentionalCloseRef.current) setStatusSync('idle')
         stopMic()
         setCanFinish(true)
       }
@@ -227,40 +534,7 @@ export default function ExamPhase3({ onComplete }: Props) {
       setStatusSync('error')
       setErrorMsg(e instanceof Error ? e.message : 'Failed to start session')
     }
-  }, [setStatusSync, handleMessage, stopMic])
-
-  function startMic() {
-    navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
-      streamRef.current = stream
-      const ctx = new AudioContext({ sampleRate: MIC_SAMPLE_RATE })
-      audioCtxRef.current = ctx
-      const source = ctx.createMediaStreamSource(stream)
-      sourceRef.current = source
-      const processor = ctx.createScriptProcessor(BUFFER_SIZE, 1, 1)
-      processorRef.current = processor
-
-      processor.onaudioprocess = (e) => {
-        const inputData = e.inputBuffer.getChannelData(0)
-        const pcm = floatTo16BitPCM(inputData)
-        const b64 = arrayBufferToBase64(pcm)
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ realtimeInput: { audio: { data: b64, mimeType: 'audio/pcm;rate=16000' } } }))
-        }
-
-        // audio level for orb
-        let sum = 0
-        for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i]
-        const rms = Math.sqrt(sum / inputData.length)
-        const level = Math.min(1, rms * 8)
-        setAudioLevel(level)
-      }
-
-      source.connect(processor)
-      processor.connect(ctx.destination)
-    }).catch(() => {
-      setErrorMsg('Microphone access denied')
-    })
-  }
+  }, [setStatusSync, handleMessage, startMic, stopMic, stopPlayback])
 
   const statusLabels: Record<Status, string> = {
     idle: 'جاهز للمرحلة الثالثة',
@@ -284,12 +558,7 @@ export default function ExamPhase3({ onComplete }: Props) {
 
       {/* Instructions (before start) */}
       {status === 'idle' && turns.length === 0 && (
-        <div
-          style={{
-            background: 'rgba(215,255,0,0.05)', border: '1px solid rgba(215,255,0,0.15)',
-            borderRadius: 12, padding: '16px 20px', marginBottom: 16,
-          }}
-        >
+        <div style={{ background: 'rgba(215,255,0,0.05)', border: '1px solid rgba(215,255,0,0.15)', borderRadius: 12, padding: '16px 20px', marginBottom: 16 }}>
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.7 }}>
             هتتكلم مع د. ياسمين — دكتورة أسنان بعتت اهتمام في وحدة عيادية في التجمع الخامس. الـ AI هيلعب دورها وأنت تلعب دور الـ agent. جرب تعرض المشاريع المناسبة وتتعامل مع أسئلتها.
           </p>
@@ -303,35 +572,26 @@ export default function ExamPhase3({ onComplete }: Props) {
 
       {/* Status label */}
       <div className="text-center mb-4">
-        <span
-          style={{
-            fontSize: 13, fontWeight: 600,
-            color: status === 'error' ? '#f87171' : status === 'idle' ? 'rgba(255,255,255,0.3)' : '#D7FF00',
-            fontFamily: "'Space Grotesk', sans-serif",
-          }}
-        >
+        <span style={{ fontSize: 13, fontWeight: 600, color: status === 'error' ? '#f87171' : status === 'idle' ? 'rgba(255,255,255,0.3)' : '#D7FF00', fontFamily: "'Space Grotesk', sans-serif" }}>
           {statusLabels[status]}
         </span>
+        {saveStatus === 'saving' && <div style={{ color: 'rgba(215,255,0,0.5)', fontSize: 12, marginTop: 4 }}>جاري حفظ التسجيل…</div>}
+        {saveStatus === 'saved' && <div style={{ color: '#26D701', fontSize: 12, marginTop: 4 }}>✓ تم حفظ التسجيل</div>}
+        {saveStatus === 'error' && <div style={{ color: '#f87171', fontSize: 12, marginTop: 4 }}>فشل الرفع — تم التحميل محلياً</div>}
         {errorMsg && <div style={{ color: '#f87171', fontSize: 12, marginTop: 4 }}>{errorMsg}</div>}
       </div>
 
-      {/* Transcript */}
+      {/* Transcript — in RTL: justify-start = RIGHT (user), justify-end = LEFT (AI) */}
       {turns.length > 0 && (
-        <div
-          ref={transcriptRef}
-          className="flex-1 overflow-y-auto space-y-3 mb-4"
-          style={{ maxHeight: 200 }}
-        >
+        <div ref={transcriptRef} className="flex-1 overflow-y-auto space-y-3 mb-4" style={{ maxHeight: 200 }}>
           {turns.map((turn, i) => (
-            <div key={i} className={`flex ${turn.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                style={{
-                  maxWidth: '80%', padding: '8px 14px', borderRadius: 10, fontSize: 13, lineHeight: 1.6,
-                  background: turn.role === 'user' ? 'rgba(215,255,0,0.12)' : 'rgba(255,255,255,0.06)',
-                  border: turn.role === 'user' ? '1px solid rgba(215,255,0,0.2)' : '1px solid rgba(255,255,255,0.08)',
-                  color: turn.role === 'user' ? 'rgba(215,255,0,0.9)' : 'rgba(255,255,255,0.8)',
-                }}
-              >
+            <div key={i} className={`flex ${turn.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+              <div style={{
+                maxWidth: '80%', padding: '8px 14px', borderRadius: 10, fontSize: 13, lineHeight: 1.6,
+                background: turn.role === 'user' ? 'rgba(215,255,0,0.12)' : 'rgba(255,255,255,0.06)',
+                border: turn.role === 'user' ? '1px solid rgba(215,255,0,0.2)' : '1px solid rgba(255,255,255,0.08)',
+                color: turn.role === 'user' ? 'rgba(215,255,0,0.9)' : 'rgba(255,255,255,0.8)',
+              }}>
                 {turn.text}
               </div>
             </div>
@@ -344,10 +604,7 @@ export default function ExamPhase3({ onComplete }: Props) {
         {status === 'idle' && (
           <button
             onClick={startSession}
-            style={{
-              background: '#D7FF00', color: '#000', fontWeight: 700, borderRadius: 10,
-              padding: '12px 32px', fontSize: 14, border: 'none', cursor: 'pointer',
-            }}
+            style={{ background: '#D7FF00', color: '#000', fontWeight: 700, borderRadius: 10, padding: '12px 32px', fontSize: 14, border: 'none', cursor: 'pointer' }}
           >
             ابدأ المكالمة
           </button>
@@ -356,11 +613,7 @@ export default function ExamPhase3({ onComplete }: Props) {
         {(status === 'listening' || status === 'speaking' || status === 'connecting') && (
           <button
             onClick={closeSession}
-            style={{
-              background: 'rgba(248,113,113,0.15)', color: '#f87171',
-              border: '1px solid rgba(248,113,113,0.3)', fontWeight: 700, borderRadius: 10,
-              padding: '10px 24px', fontSize: 13, cursor: 'pointer',
-            }}
+            style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171', border: '1px solid rgba(248,113,113,0.3)', fontWeight: 700, borderRadius: 10, padding: '10px 24px', fontSize: 13, cursor: 'pointer' }}
           >
             إنهاء المكالمة
           </button>
@@ -369,10 +622,7 @@ export default function ExamPhase3({ onComplete }: Props) {
         {canFinish && (
           <button
             onClick={onComplete}
-            style={{
-              background: '#D7FF00', color: '#000', fontWeight: 700, borderRadius: 10,
-              padding: '12px 32px', fontSize: 14, border: 'none', cursor: 'pointer',
-            }}
+            style={{ background: '#D7FF00', color: '#000', fontWeight: 700, borderRadius: 10, padding: '12px 32px', fontSize: 14, border: 'none', cursor: 'pointer' }}
           >
             إنهاء الامتحان ✓
           </button>
