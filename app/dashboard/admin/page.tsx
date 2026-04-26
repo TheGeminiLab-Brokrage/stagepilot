@@ -59,7 +59,7 @@ export default async function AdminPage() {
   }))
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl overflow-y-auto h-full pb-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-white">User Management</h1>

@@ -7,12 +7,14 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const audioPath = `${user.id}/${Date.now()}.mp3`
-  const admin = createAdminClient()
-  const { data, error } = await admin.storage
-    .from('practice-recordings')
-    .createSignedUploadUrl(audioPath)
+  const { audioPath, durationSeconds } = await request.json()
+  if (!audioPath) return NextResponse.json({ error: 'Missing audioPath' }, { status: 400 })
 
-  if (error || !data) return NextResponse.json({ error: error?.message ?? 'Failed to create signed URL' }, { status: 500 })
-  return NextResponse.json({ signedUrl: data.signedUrl, audioPath })
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from('exam_recordings')
+    .insert({ user_id: user.id, audio_path: audioPath, duration_seconds: durationSeconds ?? 0 })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
 }

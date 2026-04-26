@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getScenarioById, SCENARIOS } from '@/lib/gemini-scenarios'
+import { buildKnowledgeBlock, CLINIC_SEARCH_TOOL, type KnowledgeEntry } from '@/lib/knowledge-utils'
 
 export async function POST(req: Request) {
-  // Require authenticated session — key is never in the browser bundle,
-  // only reachable by logged-in users via this server route.
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -16,7 +15,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 })
   }
 
-  // Resolve system prompt from scenario ID (falls back to first scenario)
   let scenarioId: string | undefined
   try {
     const body = await req.json()
@@ -27,5 +25,37 @@ export async function POST(req: Request) {
 
   const scenario = (scenarioId ? getScenarioById(scenarioId) : undefined) ?? SCENARIOS[0]
 
-  return NextResponse.json({ token: apiKey, systemPrompt: scenario.prompt })
+  // Get user's company
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('company_id')
+    .eq('id', user.id)
+    .single()
+
+  let fullPrompt = scenario.prompt
+
+  if (profile?.company_id) {
+    // Fetch product_fact and common_question entries for injection at session start.
+    // clinic_project entries are NOT injected — they're fetched on demand via search_clinic_projects tool.
+    const { data: entries } = await supabase
+      .from('knowledge_entries')
+      .select('category, title, content')
+      .eq('company_id', profile.company_id)
+      .eq('is_active', true)
+      .in('category', ['product_fact', 'common_question'])
+      .or(`scenario_ids.is.null,scenario_ids.cs.{"${scenario.id}"}`)
+
+    if (entries && entries.length > 0) {
+      const block = buildKnowledgeBlock(entries as KnowledgeEntry[])
+      if (block) {
+        fullPrompt = scenario.prompt + '\n\n---\n\n' + block
+      }
+    }
+  }
+
+  return NextResponse.json({
+    token: apiKey,
+    systemPrompt: fullPrompt,
+    tools: [CLINIC_SEARCH_TOOL],
+  })
 }

@@ -15,7 +15,10 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
       : [
           { href: '/dashboard', label: role === 'agent' ? 'My Calls' : 'Team Calls' },
           ...(role === 'agent' ? [{ href: '/dashboard/upload', label: 'Upload Call' }] : []),
-          ...(role === 'super_admin' ? [{ href: '/dashboard/admin', label: 'Admin' }] : []),
+          ...(role === 'super_admin' ? [
+            { href: '/dashboard/admin', label: 'Admin' },
+            { href: '/dashboard/admin/knowledge-base', label: 'Knowledge Base' },
+          ] : []),
         ]
 
   return (
