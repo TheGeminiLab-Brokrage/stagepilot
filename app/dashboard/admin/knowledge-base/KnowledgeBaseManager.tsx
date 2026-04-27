@@ -1,6 +1,76 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
+
+function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
+  const [visible, setVisible] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
+  return (
+    <span
+      ref={ref}
+      className="relative inline-flex items-center"
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+      style={{ cursor: 'default' }}
+    >
+      {children}
+      {visible && (
+        <span
+          className="absolute z-50 text-xs rounded-lg px-3 py-2 pointer-events-none"
+          style={{
+            background: '#1a1a1a',
+            border: '1px solid rgba(255,255,255,0.12)',
+            color: 'rgba(255,255,255,0.75)',
+            whiteSpace: 'normal',
+            width: '220px',
+            bottom: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginBottom: '6px',
+            lineHeight: '1.5',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+          }}
+        >
+          {text}
+          <span
+            style={{
+              position: 'absolute',
+              bottom: '-5px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 0,
+              height: 0,
+              borderLeft: '5px solid transparent',
+              borderRight: '5px solid transparent',
+              borderTop: '5px solid rgba(255,255,255,0.12)',
+            }}
+          />
+        </span>
+      )}
+    </span>
+  )
+}
+
+function InfoIcon({ tip }: { tip: string }) {
+  return (
+    <Tooltip text={tip}>
+      <span
+        className="ml-1 inline-flex items-center justify-center rounded-full text-xs font-bold"
+        style={{
+          width: '14px',
+          height: '14px',
+          background: 'rgba(255,255,255,0.08)',
+          color: 'rgba(255,255,255,0.35)',
+          fontSize: '9px',
+          lineHeight: 1,
+          flexShrink: 0,
+        }}
+      >
+        i
+      </span>
+    </Tooltip>
+  )
+}
 
 type Category = 'clinic_project' | 'product_fact' | 'common_question'
 
@@ -42,6 +112,12 @@ const CATEGORY_LABELS: Record<Category, string> = {
   clinic_project: 'Clinic Projects',
   product_fact: 'Product Facts',
   common_question: 'Common Questions',
+}
+
+const CATEGORY_TIPS: Record<Category, string> = {
+  clinic_project: 'Real project data the AI searches in real time during a session — not baked into the prompt. Add, edit, or deactivate projects here.',
+  product_fact: 'Injected into the AI\'s memory at session start. Use for pricing rules, policies, or facts that apply across conversations.',
+  common_question: 'Injected into buyer-persona prompts so the AI-as-client asks realistic questions during practice sessions.',
 }
 
 function parseClinicContent(content: string): ClinicFields {
@@ -185,7 +261,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
           <button
             key={cat}
             onClick={() => setActiveTab(cat)}
-            className="px-4 py-2.5 text-xs font-semibold uppercase transition-all"
+            className="px-4 py-2.5 text-xs font-semibold uppercase transition-all flex items-center gap-1"
             style={{
               letterSpacing: '0.07em',
               fontFamily: "'Space Grotesk', sans-serif",
@@ -197,14 +273,31 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
           >
             {CATEGORY_LABELS[cat]}
             <span
-              className="ml-2 px-1.5 py-0.5 rounded text-xs"
+              className="ml-1 px-1.5 py-0.5 rounded text-xs"
               style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}
             >
               {tabCounts[cat]}
             </span>
+            <InfoIcon tip={CATEGORY_TIPS[cat]} />
           </button>
         ))}
       </div>
+
+      {/* Cross-tab info banner for clinic_project */}
+      {activeTab === 'clinic_project' && (
+        <div
+          className="mb-4 px-4 py-3 rounded-lg text-xs leading-relaxed flex gap-2"
+          style={{ background: 'rgba(215,255,0,0.04)', border: '1px solid rgba(215,255,0,0.12)', color: 'rgba(215,255,0,0.6)' }}
+        >
+          <span style={{ flexShrink: 0 }}>ⓘ</span>
+          <span>
+            Clinic projects are available in <strong style={{ color: 'rgba(215,255,0,0.85)' }}>all sessions</strong> — the AI searches them in real time.
+            To add facts or questions that are <strong style={{ color: 'rgba(215,255,0,0.85)' }}>specific to a persona</strong>, use the{' '}
+            <strong style={{ color: 'rgba(215,255,0,0.85)' }}>Product Facts</strong> or{' '}
+            <strong style={{ color: 'rgba(215,255,0,0.85)' }}>Common Questions</strong> tabs where you can restrict entries to specific scenarios.
+          </span>
+        </div>
+      )}
 
       {/* Table header + Add button */}
       <div className="flex items-center justify-between mb-3">
@@ -239,9 +332,19 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">Title</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">Content</th>
                 {activeTab !== 'clinic_project' && (
-                  <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">Scenarios</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">
+                    <span className="flex items-center gap-0.5">
+                      Scenarios
+                      <InfoIcon tip="Which practice sessions include this entry. 'All' = no restriction, every session gets it. Restricted entries only appear in the selected personas." />
+                    </span>
+                  </th>
                 )}
-                <th className="text-center px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">Active</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">
+                  <span className="flex items-center justify-center gap-0.5">
+                    Active
+                    <InfoIcon tip="On = AI uses this entry in sessions. Off = stored but never shown to the AI. Toggle to pause without deleting." />
+                  </span>
+                </th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -258,10 +361,31 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                     <span className="block truncate">{entry.content}</span>
                   </td>
                   {activeTab !== 'clinic_project' && (
-                    <td className="px-4 py-3 text-gray-500">
-                      {entry.scenario_ids && entry.scenario_ids.length > 0
-                        ? entry.scenario_ids.map((id) => SCENARIOS.find((s) => s.id === id)?.label ?? id).join(', ')
-                        : 'All'}
+                    <td className="px-4 py-3">
+                      {entry.scenario_ids && entry.scenario_ids.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {entry.scenario_ids.map((id) => (
+                            <span
+                              key={id}
+                              className="px-2 py-0.5 rounded-full text-xs"
+                              style={{
+                                background: 'rgba(215,255,0,0.08)',
+                                border: '1px solid rgba(215,255,0,0.25)',
+                                color: 'rgba(215,255,0,0.7)',
+                              }}
+                            >
+                              {SCENARIOS.find((s) => s.id === id)?.label ?? id}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span
+                          className="px-2 py-0.5 rounded-full text-xs"
+                          style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)' }}
+                        >
+                          All
+                        </span>
+                      )}
                     </td>
                   )}
                   <td className="px-4 py-3 text-center">
@@ -382,7 +506,11 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-2">Applies to Scenarios (leave empty for all)</label>
+                  <label className="flex items-center text-xs text-gray-500 mb-2">
+                    Applies to Scenarios
+                    <InfoIcon tip="Leave empty = this entry is available in every session. Select specific personas to restrict it to only those sessions." />
+                    <span className="ml-1 text-gray-600">(leave empty for all)</span>
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     {SCENARIOS.map((s) => {
                       const selected = formScenarioIds.includes(s.id)
@@ -420,6 +548,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                   className="accent-yellow-300"
                 />
                 Active (visible to AI)
+                <InfoIcon tip="Uncheck to temporarily hide this entry from the AI without deleting it. Useful for testing or seasonal content." />
               </label>
               <div className="flex-1" />
               <button
