@@ -117,7 +117,7 @@ function createStereoMp3Blob(
     rightInt16[i] = Math.max(-32768, Math.min(32767, Math.round((mic[i] ?? 0) * 32767)))
   }
 
-  const encoder = new Mp3Encoder(2, sampleRate, 128)
+  const encoder = new Mp3Encoder(2, sampleRate, 96)
   const chunkSize = 1152
   const mp3Parts: Uint8Array[] = []
   for (let i = 0; i < len; i += chunkSize) {
@@ -149,23 +149,28 @@ function isGoodbye(text: string): boolean {
   return /(?<!ل)سلام[.!،؟\s]*$/.test(text.trim())
 }
 
-function playCallEndSound() {
-  const ctx = new AudioContext()
-  const schedule = (startTime: number) => {
-    const gain = ctx.createGain()
-    gain.connect(ctx.destination)
-    gain.gain.setValueAtTime(0.3, startTime)
-    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.35)
-    const o = ctx.createOscillator()
-    o.type = 'sine'
-    o.frequency.value = 480
-    o.connect(gain)
-    o.start(startTime)
-    o.stop(startTime + 0.4)
+function playCallEndSound(existingCtx?: AudioContext | null) {
+  const ctx = existingCtx ?? new AudioContext()
+  const scheduleBeeps = () => {
+    const t = ctx.currentTime
+    const schedule = (startTime: number) => {
+      const gain = ctx.createGain()
+      gain.connect(ctx.destination)
+      gain.gain.setValueAtTime(0.4, startTime)
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.35)
+      const o = ctx.createOscillator()
+      o.type = 'sine'
+      o.frequency.value = 480
+      o.connect(gain)
+      o.start(startTime)
+      o.stop(startTime + 0.4)
+    }
+    schedule(t)
+    schedule(t + 0.55)
+    if (!existingCtx) setTimeout(() => ctx.close().catch(() => {}), 2000)
   }
-  schedule(ctx.currentTime)
-  schedule(ctx.currentTime + 0.55)
-  setTimeout(() => ctx.close().catch(() => {}), 2000)
+  if (ctx.state === 'suspended') ctx.resume().then(scheduleBeeps).catch(() => {})
+  else scheduleBeeps()
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -207,7 +212,9 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   const audioLevelRafRef = useRef<number>(0)
   const ringCtxRef = useRef<AudioContext | null>(null)
   const ringStoppedRef = useRef(true)
+  const ringMinEndTimeRef = useRef(0)
   const goodbyeTriggeredRef = useRef(false)
+  const lastAssistantTextRef = useRef('')
   const closeSessionRef = useRef<() => void>(() => {})
 
   const selectedScenarioRef = useRef(selectedScenario)
@@ -263,6 +270,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   const startRingSound = useCallback(() => {
     stopRingSound()
     ringStoppedRef.current = false
+    ringMinEndTimeRef.current = Date.now() + 4500
     const ctx = new AudioContext()
     ringCtxRef.current = ctx
 
@@ -272,7 +280,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       ringCount++
 
       const gain = ctx.createGain()
-      gain.gain.value = 0.22
+      gain.gain.value = 0.35
       gain.connect(ctx.destination)
 
       const o1 = ctx.createOscillator()
@@ -297,7 +305,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       }, 1200)
     }
 
-    scheduleRing()
+    ctx.resume().then(() => { scheduleRing() }).catch(() => {})
   }, [stopRingSound])
 
   const saveSessionToServer = useCallback(async (blob: Blob, durationSeconds: number) => {
@@ -357,40 +365,45 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     playbackCtxRef.current?.close().catch(() => {})
     playbackCtxRef.current = null
 
-    if (aiChunksRef.current.length > 0 || micSamplesRef.current.length > 0) {
-      const durationSeconds = Math.round((Date.now() - micStartWallRef.current) / 1000)
-      const blob = createStereoMp3Blob(aiChunksRef.current, micSamplesRef.current, micStartWallRef.current, OUT_SAMPLE_RATE)
-      saveSessionToServer(blob, durationSeconds)
-    }
+    // Capture before clearing so deferred encode has the data
+    const chunks = aiChunksRef.current.slice()
+    const mic = micSamplesRef.current.slice()
+    const startMs = micStartWallRef.current
 
+    // Reset UI immediately — don't wait for encoding
     aiChunksRef.current = []
     micSamplesRef.current = []
     setStatusSync('idle')
     setTurns([])
     setErrorMsg('')
     setSessionStartMs(0)
+
+    // Defer heavy MP3 encoding so the UI state update flushes first
+    if (chunks.length > 0 || mic.length > 0) {
+      const durationSeconds = Math.round((Date.now() - startMs) / 1000)
+      setTimeout(() => {
+        try {
+          const blob = createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
+          saveSessionToServer(blob, durationSeconds)
+        } catch (e) {
+          console.error('[PracticeClient] MP3 encoding failed:', e)
+        }
+      }, 50)
+    }
   }, [stopMic, stopPlayback, saveSessionToServer, setStatusSync])
 
   useEffect(() => { return () => closeSession() }, [closeSession])
 
-  // Stop ring when no longer connecting (ring is started directly in startSession)
+  // Stop ring when no longer connecting — delay until minimum ring duration has elapsed
   useEffect(() => {
-    if (status !== 'connecting') stopRingSound()
+    if (status === 'connecting') return
+    const delay = Math.max(0, ringMinEndTimeRef.current - Date.now())
+    const t = setTimeout(stopRingSound, delay)
+    return () => clearTimeout(t)
   }, [status, stopRingSound])
 
   // Keep ref current so the goodbye timer always calls the latest closeSession
   useEffect(() => { closeSessionRef.current = closeSession }, [closeSession])
-
-  // Auto-close when AI says goodbye
-  useEffect(() => {
-    if (status !== 'listening' && status !== 'speaking') return
-    const lastAI = [...turns].reverse().find((t) => t.role === 'assistant')
-    if (!lastAI || !isGoodbye(lastAI.text) || goodbyeTriggeredRef.current) return
-    goodbyeTriggeredRef.current = true
-    setStatusSync('ending')
-    playCallEndSound()
-    setTimeout(() => closeSessionRef.current(), 1500)
-  }, [turns, status, setStatusSync])
 
   const playAudioChunk = useCallback((b64: string) => {
     const samples = base64ToFloat32(b64)
@@ -504,15 +517,24 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
       if (sc.turnComplete) {
         lastTurnCompleteRef.current = true
+        if (!goodbyeTriggeredRef.current && isGoodbye(lastAssistantTextRef.current)) {
+          goodbyeTriggeredRef.current = true
+          setStatusSync('ending')
+          playCallEndSound(playbackCtxRef.current)
+          setTimeout(() => closeSessionRef.current(), 1500)
+        }
       }
 
       const appendAssistant = (text: string) => {
         setTurns((prev) => {
           const last = prev[prev.length - 1]
           if (last?.role === 'assistant' && !lastTurnCompleteRef.current) {
-            return [...prev.slice(0, -1), { role: 'assistant', text: last.text + text }]
+            const combined = last.text + text
+            lastAssistantTextRef.current = combined
+            return [...prev.slice(0, -1), { role: 'assistant', text: combined }]
           }
           lastTurnCompleteRef.current = false
+          lastAssistantTextRef.current = text
           return [...prev, { role: 'assistant', text }]
         })
       }
@@ -562,6 +584,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     ctxCreatedAtWallRef.current = 0
     lastTurnCompleteRef.current = true
     goodbyeTriggeredRef.current = false
+    lastAssistantTextRef.current = ''
     stopPlayback()
 
     let token: string
