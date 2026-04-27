@@ -3,48 +3,39 @@
 import { useState, useCallback, useRef } from 'react'
 
 function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
-  const [visible, setVisible] = useState(false)
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null)
   const ref = useRef<HTMLSpanElement>(null)
   return (
     <span
       ref={ref}
-      className="relative inline-flex items-center"
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
+      className="inline-flex items-center"
+      onMouseEnter={() => {
+        const r = ref.current?.getBoundingClientRect()
+        if (r) setRect({ top: r.top, left: r.left, width: r.width })
+      }}
+      onMouseLeave={() => setRect(null)}
       style={{ cursor: 'default' }}
     >
       {children}
-      {visible && (
+      {rect && (
         <span
-          className="absolute z-50 text-xs rounded-lg px-3 py-2 pointer-events-none"
+          className="pointer-events-none text-xs rounded-lg px-3 py-2"
           style={{
-            background: '#1a1a1a',
-            border: '1px solid rgba(255,255,255,0.12)',
-            color: 'rgba(255,255,255,0.75)',
+            position: 'fixed',
+            top: rect.top - 8,
+            left: rect.left + rect.width / 2,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 99999,
+            background: '#1c1c1c',
+            border: '1px solid rgba(255,255,255,0.14)',
+            color: 'rgba(255,255,255,0.8)',
             whiteSpace: 'normal',
             width: '220px',
-            bottom: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            marginBottom: '6px',
-            lineHeight: '1.5',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+            lineHeight: '1.55',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
           }}
         >
           {text}
-          <span
-            style={{
-              position: 'absolute',
-              bottom: '-5px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 0,
-              height: 0,
-              borderLeft: '5px solid transparent',
-              borderRight: '5px solid transparent',
-              borderTop: '5px solid rgba(255,255,255,0.12)',
-            }}
-          />
         </span>
       )}
     </span>

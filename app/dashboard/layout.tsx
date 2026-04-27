@@ -33,9 +33,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex flex-col" style={{ height: '100vh', background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
       <Navbar role={role} fullName={profile?.full_name} rightSlot={<LogoutButton />} />
 
-      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-6 overflow-y-auto flex flex-col">
-        {children}
-      </main>
+      <div className="flex-1 overflow-y-auto flex flex-col">
+        <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-6 flex flex-col">
+          {children}
+        </main>
+      </div>
 
       {role !== 'trainee' && role !== 'exam' && <GeminiVoiceButton />}
     </div>
