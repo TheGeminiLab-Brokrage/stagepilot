@@ -10,7 +10,7 @@ const MIC_SAMPLE_RATE = 16000
 const OUT_SAMPLE_RATE = 24000
 const BUFFER_SIZE = 4096
 
-type Status = 'idle' | 'connecting' | 'listening' | 'speaking' | 'error'
+type Status = 'idle' | 'connecting' | 'listening' | 'speaking' | 'ending' | 'error'
 
 interface Turn { role: 'user' | 'assistant'; text: string }
 
@@ -148,6 +148,25 @@ function isGoodbye(text: string): boolean {
   return /(?<!ل)سلام[.!،؟\s]*$/.test(text.trim())
 }
 
+function playCallEndSound() {
+  const ctx = new AudioContext()
+  const schedule = (startTime: number) => {
+    const gain = ctx.createGain()
+    gain.connect(ctx.destination)
+    gain.gain.setValueAtTime(0.3, startTime)
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.35)
+    const o = ctx.createOscillator()
+    o.type = 'sine'
+    o.frequency.value = 480
+    o.connect(gain)
+    o.start(startTime)
+    o.stop(startTime + 0.4)
+  }
+  schedule(ctx.currentTime)
+  schedule(ctx.currentTime + 0.55)
+  setTimeout(() => ctx.close().catch(() => {}), 2000)
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface Props {
@@ -226,8 +245,10 @@ export default function ExamPhase3({ onComplete }: Props) {
     const ctx = new AudioContext()
     ringCtxRef.current = ctx
 
+    let ringCount = 0
     const scheduleRing = () => {
       if (ringStoppedRef.current || !ringCtxRef.current || ringCtxRef.current.state === 'closed') return
+      ringCount++
 
       const gain = ctx.createGain()
       gain.gain.value = 0.22
@@ -249,6 +270,7 @@ export default function ExamPhase3({ onComplete }: Props) {
         gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.1)
         setTimeout(() => {
           try { o1.stop(); o2.stop() } catch { /* already stopped */ }
+          if (ringCount >= 3) { stopRingSound(); return }
           setTimeout(scheduleRing, 3000)
         }, 150)
       }, 1200)
@@ -327,12 +349,14 @@ export default function ExamPhase3({ onComplete }: Props) {
 
   // Auto-close when AI says goodbye
   useEffect(() => {
-    if (!isActive) return
+    if (status !== 'listening' && status !== 'speaking') return
     const lastAI = [...turns].reverse().find((t) => t.role === 'assistant')
     if (!lastAI || !isGoodbye(lastAI.text) || goodbyeTriggeredRef.current) return
     goodbyeTriggeredRef.current = true
+    setStatusSync('ending')
+    playCallEndSound()
     setTimeout(() => closeSessionRef.current(), 1500)
-  }, [turns, isActive])
+  }, [turns, status, setStatusSync])
 
   const playAudioChunk = useCallback((b64: string) => {
     const samples = base64ToFloat32(b64)
@@ -529,7 +553,7 @@ export default function ExamPhase3({ onComplete }: Props) {
         if (!intentionalCloseRef.current) { setStatusSync('error'); setErrorMsg('Connection error') }
       }
       ws.onclose = () => {
-        if (!intentionalCloseRef.current) setStatusSync('idle')
+        if (!intentionalCloseRef.current && !goodbyeTriggeredRef.current) setStatusSync('idle')
         stopMic()
         setCanFinish(true)
       }
@@ -541,9 +565,10 @@ export default function ExamPhase3({ onComplete }: Props) {
 
   const statusLabels: Record<Status, string> = {
     idle: 'جاهز للمرحلة الثالثة',
-    connecting: 'جاري الاتصال…',
+    connecting: 'بيسمعك…',
     listening: 'بيسمعك…',
     speaking: 'بيتكلم…',
+    ending: 'جاري الإنهاء…',
     error: 'خطأ في الاتصال',
   }
 

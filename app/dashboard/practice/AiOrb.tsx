@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 
-type OrbStatus = 'idle' | 'connecting' | 'listening' | 'speaking' | 'error'
+type OrbStatus = 'idle' | 'connecting' | 'listening' | 'speaking' | 'ending' | 'error'
 
 interface AiOrbProps {
   status: OrbStatus

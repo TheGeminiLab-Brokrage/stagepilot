@@ -12,7 +12,7 @@ const OUT_SAMPLE_RATE = 24000
 const BUFFER_SIZE = 4096
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
-type Status = 'idle' | 'connecting' | 'listening' | 'speaking' | 'error'
+type Status = 'idle' | 'connecting' | 'listening' | 'speaking' | 'ending' | 'error'
 
 interface Turn {
   role: 'user' | 'assistant'
@@ -149,6 +149,25 @@ function isGoodbye(text: string): boolean {
   return /(?<!ل)سلام[.!،؟\s]*$/.test(text.trim())
 }
 
+function playCallEndSound() {
+  const ctx = new AudioContext()
+  const schedule = (startTime: number) => {
+    const gain = ctx.createGain()
+    gain.connect(ctx.destination)
+    gain.gain.setValueAtTime(0.3, startTime)
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.35)
+    const o = ctx.createOscillator()
+    o.type = 'sine'
+    o.frequency.value = 480
+    o.connect(gain)
+    o.start(startTime)
+    o.stop(startTime + 0.4)
+  }
+  schedule(ctx.currentTime)
+  schedule(ctx.currentTime + 0.55)
+  setTimeout(() => ctx.close().catch(() => {}), 2000)
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 interface PracticeClientProps {
   userId: string
@@ -166,6 +185,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   const [saveError, setSaveError] = useState('')
   const [sessionStartMs, setSessionStartMs] = useState(0)
   const [audioLevel, setAudioLevel] = useState(0)
+  const [toolCallNote, setToolCallNote] = useState<string | null>(null)
 
   const statusRef = useRef<Status>('idle')
   const setStatusSync = useCallback((s: Status) => { statusRef.current = s; setStatus(s) }, [])
@@ -246,8 +266,10 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     const ctx = new AudioContext()
     ringCtxRef.current = ctx
 
+    let ringCount = 0
     const scheduleRing = () => {
       if (ringStoppedRef.current || !ringCtxRef.current || ringCtxRef.current.state === 'closed') return
+      ringCount++
 
       const gain = ctx.createGain()
       gain.gain.value = 0.22
@@ -269,6 +291,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
         gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.1)
         setTimeout(() => {
           try { o1.stop(); o2.stop() } catch { /* already stopped */ }
+          if (ringCount >= 3) { stopRingSound(); return }
           setTimeout(scheduleRing, 3000)
         }, 150)
       }, 1200)
@@ -364,8 +387,10 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     const lastAI = [...turns].reverse().find((t) => t.role === 'assistant')
     if (!lastAI || !isGoodbye(lastAI.text) || goodbyeTriggeredRef.current) return
     goodbyeTriggeredRef.current = true
+    setStatusSync('ending')
+    playCallEndSound()
     setTimeout(() => closeSessionRef.current(), 1500)
-  }, [turns, status])
+  }, [turns, status, setStatusSync])
 
   const playAudioChunk = useCallback((b64: string) => {
     const samples = base64ToFloat32(b64)
@@ -428,6 +453,11 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       const toolCall = msg.toolCall as Record<string, unknown> | undefined
       if (toolCall) {
         const functionCalls = (toolCall.functionCalls as Array<Record<string, unknown>>) ?? []
+        const searchCall = functionCalls.find((c) => c.name === 'search_clinic_projects')
+        if (searchCall) {
+          const q = (searchCall.args as Record<string, unknown>)?.query as string
+          setToolCallNote(q ?? '…')
+        }
         void (async () => {
           const responses = await Promise.all(
             functionCalls.map(async (call) => {
@@ -443,12 +473,12 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
                     body: JSON.stringify({ query: args.query }),
                   })
                   const json = await res.json()
-                  return { id: callId, response: { output: json.result ?? 'No results found.' } }
+                  return { id: callId, name, response: { output: json.result ?? 'No results found.' } }
                 } catch {
-                  return { id: callId, response: { output: 'Search unavailable.' } }
+                  return { id: callId, name, response: { output: 'Search unavailable.' } }
                 }
               }
-              return { id: callId, response: { output: 'Unknown tool.' } }
+              return { id: callId, name, response: { output: 'Unknown tool.' } }
             })
           )
 
@@ -457,6 +487,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
               toolResponse: { functionResponses: responses },
             }))
           }
+          setToolCallNote(null)
         })()
         return
       }
@@ -594,6 +625,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       const wasIntentional = intentionalCloseRef.current
       intentionalCloseRef.current = false
       if (wasIntentional) { stopMic(); return }
+      if (goodbyeTriggeredRef.current) { stopMic(); return }
       console.warn(`[PracticeClient] closed code=${e.code} reason=${e.reason}`)
       if (statusRef.current !== 'error') {
         if (e.code !== 1000) {
@@ -679,9 +711,10 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
   const statusLabel: Record<Status, string> = {
     idle:       'Ready to Practice',
-    connecting: 'Connecting…',
+    connecting: 'Listening',
     listening:  'Listening',
     speaking:   'Speaking',
+    ending:     'Ending…',
     error:      'Connection Error',
   }
 
@@ -817,6 +850,18 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
           </div>
         ))}
 
+        {toolCallNote && (
+          <div className="flex justify-center">
+            <div
+              className="px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5"
+              style={{ background: 'rgba(215,255,0,0.06)', border: '1px solid rgba(215,255,0,0.2)', color: 'rgba(215,255,0,0.55)' }}
+            >
+              <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span>
+              Searching: {toolCallNote}
+            </div>
+          </div>
+        )}
+
         {status === 'speaking' && turns.length > 0 && turns[turns.length - 1]?.role === 'assistant' && (
           <div className="flex gap-2 justify-start">
             <div
@@ -877,7 +922,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
           <div />
         )}
 
-        {!isActive && status !== 'connecting' ? (
+        {status === 'idle' || status === 'error' ? (
           <button
             onClick={startSession}
             disabled={!selectedScenario || saveStatus === 'saving'}
@@ -895,14 +940,14 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
             </svg>
             {saveStatus === 'saving' ? 'Saving…' : 'Start'}
           </button>
-        ) : status === 'connecting' ? (
+        ) : status === 'connecting' || status === 'ending' ? (
           <button
             disabled
             className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm opacity-60 cursor-not-allowed"
             style={{ background: 'rgba(215,255,0,0.2)', color: '#D7FF00', border: '1px solid rgba(215,255,0,0.3)', fontFamily: "'Space Grotesk', sans-serif" }}
           >
             <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
-            Connecting
+            {status === 'ending' ? 'Ending…' : 'Connecting'}
           </button>
         ) : (
           <button
