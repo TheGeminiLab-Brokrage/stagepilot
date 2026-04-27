@@ -9,7 +9,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { query } = await req.json()
+  const body = await req.json()
+  const { query, scenarioId } = body
   if (!query || typeof query !== 'string') {
     return NextResponse.json({ error: 'Missing query' }, { status: 400 })
   }
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
 
   // Search clinic projects by title or content (case-insensitive)
   const term = query.trim()
-  const { data: entries } = await supabase
+  let q = supabase
     .from('knowledge_entries')
     .select('category, title, content')
     .eq('company_id', profile.company_id)
@@ -34,6 +35,13 @@ export async function POST(req: Request) {
     .eq('is_active', true)
     .or(`title.ilike.%${term}%,content.ilike.%${term}%`)
     .limit(10)
+
+  // If a scenario is specified, only return projects available to that scenario
+  if (scenarioId && typeof scenarioId === 'string') {
+    q = q.or(`scenario_ids.is.null,scenario_ids.cs.{"${scenarioId}"}`)
+  }
+
+  const { data: entries } = await q
 
   const result = formatProjectResults((entries ?? []) as KnowledgeEntry[])
   return NextResponse.json({ result })

@@ -470,7 +470,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
                   const res = await fetch('/api/knowledge/search', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: args.query }),
+                    body: JSON.stringify({ query: args.query, scenarioId: selectedScenarioRef.current }),
                   })
                   const json = await res.json()
                   return { id: callId, name, response: { output: json.result ?? 'No results found.' } }

@@ -320,7 +320,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
       </div>
 
       {/* Table */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         {filtered.length === 0 ? (
           <div className="py-12 text-center text-sm text-gray-600">
             No {CATEGORY_LABELS[activeTab].toLowerCase()} yet. Click &ldquo;+ Add Entry&rdquo; to add the first one.
@@ -331,14 +331,12 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">Title</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">Content</th>
-                {activeTab !== 'clinic_project' && (
-                  <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">
-                    <span className="flex items-center gap-0.5">
-                      Scenarios
-                      <InfoIcon tip="Which practice sessions include this entry. 'All' = no restriction, every session gets it. Restricted entries only appear in the selected personas." />
-                    </span>
-                  </th>
-                )}
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">
+                  <span className="flex items-center gap-0.5">
+                    Scenarios
+                    <InfoIcon tip="Which practice sessions include this entry. 'All' = no restriction, every session gets it. Restricted entries only appear in the selected personas." />
+                  </span>
+                </th>
                 <th className="text-center px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">
                   <span className="flex items-center justify-center gap-0.5">
                     Active
@@ -360,34 +358,32 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                   <td className="px-4 py-3 text-gray-400" style={{ maxWidth: '260px' }}>
                     <span className="block truncate">{entry.content}</span>
                   </td>
-                  {activeTab !== 'clinic_project' && (
-                    <td className="px-4 py-3">
-                      {entry.scenario_ids && entry.scenario_ids.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {entry.scenario_ids.map((id) => (
-                            <span
-                              key={id}
-                              className="px-2 py-0.5 rounded-full text-xs"
-                              style={{
-                                background: 'rgba(215,255,0,0.08)',
-                                border: '1px solid rgba(215,255,0,0.25)',
-                                color: 'rgba(215,255,0,0.7)',
-                              }}
-                            >
-                              {SCENARIOS.find((s) => s.id === id)?.label ?? id}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span
-                          className="px-2 py-0.5 rounded-full text-xs"
-                          style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)' }}
-                        >
-                          All
-                        </span>
-                      )}
-                    </td>
-                  )}
+                  <td className="px-4 py-3">
+                    {entry.scenario_ids && entry.scenario_ids.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {entry.scenario_ids.map((id) => (
+                          <span
+                            key={id}
+                            className="px-2 py-0.5 rounded-full text-xs"
+                            style={{
+                              background: 'rgba(215,255,0,0.08)',
+                              border: '1px solid rgba(215,255,0,0.25)',
+                              color: 'rgba(215,255,0,0.7)',
+                            }}
+                          >
+                            {SCENARIOS.find((s) => s.id === id)?.label ?? id}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span
+                        className="px-2 py-0.5 rounded-full text-xs"
+                        style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)' }}
+                      >
+                        All
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-center">
                     <button
                       onClick={() => handleToggleActive(entry)}
@@ -474,6 +470,37 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                 ))}
                 <div className="mt-2 p-3 rounded-lg text-xs text-gray-500" style={{ background: 'rgba(255,255,255,0.03)' }}>
                   Preview: <span className="text-gray-400">{buildClinicContent(formClinic)}</span>
+                </div>
+                <div className="mt-1">
+                  <label className="flex items-center text-xs text-gray-500 mb-2">
+                    Applies to Scenarios
+                    <InfoIcon tip="Leave empty = this project is searchable in every session. Select specific personas to restrict it to only those sessions." />
+                    <span className="ml-1 text-gray-600">(leave empty for all)</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {SCENARIOS.map((s) => {
+                      const selected = formScenarioIds.includes(s.id)
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() =>
+                            setFormScenarioIds((prev) =>
+                              selected ? prev.filter((id) => id !== s.id) : [...prev, s.id]
+                            )
+                          }
+                          className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
+                          style={{
+                            background: selected ? 'rgba(215,255,0,0.15)' : 'rgba(255,255,255,0.05)',
+                            border: selected ? '1px solid rgba(215,255,0,0.4)' : '1px solid rgba(255,255,255,0.1)',
+                            color: selected ? '#D7FF00' : 'rgba(255,255,255,0.5)',
+                          }}
+                        >
+                          {s.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             ) : (
