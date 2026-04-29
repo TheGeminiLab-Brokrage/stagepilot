@@ -6,6 +6,7 @@ import { DR_YASMINE_PROMPT } from './scenario-prompts/prompt_dr_yasmine'
 import { DR_MARIAM_PROMPT } from './scenario-prompts/prompt_dr_mariam'
 import { MOHAMMED_TGL_PROMPT } from './scenario-prompts/prompt_mohammed_tgl'
 import { MOHAMMED_MADINET_MASR_PROMPT } from './scenario-prompts/prompt_mohammed_madinet_masr'
+import { MONA_HASSAN_PROMPT } from './scenario-prompts/prompt_mona_hassan'
 
 export interface Scenario {
   id: string;
@@ -72,6 +73,19 @@ export const SCENARIOS: Scenario[] = [
     name: "محمد",
     job: "Madinet Masr Strategist",
     tag: "Taj City & Sarai",
+    iconType: "tower",
+  },
+  {
+    id: "mona_hassan",
+    label: "منى حسن — Sarai Buyer (Cold Call)",
+    defaultVoice: "Zephyr",
+    prompt: MONA_HASSAN_PROMPT,
+    description: "منى حسن is a busy businesswoman privately interested in Sarai compound. Two-phase knowledge test: developer credibility first, then Sarai details. Ends call if agent scores below 70% in Phase 1. (Cold Call — Residential Buyer)",
+    category: "Madinet Masr",
+    subcategory: "Clients",
+    name: "منى حسن",
+    job: "Businesswoman",
+    tag: "Madinet Masr — Sarai",
     iconType: "tower",
   },
 ]
