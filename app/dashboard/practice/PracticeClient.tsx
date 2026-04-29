@@ -783,7 +783,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       </div>
 
       {/* ── ORB SECTION (center) ────────────────────────────────────────────── */}
-      <div className="flex flex-col items-center justify-center py-4" style={{ flexShrink: 0 }}>
+      <div className="flex flex-col items-center justify-center py-2" style={{ flexShrink: 0 }}>
         <AiOrb status={status} audioLevel={audioLevel} />
 
         {/* Status label under orb */}

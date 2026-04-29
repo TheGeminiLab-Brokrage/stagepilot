@@ -19,14 +19,14 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "dr_yasmine",
     label: "Dr. Yasmine — Inbound Lead",
-    defaultVoice: "Aoede",
+    defaultVoice: "Zephyr",
     prompt: DR_YASMINE_PROMPT,
     description: "Dr. Yasmine is a dentist. She submitted a Facebook ad form about a clinic unit and is expecting a callback. (Inbound Lead)",
   },
   {
     id: "dr_mariam",
     label: "Dr. Mariam — Cosmetic Clinic",
-    defaultVoice: "Aoede",
+    defaultVoice: "Zephyr",
     prompt: DR_MARIAM_PROMPT,
     description: "Dr. Mariam is an aesthetic medicine doctor looking for a cosmetic clinic unit. Will only meet if project is Mercon VX 90 or VX Golden Square. (Inbound Lead)",
   },
