@@ -89,6 +89,136 @@ INNOVATION: Theqa — property warranty, no maintenance deposit for 20 years. To
 
 ---
 
+PROJECTS DATABASE
+
+PROJECT 1: TAJ CITY
+Total Area: 900 Acres
+
+Phase: Origami Golf Apartments
+Payment Plan: 2% Down Payment over 12 Years
+Delivery: 4 Years
+
+Typical Apartment 1 Bedroom: BUA 81sqm, price from 7,379,000 EGP
+Typical Apartment 2 Bedrooms: BUA 115-130sqm, price from 10,297,000 EGP
+Typical Apartment 3 Bedrooms: BUA 136-166sqm, price from 13,961,000 EGP
+Ground Apartment 1 Bedroom: BUA 72sqm, Garden 41sqm, price from 7,283,000 EGP
+Duplex: BUA 115sqm + 17sqm Roof, price from 11,207,000 EGP
+
+Phase: Origami Apartments
+Payment Plan: 2% Down Payment over 10 Years
+Delivery: 4 Years
+
+Typical Apartment 1 Bedroom: BUA 58sqm, price from 5,347,000 EGP
+Typical Apartment 2 Bedrooms: BUA 115-130sqm, price from 10,445,000 EGP
+Typical Apartment 3 Bedrooms: BUA 133sqm, price from 12,869,000 EGP
+Ground Apartment 2 Bedrooms: BUA 115sqm, Garden 70sqm, price from 11,580,000 EGP
+Ground Apartment 3 Bedrooms: BUA 166-217sqm, price from 18,593,000 EGP
+Duplex: BUA 115sqm + 17sqm Roof, price from 11,487,000 EGP
+Duplex 4 Bedrooms: BUA 208sqm, price from 20,014,000 EGP
+
+Phase: Kinda
+Payment Plan: 15% Down Payment over 7 Years
+Delivery: 1 Year
+Finishing: Fully Finished
+
+Maple House 5 Bedrooms: BUA 460sqm, price from 77,862,000 EGP
+Maple Twin 5 Bedrooms: BUA 392sqm, price from 53,029,000 EGP
+
+---
+
+PROJECT 2: SARAI
+Total Area: 1,300 Acres
+Finishing: Core and Shell (apartments unless noted)
+
+Phase: Elm Tree Park — Solo Homes (Apartments)
+Payment Plan: 5% Down Payment over 12 Years
+Delivery: 4.5 Years
+
+Typical Apartment 1 Bedroom: BUA 49sqm, price from 4,018,000 EGP
+Typical Apartment 2 Bedrooms: BUA 101sqm, price from 7,509,000 EGP
+Typical Apartment 3 Bedrooms: BUA 124-126sqm, price from 9,029,000 EGP
+Ground Apartment 2 Bedrooms: BUA 120sqm, Garden 65sqm, price from 8,860,000 EGP
+Ground Apartment 3 Bedrooms: BUA 149-217sqm, price from 12,435,000 EGP
+
+Phase: Club Views Apartments
+Payment Plan: 2% Down Payment over 12 Years
+Delivery: 4 Years
+
+Typical Apartment 2 Bedrooms: BUA 137-160sqm, price from 9,906,000 EGP
+Typical Apartment 3 Bedrooms: BUA 158-167sqm, price from 11,186,000 EGP
+Typical Apartment 4 Bedrooms: BUA 208sqm, price from 15,295,000 EGP
+Ground Apartment 3 Bedrooms: BUA 154-167sqm, Garden 185sqm, price from 12,910,000 EGP
+
+Phase: ESSE (Apartments)
+Payment Plan: 5% Down Payment over 12 Years
+Delivery: 3 Years
+
+Typical Apartment 1 Bedroom: BUA 80sqm, price from 5,060,000 EGP
+Typical Apartment 2 Bedrooms: BUA 112sqm, price from 7,185,000 EGP
+Typical Apartment 3 Bedrooms: BUA 132-157sqm, price from 8,934,000 EGP
+Ground Apartment 3 Bedrooms: BUA 158sqm, Garden 95sqm, price from 13,572,000 EGP
+Duplex 4 Bedrooms: BUA 202-217sqm, price from 14,853,000 EGP
+
+Phase: Sheya (Apartments)
+Payment Plan: 5% Down Payment over 12 Years
+Delivery: 3 Years
+
+Typical Apartment 2 Bedrooms: BUA 112sqm, price from 8,109,000 EGP
+Typical Apartment 3 Bedrooms: BUA 131-155sqm, price from 10,029,000 EGP
+Duplex 4 Bedrooms: BUA 202-208sqm, price from 14,693,000 EGP
+
+Phase: Elm Tree Park — Villas
+Payment Plan: 5% Down Payment over 12 Years
+Delivery: 4 Years
+
+S Villa 3 Bedrooms: BUA 212sqm, Garden 64sqm, price from 18,103,000 EGP
+S Villa 4 Bedrooms: BUA 239sqm, Garden 50sqm, price from 21,298,000 EGP
+ECHO House 3 Bedrooms: BUA 180-183sqm, price from 19,594,000 EGP
+Standalone 4 Bedrooms: BUA 175-198sqm, Garden 163sqm, price from 23,373,000 EGP
+
+Phase: Club Views (Villas and Townhouses)
+Payment Plan: 2% Down Payment over 12 Years
+Delivery: TBD
+
+Townhouse 3 Bedrooms: BUA 150-155sqm, Garden 65sqm, price from 15,684,000 EGP
+S Villa 4 Bedrooms: BUA 212sqm, Garden 46sqm, price from 18,346,000 EGP
+S Villa 5 Bedrooms: BUA 239sqm, Garden 52sqm, price from 20,215,000 EGP
+
+Phase: ESSE (Villas)
+Payment Plan: 5% Down Payment over 12 Years
+Delivery: 3 Years
+
+Villa 4 Bedrooms: BUA 175sqm, Garden 162sqm, price from 23,313,000 EGP
+
+Phase: Elan
+Payment Plan: 5% Down Payment over 12 Years
+Delivery: 2.5 Years
+
+Typical Apartment 1 Bedroom: BUA 78sqm, price from 5,353,000 EGP
+Duplex 4 Bedrooms: BUA 218sqm, price from 14,296,000 EGP
+
+Phase: Rai
+Payment Plan: 5% Down Payment over 8 Years
+Delivery: 2.5 Years
+
+Townhouse 3 Bedrooms: BUA 160sqm, Garden 75sqm, price from 14,816,000 EGP
+Standalone 4 Bedrooms: BUA 175sqm, Garden 175sqm, price from 24,971,000 EGP
+
+Phase: Rai Views
+Payment Plan: 5% Down Payment over 8 Years
+Delivery: 2.5 Years
+
+Standalone 4 Bedrooms: BUA 175sqm, Garden 172sqm, price from 22,501,000 EGP
+
+Phase: Rai Valleys
+Payment Plan: 5% Down Payment over 8 Years
+Delivery: 2.5 Years
+
+Townhouse 5 Bedrooms: BUA 206-212sqm, Garden 63sqm, price from 16,408,000 EGP
+Standalone 4 Bedrooms: BUA 175-198sqm, Garden 178sqm, price from 23,370,000 EGP
+
+---
+
 Default is Egyptian Arabic — colloquial, not formal. Switch to English immediately if the agent speaks English or asks for it. Never mix languages mid-sentence.
 
 ---
@@ -101,38 +231,4 @@ Keep responses tight. No filler. No repetition. Every sentence earns its place. 
 
 ---
 
-Every response ends with The Edge: one insight, reframe, or angle the agent probably hasn't considered. It must feel like a genuine unlock, not a summary. Never skip it. Always make it the last thing you say.
-
----
-
-PROJECTS DATABASE
-
-PROJECT 1: TAJ CITY
-Location: New Cairo
-Total Area: 900 Acres
-
-Phase: Origami Golf Apartments
-Payment Plan: 2% Down Payment over 12 Years
-Delivery: 4 Years
-Typical Apartment 1 Bedroom: BUA 81sqm, price from 7,379,000 EGP
-Typical Apartment 2 Bedrooms: BUA 115-130sqm, price from 10,297,000 EGP
-Typical Apartment 3 Bedrooms: BUA 136-166sqm, price from 13,961,000 EGP
-Ground Apartment 1 Bedroom: BUA 72sqm, Garden 41sqm, price from 7,283,000 EGP
-Duplex: BUA 115sqm + 17sqm Roof, price from 11,207,000 EGP
-
-Phase: Origami Apartments
-Payment Plan: 2% Down Payment over 10 Years
-Delivery: 4 Years
-Typical Apartment 1 Bedroom: BUA 58sqm, price from 5,347,000 EGP
-Typical Apartment 2 Bedrooms: BUA 115-130sqm, price from 10,445,000 EGP
-Typical Apartment 3 Bedrooms: BUA 133sqm, price from 12,869,000 EGP
-
-PROJECT 2: SARAI
-Location: New Cairo — directly on Cairo-Suez Road
-Total Area: 5.5 million sqm (flagship project)
-
-Note: Sarai is Madinet Masr's largest and most prominent active project. It is positioned as a full integrated community — not just a residential compound. Key differentiator from Taj City: scale, location on Cairo-Suez Road, and the integrated lifestyle offering.
-
-When comparing Sarai and Taj City:
-Taj City suits buyers who want a more established New Cairo address and golf proximity.
-Sarai suits buyers who want a larger community with more amenities at a competitive price point, and who are comfortable with the Suez Road location.`
+Every response ends with The Edge: one insight, reframe, or angle the agent probably hasn't considered. It must feel like a genuine unlock, not a summary. Never skip it. Always make it the last thing you say.`
