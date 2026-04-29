@@ -24,6 +24,12 @@ interface ScenarioOption {
   label: string
   defaultVoice?: string
   description?: string
+  category?: string
+  subcategory?: 'Clients' | 'Educational'
+  name?: string
+  job?: string
+  tag?: string
+  iconType?: 'tooth' | 'sparkle' | 'chart' | 'tower'
 }
 
 interface AiChunk {
@@ -746,40 +752,115 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   return (
     <div className="flex-1 min-h-0 flex flex-col" style={{ background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
 
-      {/* ── SCENARIO SELECTOR (top) ─────────────────────────────────────────── */}
-      <div className="px-6 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(215,255,0,0.12)' }}>
-        <label
-          className="block text-xs font-semibold mb-2 uppercase"
-          style={{ color: 'rgba(215,255,0,0.6)', letterSpacing: '0.1em', fontFamily: "'Space Grotesk', sans-serif" }}
-        >
-          Select Scenario
-        </label>
-        <select
-          value={selectedScenario}
-          onChange={(e) => setSelectedScenario(e.target.value)}
-          disabled={isActive || status === 'connecting'}
-          className="w-full rounded-lg px-4 py-2.5 text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none"
-          style={{
-            background: 'rgba(215,255,0,0.05)',
-            border: '1px solid rgba(215,255,0,0.25)',
-            color: '#fff',
-            fontFamily: "'Montserrat', sans-serif",
-          }}
-          onFocus={e => (e.target.style.borderColor = 'rgba(215,255,0,0.7)')}
-          onBlur={e => (e.target.style.borderColor = 'rgba(215,255,0,0.25)')}
-        >
-          {scenarios.map((s) => (
-            <option key={s.id} value={s.id} style={{ background: '#111', color: '#fff' }}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+      {/* ── SCENARIO CARDS ──────────────────────────────────────────────────── */}
+      <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(215,255,0,0.12)' }}>
 
-        {currentScenario && !isActive && (
-          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
-            {currentScenario.description}
-          </p>
-        )}
+        {/* Category header */}
+        <div className="flex items-center gap-2 mb-3">
+          <span style={{
+            fontSize: 9, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase',
+            color: '#D7FF00', fontFamily: "'Space Grotesk', sans-serif",
+          }}>
+            Clinics
+          </span>
+          <div className="flex-1" style={{ height: 1, background: 'rgba(215,255,0,0.15)' }} />
+        </div>
+
+        {/* CLIENTS */}
+        {(['Clients', 'Educational'] as const).map(sub => (
+          <div key={sub} className={sub === 'Clients' ? 'mb-3' : ''}>
+            <p style={{
+              fontSize: 8.5, letterSpacing: '0.14em', textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.22)', marginBottom: 6,
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+            }}>
+              {sub}
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {scenarios.filter(s => s.subcategory === sub).map(s => {
+                const selected = selectedScenario === s.id
+                const disabled = isActive || status === 'connecting'
+                const isClient = sub === 'Clients'
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => !disabled && setSelectedScenario(s.id)}
+                    disabled={disabled}
+                    style={{
+                      background: selected ? 'rgba(215,255,0,0.07)' : 'rgba(255,255,255,0.03)',
+                      border: selected
+                        ? '1px solid rgba(215,255,0,0.65)'
+                        : '1px solid rgba(255,255,255,0.07)',
+                      boxShadow: selected ? '0 0 14px rgba(215,255,0,0.12)' : 'none',
+                      borderRadius: 10, padding: '10px 9px',
+                      textAlign: 'left', cursor: disabled ? 'not-allowed' : 'pointer',
+                      opacity: disabled ? 0.38 : 1,
+                      transition: 'border-color 0.15s, box-shadow 0.15s, background 0.15s',
+                      width: '100%',
+                    }}
+                  >
+                    {/* Icon */}
+                    <div style={{
+                      width: 30, height: 30, borderRadius: 8, marginBottom: 8,
+                      background: isClient ? 'rgba(215,255,0,0.1)' : 'rgba(255,255,255,0.06)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {s.iconType === 'tooth' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isClient ? '#D7FF00' : 'rgba(255,255,255,0.5)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2C9.5 2 8 3.5 7 5c-1-.8-2.5-.8-3.5 0C2 6 1.5 8.5 2.5 11c.5 1.5 1.5 5 2 7 .3 1.2 1 3 2.5 3s2-2.5 5-2.5 3.5 2.5 5 2.5 2.2-1.8 2.5-3c.5-2 1.5-5.5 2-7 1-2.5.5-5-1-6.5-1-.8-2.5-.8-3.5 0-1-1.5-2.5-3-5-3z"/>
+                        </svg>
+                      )}
+                      {s.iconType === 'sparkle' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isClient ? '#D7FF00' : 'rgba(255,255,255,0.5)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+                        </svg>
+                      )}
+                      {s.iconType === 'chart' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-6"/>
+                        </svg>
+                      )}
+                      {s.iconType === 'tower' && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/>
+                        </svg>
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <p style={{
+                      color: selected ? '#fff' : 'rgba(255,255,255,0.75)',
+                      fontSize: 11, fontWeight: 700, marginBottom: 2, lineHeight: 1.2,
+                      fontFamily: "'Montserrat', sans-serif",
+                    }}>
+                      {s.name || s.label}
+                    </p>
+
+                    {/* Job */}
+                    <p style={{
+                      color: 'rgba(255,255,255,0.35)', fontSize: 9, lineHeight: 1.3, marginBottom: 7,
+                      fontFamily: "'Montserrat', sans-serif",
+                    }}>
+                      {s.job}
+                    </p>
+
+                    {/* Tag pill */}
+                    <span style={{
+                      display: 'inline-block',
+                      background: isClient ? 'rgba(215,255,0,0.1)' : 'rgba(255,255,255,0.05)',
+                      color: isClient ? 'rgba(215,255,0,0.75)' : 'rgba(255,255,255,0.35)',
+                      borderRadius: 4, padding: '2px 5px',
+                      fontSize: 8, lineHeight: 1.5,
+                      fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+                    }}>
+                      {s.tag}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ── ORB SECTION (center) ────────────────────────────────────────────── */}

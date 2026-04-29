@@ -13,6 +13,12 @@ export interface Scenario {
   prompt: string;
   defaultVoice: string;
   description: string;
+  category: string;
+  subcategory: 'Clients' | 'Educational';
+  name: string;
+  job: string;
+  tag: string;
+  iconType: 'tooth' | 'sparkle' | 'chart' | 'tower';
 }
 
 export const SCENARIOS: Scenario[] = [
@@ -22,6 +28,12 @@ export const SCENARIOS: Scenario[] = [
     defaultVoice: "Zephyr",
     prompt: DR_YASMINE_PROMPT,
     description: "Dr. Yasmine is a dentist. She submitted a Facebook ad form about a clinic unit and is expecting a callback. (Inbound Lead)",
+    category: "Clinics",
+    subcategory: "Clients",
+    name: "Dr. Yasmine",
+    job: "Dentist",
+    tag: "Facebook Ad — Clinic Unit",
+    iconType: "tooth",
   },
   {
     id: "dr_mariam",
@@ -29,6 +41,12 @@ export const SCENARIOS: Scenario[] = [
     defaultVoice: "Zephyr",
     prompt: DR_MARIAM_PROMPT,
     description: "Dr. Mariam is an aesthetic medicine doctor looking for a cosmetic clinic unit. Will only meet if project is Mercon VX 90 or VX Golden Square. (Inbound Lead)",
+    category: "Clinics",
+    subcategory: "Clients",
+    name: "Dr. Mariam",
+    job: "Cosmetic & Aesthetic Doctor",
+    tag: "Clinic Unit Inquiry",
+    iconType: "sparkle",
   },
   {
     id: "mohammed_tgl",
@@ -36,6 +54,12 @@ export const SCENARIOS: Scenario[] = [
     defaultVoice: "Charon",
     prompt: MOHAMMED_TGL_PROMPT,
     description: "محمد — TGL's internal sales strategist. Ask anything about the clinic projects in the portfolio. Strategy, comparisons, buyer targeting.",
+    category: "Clinics",
+    subcategory: "Educational",
+    name: "محمد",
+    job: "TGL Sales Strategist",
+    tag: "40+ Clinic Projects",
+    iconType: "chart",
   },
   {
     id: "mohammed_madinet_masr",
@@ -43,6 +67,12 @@ export const SCENARIOS: Scenario[] = [
     defaultVoice: "Charon",
     prompt: MOHAMMED_MADINET_MASR_PROMPT,
     description: "محمد — Madinet Masr's internal sales strategist. Ask anything about Taj City and Sarai. Strategy, comparisons, buyer targeting.",
+    category: "Clinics",
+    subcategory: "Educational",
+    name: "محمد",
+    job: "Madinet Masr Strategist",
+    tag: "Taj City & Sarai",
+    iconType: "tower",
   },
 ]
 
