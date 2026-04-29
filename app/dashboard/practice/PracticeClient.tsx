@@ -30,6 +30,8 @@ interface ScenarioOption {
   job?: string
   tag?: string
   iconType?: 'tooth' | 'sparkle' | 'chart' | 'tower'
+  context?: string
+  practiceGoal?: string
 }
 
 interface AiChunk {
@@ -196,6 +198,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   const [errorMsg, setErrorMsg] = useState('')
   const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
   const [selectedScenario, setSelectedScenario] = useState<string>('')
+  const [panelOpen, setPanelOpen] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
   const [sessionStartMs, setSessionStartMs] = useState(0)
@@ -325,8 +328,11 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     const a = document.createElement('a')
     a.href = localUrl
     a.download = `practice-session-${Date.now()}.mp3`
+    a.style.display = 'none'
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(localUrl)
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(localUrl), 5000)
 
     setSaveStatus('saving')
     setSaveError('')
@@ -729,6 +735,23 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     stopPlayback()
     playbackCtxRef.current?.close().catch(() => {})
     playbackCtxRef.current = null
+
+    // Save before clearing — same logic as closeSession
+    const chunks = aiChunksRef.current.slice()
+    const mic = micSamplesRef.current.slice()
+    const startMs = micStartWallRef.current
+    if (chunks.length > 0 || mic.length > 0) {
+      const durationSeconds = Math.round((Date.now() - startMs) / 1000)
+      setTimeout(async () => {
+        try {
+          const blob = await createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
+          saveSessionToServer(blob, durationSeconds)
+        } catch (e) {
+          console.error('[PracticeClient] MP3 encoding failed in newConversation:', e)
+        }
+      }, 50)
+    }
+
     aiChunksRef.current = []
     micSamplesRef.current = []
     ctxCreatedAtWallRef.current = 0
@@ -739,7 +762,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     setStatusSync('idle')
     setSessionStartMs(0)
     setAudioLevel(0)
-  }, [stopMic, stopPlayback, setStatusSync])
+  }, [stopMic, stopPlayback, saveSessionToServer, setStatusSync])
 
   const isActive = status === 'listening' || status === 'speaking'
   const currentScenario = scenarios.find(s => s.id === selectedScenario)
@@ -754,118 +777,213 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   }
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
+
+  // icon helper
+  const ScenarioIcon = ({ iconType, isClient }: { iconType?: string; isClient: boolean }) => {
+    const stroke = isClient ? '#D7FF00' : 'rgba(255,255,255,0.45)'
+    if (iconType === 'tooth') return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2C9.5 2 8 3.5 7 5c-1-.8-2.5-.8-3.5 0C2 6 1.5 8.5 2.5 11c.5 1.5 1.5 5 2 7 .3 1.2 1 3 2.5 3s2-2.5 5-2.5 3.5 2.5 5 2.5 2.2-1.8 2.5-3c.5-2 1.5-5.5 2-7 1-2.5.5-5-1-6.5-1-.8-2.5-.8-3.5 0-1-1.5-2.5-3-5-3z"/>
+      </svg>
+    )
+    if (iconType === 'sparkle') return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+      </svg>
+    )
+    if (iconType === 'chart') return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-6"/>
+      </svg>
+    )
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/>
+      </svg>
+    )
+  }
+
+  const categories = Array.from(new Set(scenarios.map(s => s.category).filter(Boolean)))
+
   return (
-    <div className="flex-1 min-h-0 flex flex-col" style={{ background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
+    <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden" style={{ background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
 
-      {/* ── SCENARIO CARDS ──────────────────────────────────────────────────── */}
-      <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(215,255,0,0.12)' }}>
+      {/* ── RETRACTABLE SCENARIO PANEL ─────────────────────────────────────── */}
 
-        {/* Category header */}
-        <div className="flex items-center gap-2 mb-3">
-          <span style={{
-            fontSize: 9, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase',
-            color: '#D7FF00', fontFamily: "'Space Grotesk', sans-serif",
-          }}>
-            Clinics
+      {/* Backdrop */}
+      {panelOpen && (
+        <div
+          onClick={() => setPanelOpen(false)}
+          style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(2px)' }}
+        />
+      )}
+
+      {/* Drawer */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, bottom: 0, zIndex: 20,
+        width: 300,
+        transform: panelOpen ? 'translateX(0)' : 'translateX(-300px)',
+        transition: 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
+        background: '#060606',
+        borderRight: '1px solid rgba(215,255,0,0.1)',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        {/* Panel header */}
+        <div style={{
+          padding: '14px 16px 12px',
+          borderBottom: '1px solid rgba(215,255,0,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
+          <span style={{ color: '#D7FF00', fontSize: 10, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif" }}>
+            Scenarios
           </span>
-          <div className="flex-1" style={{ height: 1, background: 'rgba(215,255,0,0.15)' }} />
+          <button
+            onClick={() => setPanelOpen(false)}
+            style={{ color: 'rgba(255,255,255,0.35)', fontSize: 20, lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', fontWeight: 300 }}
+          >
+            ×
+          </button>
         </div>
 
-        {/* CLIENTS */}
-        {(['Clients', 'Educational'] as const).map(sub => (
-          <div key={sub} className={sub === 'Clients' ? 'mb-3' : ''}>
-            <p style={{
-              fontSize: 8.5, letterSpacing: '0.14em', textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.22)', marginBottom: 6,
-              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
-            }}>
-              {sub}
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {scenarios.filter(s => s.subcategory === sub).map(s => {
-                const selected = selectedScenario === s.id
-                const disabled = isActive || status === 'connecting'
-                const isClient = sub === 'Clients'
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => !disabled && setSelectedScenario(s.id)}
-                    disabled={disabled}
-                    style={{
-                      background: selected ? 'rgba(215,255,0,0.07)' : 'rgba(255,255,255,0.03)',
-                      border: selected
-                        ? '1px solid rgba(215,255,0,0.65)'
-                        : '1px solid rgba(255,255,255,0.07)',
-                      boxShadow: selected ? '0 0 14px rgba(215,255,0,0.12)' : 'none',
-                      borderRadius: 10, padding: '10px 9px',
-                      textAlign: 'left', cursor: disabled ? 'not-allowed' : 'pointer',
-                      opacity: disabled ? 0.38 : 1,
-                      transition: 'border-color 0.15s, box-shadow 0.15s, background 0.15s',
-                      width: '100%',
-                    }}
-                  >
-                    {/* Icon */}
-                    <div style={{
-                      width: 30, height: 30, borderRadius: 8, marginBottom: 8,
-                      background: isClient ? 'rgba(215,255,0,0.1)' : 'rgba(255,255,255,0.06)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      {s.iconType === 'tooth' && (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isClient ? '#D7FF00' : 'rgba(255,255,255,0.5)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 2C9.5 2 8 3.5 7 5c-1-.8-2.5-.8-3.5 0C2 6 1.5 8.5 2.5 11c.5 1.5 1.5 5 2 7 .3 1.2 1 3 2.5 3s2-2.5 5-2.5 3.5 2.5 5 2.5 2.2-1.8 2.5-3c.5-2 1.5-5.5 2-7 1-2.5.5-5-1-6.5-1-.8-2.5-.8-3.5 0-1-1.5-2.5-3-5-3z"/>
-                        </svg>
-                      )}
-                      {s.iconType === 'sparkle' && (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isClient ? '#D7FF00' : 'rgba(255,255,255,0.5)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
-                        </svg>
-                      )}
-                      {s.iconType === 'chart' && (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-6"/>
-                        </svg>
-                      )}
-                      {s.iconType === 'tower' && (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/>
-                        </svg>
-                      )}
-                    </div>
+        {/* Scrollable scenario list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px' }}>
+          {categories.map((cat, ci) => (
+            <div key={cat} style={{ marginBottom: ci < categories.length - 1 ? 24 : 0 }}>
 
-                    {/* Name */}
-                    <p style={{
-                      color: selected ? '#fff' : 'rgba(255,255,255,0.75)',
-                      fontSize: 11, fontWeight: 700, marginBottom: 2, lineHeight: 1.2,
-                      fontFamily: "'Montserrat', sans-serif",
-                    }}>
-                      {s.name || s.label}
+              {/* Category header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{ color: '#D7FF00', fontSize: 8.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif", whiteSpace: 'nowrap' }}>
+                  {cat}
+                </span>
+                <div style={{ flex: 1, height: 1, background: 'rgba(215,255,0,0.12)' }} />
+              </div>
+
+              {/* Subcategories */}
+              {(['Clients', 'Educational'] as const)
+                .filter(sub => scenarios.some(s => s.category === cat && s.subcategory === sub))
+                .map(sub => (
+                  <div key={sub} style={{ marginBottom: 14 }}>
+                    <p style={{ fontSize: 8, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)', marginBottom: 8, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
+                      {sub}
                     </p>
 
-                    {/* Job */}
-                    <p style={{
-                      color: 'rgba(255,255,255,0.35)', fontSize: 9, lineHeight: 1.3, marginBottom: 7,
-                      fontFamily: "'Montserrat', sans-serif",
-                    }}>
-                      {s.job}
-                    </p>
+                    {scenarios.filter(s => s.category === cat && s.subcategory === sub).map(s => {
+                      const selected = selectedScenario === s.id
+                      const disabled = isActive || status === 'connecting'
+                      const isClient = sub === 'Clients'
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => { if (!disabled) { setSelectedScenario(s.id); setPanelOpen(false) } }}
+                          disabled={disabled}
+                          style={{
+                            display: 'block', width: '100%', textAlign: 'left',
+                            background: selected ? 'rgba(215,255,0,0.06)' : 'rgba(255,255,255,0.02)',
+                            border: selected ? '1px solid rgba(215,255,0,0.45)' : '1px solid rgba(255,255,255,0.06)',
+                            boxShadow: selected ? '0 0 18px rgba(215,255,0,0.08)' : 'none',
+                            borderRadius: 11, padding: '13px 13px 11px',
+                            marginBottom: 7, cursor: disabled ? 'not-allowed' : 'pointer',
+                            opacity: disabled ? 0.35 : 1,
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {/* Header row: icon + name + job */}
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 11 }}>
+                            <div style={{
+                              width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+                              background: isClient ? 'rgba(215,255,0,0.1)' : 'rgba(255,255,255,0.06)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                              <ScenarioIcon iconType={s.iconType} isClient={isClient} />
+                            </div>
+                            <div style={{ paddingTop: 2 }}>
+                              <p style={{ color: '#fff', fontSize: 12.5, fontWeight: 700, lineHeight: 1.2, marginBottom: 3, fontFamily: "'Montserrat', sans-serif" }}>
+                                {s.name || s.label}
+                              </p>
+                              <p style={{ color: 'rgba(255,255,255,0.38)', fontSize: 9.5, lineHeight: 1.3, fontFamily: "'Montserrat', sans-serif" }}>
+                                {s.job}
+                              </p>
+                            </div>
+                          </div>
 
-                    {/* Tag pill */}
-                    <span style={{
-                      display: 'inline-block',
-                      background: isClient ? 'rgba(215,255,0,0.1)' : 'rgba(255,255,255,0.05)',
-                      color: isClient ? 'rgba(215,255,0,0.75)' : 'rgba(255,255,255,0.35)',
-                      borderRadius: 4, padding: '2px 5px',
-                      fontSize: 8, lineHeight: 1.5,
-                      fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
-                    }}>
-                      {s.tag}
-                    </span>
-                  </button>
-                )
-              })}
+                          {/* Divider */}
+                          <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', marginBottom: 11 }} />
+
+                          {/* Context block */}
+                          <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
+                            {isClient ? 'Scenario' : 'Ask about'}
+                          </p>
+                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, marginBottom: 11, fontFamily: "'Montserrat', sans-serif" }}>
+                            {s.context}
+                          </p>
+
+                          {/* Practice goal block */}
+                          <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
+                            {isClient ? 'What to practice' : 'How to use'}
+                          </p>
+                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, marginBottom: 11, fontFamily: "'Montserrat', sans-serif" }}>
+                            {s.practiceGoal}
+                          </p>
+
+                          {/* Tag */}
+                          <span style={{
+                            display: 'inline-block',
+                            background: isClient ? 'rgba(215,255,0,0.09)' : 'rgba(255,255,255,0.05)',
+                            color: isClient ? 'rgba(215,255,0,0.75)' : 'rgba(255,255,255,0.32)',
+                            borderRadius: 4, padding: '3px 7px', fontSize: 9, lineHeight: 1.5,
+                            fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+                          }}>
+                            {s.tag}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
             </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── TOGGLE BAR (always visible) ─────────────────────────────────────── */}
+      <div style={{
+        flexShrink: 0, padding: '9px 14px',
+        borderBottom: '1px solid rgba(215,255,0,0.08)',
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <button
+          onClick={() => setPanelOpen(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            background: 'rgba(215,255,0,0.05)', border: '1px solid rgba(215,255,0,0.18)',
+            borderRadius: 7, padding: '5px 10px', cursor: 'pointer',
+            color: 'rgba(255,255,255,0.65)', fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', flexShrink: 0,
+            transition: 'all 0.15s',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/>
+          </svg>
+          Scenarios
+        </button>
+        {currentScenario && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10.5, fontFamily: "'Montserrat', sans-serif", fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {currentScenario.name || currentScenario.label}
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.18)', fontSize: 10 }}>·</span>
+            <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 10, fontFamily: "'Montserrat', sans-serif", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {currentScenario.job}
+            </span>
           </div>
-        ))}
+        )}
+        {!currentScenario && (
+          <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, fontFamily: "'Space Grotesk', sans-serif", fontStyle: 'italic' }}>
+            No scenario selected
+          </span>
+        )}
       </div>
 
       {/* ── ORB SECTION (center) ────────────────────────────────────────────── */}
