@@ -305,7 +305,8 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       }, 1200)
     }
 
-    ctx.resume().then(() => { scheduleRing() }).catch(() => {})
+    ctx.resume().catch(() => {})
+    scheduleRing()
   }, [stopRingSound])
 
   const saveSessionToServer = useCallback(async (blob: Blob, durationSeconds: number) => {

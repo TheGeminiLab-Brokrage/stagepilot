@@ -284,7 +284,8 @@ export default function ExamPhase3({ onComplete }: Props) {
       }, 1200)
     }
 
-    ctx.resume().then(() => { scheduleRing() }).catch(() => {})
+    ctx.resume().catch(() => {})
+    scheduleRing()
   }, [stopRingSound])
 
   const saveRecording = useCallback(async (chunks: AiChunk[], mic: Float32Array[], startMs: number) => {
