@@ -735,7 +735,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
   const statusLabel: Record<Status, string> = {
     idle:       'Ready to Practice',
-    connecting: 'Listening',
+    connecting: 'Connecting',
     listening:  'Listening',
     speaking:   'Speaking',
     ending:     'Ending…',
@@ -744,7 +744,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col" style={{ background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
+    <div className="flex-1 min-h-0 flex flex-col" style={{ background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
 
       {/* ── SCENARIO SELECTOR (top) ─────────────────────────────────────────── */}
       <div className="px-6 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(215,255,0,0.12)' }}>
@@ -783,7 +783,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       </div>
 
       {/* ── ORB SECTION (center) ────────────────────────────────────────────── */}
-      <div className="flex flex-col items-center justify-center py-4" style={{ flex: '1 1 auto', minHeight: 0 }}>
+      <div className="flex flex-col items-center justify-center py-4" style={{ flexShrink: 0 }}>
         <AiOrb status={status} audioLevel={audioLevel} />
 
         {/* Status label under orb */}
@@ -833,7 +833,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       {/* ── TRANSCRIPT (scrollable middle) ──────────────────────────────────── */}
       <div
         ref={transcriptRef}
-        className="flex-1 overflow-y-auto px-6 space-y-3 pb-4"
+        className="flex-1 min-h-50 overflow-y-auto px-6 space-y-3 pb-4"
         style={{ minHeight: 0 }}
       >
         {turns.map((t, i) => (
