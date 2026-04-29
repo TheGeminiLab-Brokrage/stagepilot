@@ -73,12 +73,12 @@ function resampleLinear(input: Float32Array, fromRate: number, toRate: number): 
   return output
 }
 
-function createStereoMp3Blob(
+async function createStereoMp3Blob(
   aiChunks: AiChunk[],
   micSamples: Float32Array[],
   sessionStartMs: number,
   sampleRate: number,
-): Blob {
+): Promise<Blob> {
   // Build AI track with proper wall-clock offsets
   let aiTrackLen = 0
   for (const chunk of aiChunks) {
@@ -110,11 +110,15 @@ function createStereoMp3Blob(
   const chunkSize = 1152
   const mp3Parts: Uint8Array[] = []
 
+  // Yield to the browser every 100 lamejs chunks so the UI stays responsive
   for (let i = 0; i < len; i += chunkSize) {
     const left = leftInt16.subarray(i, i + chunkSize)
     const right = rightInt16.subarray(i, i + chunkSize)
     const encoded = encoder.encodeBuffer(left, right)
     if (encoded.length > 0) mp3Parts.push(new Uint8Array(encoded.buffer as ArrayBuffer))
+    if (Math.floor(i / chunkSize) % 100 === 0) {
+      await new Promise<void>(r => setTimeout(r, 0))
+    }
   }
   const flushed = encoder.flush()
   if (flushed.length > 0) mp3Parts.push(new Uint8Array(flushed.buffer as ArrayBuffer))
@@ -290,10 +294,14 @@ export default function ExamPhase3({ onComplete }: Props) {
 
   const saveRecording = useCallback(async (chunks: AiChunk[], mic: Float32Array[], startMs: number) => {
     if (chunks.length === 0 && mic.length === 0) return
-    setSaveStatus('saving')
     const durationSeconds = Math.round((Date.now() - startMs) / 1000)
-    const blob = createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
+    const blob = await createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
 
+    // Always save locally first, immediately — independent of DB upload success
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    triggerDownload(blob, `exam-session-${ts}.mp3`)
+
+    setSaveStatus('saving')
     try {
       const urlRes = await fetch('/api/exam/signed-upload', { method: 'POST' })
       if (!urlRes.ok) throw new Error('Could not get upload URL')
@@ -314,8 +322,7 @@ export default function ExamPhase3({ onComplete }: Props) {
       setSaveStatus('saved')
     } catch {
       setSaveStatus('error')
-      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      triggerDownload(blob, `exam-session-${ts}.mp3`)
+      // Local copy already saved above — no second download needed
     }
   }, [])
 
@@ -342,9 +349,9 @@ export default function ExamPhase3({ onComplete }: Props) {
 
     // Defer heavy MP3 encoding so the UI state update flushes first
     if (chunks.length > 0 || mic.length > 0) {
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          saveRecording(chunks, mic, startMs)
+          await saveRecording(chunks, mic, startMs)
         } catch (e) {
           console.error('[ExamPhase3] MP3 encoding failed:', e)
         }

@@ -93,12 +93,12 @@ function resampleLinear(input: Float32Array, fromRate: number, toRate: number): 
   return output
 }
 
-function createStereoMp3Blob(
+async function createStereoMp3Blob(
   aiChunks: AiChunk[],
   micSamples: Float32Array[],
   sessionStartMs: number,
   sampleRate: number,
-): Blob {
+): Promise<Blob> {
   let aiTrackLen = 0
   for (const chunk of aiChunks) {
     const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
@@ -126,9 +126,13 @@ function createStereoMp3Blob(
   const encoder = new Mp3Encoder(2, sampleRate, 96)
   const chunkSize = 1152
   const mp3Parts: Uint8Array[] = []
+  // Yield to the browser every 100 lamejs chunks so the UI stays responsive
   for (let i = 0; i < len; i += chunkSize) {
     const encoded = encoder.encodeBuffer(leftInt16.subarray(i, i + chunkSize), rightInt16.subarray(i, i + chunkSize))
     if (encoded.length > 0) mp3Parts.push(new Uint8Array(encoded.buffer as ArrayBuffer))
+    if (Math.floor(i / chunkSize) % 100 === 0) {
+      await new Promise<void>(r => setTimeout(r, 0))
+    }
   }
   const flushed = encoder.flush()
   if (flushed.length > 0) mp3Parts.push(new Uint8Array(flushed.buffer as ArrayBuffer))
@@ -316,6 +320,14 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   }, [stopRingSound])
 
   const saveSessionToServer = useCallback(async (blob: Blob, durationSeconds: number) => {
+    // Always save locally first, immediately — independent of DB upload success
+    const localUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = localUrl
+    a.download = `practice-session-${Date.now()}.mp3`
+    a.click()
+    URL.revokeObjectURL(localUrl)
+
     setSaveStatus('saving')
     setSaveError('')
 
@@ -352,14 +364,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       const msg = e instanceof Error ? e.message : String(e)
       setSaveStatus('error')
       setSaveError(msg)
-      console.error('[PracticeClient] Save failed:', msg)
-
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `practice-session-${Date.now()}.mp3`
-      a.click()
-      URL.revokeObjectURL(url)
+      console.error('[PracticeClient] DB upload failed (local copy already saved):', msg)
     }
   }, [])
 
@@ -388,9 +393,9 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     // Defer heavy MP3 encoding so the UI state update flushes first
     if (chunks.length > 0 || mic.length > 0) {
       const durationSeconds = Math.round((Date.now() - startMs) / 1000)
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          const blob = createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
+          const blob = await createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
           saveSessionToServer(blob, durationSeconds)
         } catch (e) {
           console.error('[PracticeClient] MP3 encoding failed:', e)
@@ -900,14 +905,14 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
           </span>
         </div>
 
-        {saveStatus === 'saving' && (
-          <p className="mt-2 text-xs" style={{ color: 'rgba(215,255,0,0.5)' }}>Saving session…</p>
+        {status === 'idle' && saveStatus === 'saving' && (
+          <p className="mt-2 text-xs" style={{ color: 'rgba(215,255,0,0.5)' }}>Uploading session…</p>
         )}
-        {saveStatus === 'saved' && (
+        {status === 'idle' && saveStatus === 'saved' && (
           <p className="mt-2 text-xs" style={{ color: '#26D701' }}>✓ Session saved</p>
         )}
-        {saveStatus === 'error' && (
-          <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>Save failed — downloaded locally</p>
+        {status === 'idle' && saveStatus === 'error' && (
+          <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>Upload failed — saved locally</p>
         )}
       </div>
 
@@ -1030,7 +1035,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
         {status === 'idle' || status === 'error' ? (
           <button
             onClick={startSession}
-            disabled={!selectedScenario || saveStatus === 'saving'}
+            disabled={!selectedScenario}
             className="tgl-btn-glow flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
               background: '#D7FF00',
