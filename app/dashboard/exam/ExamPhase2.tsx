@@ -80,10 +80,7 @@ export default function ExamPhase2({ onComplete }: Props) {
             المرحلة الثانية
           </div>
           <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, maxWidth: 480 }}>
-            10 سيناريوهات عملاء — اختار المشروع الصح لكل عميل من 3 خيارات قريبين من بعض.
-          </div>
-          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>
-            5 سيناريوهات سردية + 5 ميزانيات دكاترة
+            20 سيناريو عميل — اختار المشروع الصح لكل عميل من 3 خيارات قريبين من بعض.
           </div>
         </div>
         {error && <div style={{ color: '#f87171', fontSize: 13 }}>{error}</div>}

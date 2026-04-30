@@ -32,7 +32,7 @@ export default async function AdminPage() {
   // Fetch exam results with user names
   const { data: rawExamResults } = await adminClient
     .from('exam_results')
-    .select(`id, phase1_score, phase1_max, phase2_score, phase2_max, phase3_completed, created_at, profiles!user_id(full_name)`)
+    .select(`id, phase1_score, phase1_max, phase2_score, phase2_max, phase3_completed, phase1_details, phase2_details, created_at, profiles!user_id(full_name)`)
     .eq('company_id', profile.company_id)
     .order('created_at', { ascending: false })
     .limit(100)

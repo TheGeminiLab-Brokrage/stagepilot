@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { phase1Score, phase1Max, phase2Score, phase2Max, phase3Completed } = await req.json()
+  const { phase1Score, phase1Max, phase2Score, phase2Max, phase3Completed, phase1Details, phase2Details } = await req.json()
 
   const { error } = await supabase.from('exam_results').insert({
     user_id: user.id,
@@ -26,6 +26,8 @@ export async function POST(req: Request) {
     phase2_score: phase2Score,
     phase2_max: phase2Max,
     phase3_completed: phase3Completed,
+    phase1_details: phase1Details ?? null,
+    phase2_details: phase2Details ?? null,
   })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     }
 
     totalScore += pointsEarned
-    return { id, correct, pointsEarned, correctAnswer: q.answer, maxPoints: q.points }
+    return { id, correct, pointsEarned, correctAnswer: q.answer, maxPoints: q.points, questionText: q.question, userAnswer: response }
   }))
 
   return NextResponse.json({ results, totalScore, maxScore })

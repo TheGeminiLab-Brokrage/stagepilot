@@ -46,15 +46,12 @@ export function selectPhase1(all: Phase1Question[]): Phase1Question[] {
   const mcq = shuffle(all.filter(q => q.type === 'mcq'))
   const tf = shuffle(all.filter(q => q.type === 'truefalse'))
   const essay = shuffle(all.filter(q => q.type === 'essay'))
-  const selected = [...mcq.slice(0, 2), ...tf.slice(0, 2), ...essay.slice(0, 2)]
-  const remaining = shuffle([...mcq.slice(2), ...tf.slice(2), ...essay.slice(2)])
-  return shuffle([...selected, ...remaining.slice(0, 4)])
+  // Guaranteed minimums: 5 T/F, 5 essay, 15 MCQ = 25 total
+  return shuffle([...tf.slice(0, 5), ...essay.slice(0, 5), ...mcq.slice(0, 15)])
 }
 
 export function selectPhase2(all: Phase2Question[]): Phase2Question[] {
-  const narrative = shuffle(all.filter(q => q.subtype === 'narrative'))
-  const budget = shuffle(all.filter(q => q.subtype === 'budget'))
-  return shuffle([...narrative.slice(0, 5), ...budget.slice(0, 5)])
+  return shuffle([...all])
 }
 
 export async function gradeEssay(

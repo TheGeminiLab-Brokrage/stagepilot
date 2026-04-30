@@ -15,6 +15,8 @@ interface GradeResult {
   correctAnswer: string
   maxPoints: number
   reasoning?: string
+  questionText?: string
+  userAnswer?: string
 }
 
 interface Props {
@@ -91,6 +93,8 @@ export default function ExamClient({ userId, companyId, userName }: Props) {
           phase2Score,
           phase2Max,
           phase3Completed: true,
+          phase1Details: phase1Results,
+          phase2Details: phase2Results,
         }),
       })
     } catch {
