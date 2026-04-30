@@ -1,7 +1,7 @@
 // ─── SERVER-ONLY ──────────────────────────────────────────────────────────────
 // Never imported by client components. Used only in /api/exam/* routes.
 
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import phase1Raw from '../data/phase1-questions.json'
 import phase2Raw from '../data/phase2-questions.json'
 
@@ -66,7 +66,7 @@ export async function gradeEssay(
   if (!userAnswer.trim()) return 0
 
   try {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const prompt = `You are grading a free-text exam answer for a real estate sales training exam.
 
 ${question ? `Question: ${question}\n` : ''}Model Answer: ${correctAnswer}
@@ -77,13 +77,14 @@ Grade the student's answer based on conceptual accuracy and understanding. Exact
 
 Respond with valid JSON only, no other text: {"score": <integer from 0 to ${points}>}`
 
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
       max_tokens: 50,
       messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
     })
 
-    const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+    const text = completion.choices[0].message.content?.trim() ?? ''
     const parsed = JSON.parse(text)
     return Math.min(Math.max(0, Math.round(parsed.score)), points)
   } catch {
