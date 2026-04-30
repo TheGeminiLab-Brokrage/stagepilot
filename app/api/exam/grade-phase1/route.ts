@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   let totalScore = 0
   let maxScore = 0
 
-  const results = answers.map(({ id, response }) => {
+  const results = await Promise.all(answers.map(async ({ id, response }) => {
     const q = bankMap.get(id)
     if (!q) return { id, correct: false, pointsEarned: 0, correctAnswer: '' }
 
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     let correct = false
 
     if (q.type === 'essay') {
-      pointsEarned = gradeEssay(response, q.answer, q.points)
+      pointsEarned = await gradeEssay(response, q.answer, q.points, q.question)
       correct = pointsEarned === q.points
     } else {
       // MCQ and T/F: normalize and compare
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
 
     totalScore += pointsEarned
     return { id, correct, pointsEarned, correctAnswer: q.answer, maxPoints: q.points }
-  })
+  }))
 
   return NextResponse.json({ results, totalScore, maxScore })
 }

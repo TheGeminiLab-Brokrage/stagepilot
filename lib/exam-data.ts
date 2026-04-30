@@ -1,6 +1,7 @@
 // ─── SERVER-ONLY ──────────────────────────────────────────────────────────────
 // Never imported by client components. Used only in /api/exam/* routes.
 
+import Anthropic from '@anthropic-ai/sdk'
 import phase1Raw from '../data/phase1-questions.json'
 import phase2Raw from '../data/phase2-questions.json'
 
@@ -56,14 +57,45 @@ export function selectPhase2(all: Phase2Question[]): Phase2Question[] {
   return shuffle([...narrative.slice(0, 5), ...budget.slice(0, 5)])
 }
 
-export function gradeEssay(userAnswer: string, correctAnswer: string, points: number): number {
-  const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
-  const keyWords = normalize(correctAnswer).split(' ').filter(w => w.length > 2)
-  if (keyWords.length === 0) return points
-  const userNorm = normalize(userAnswer)
-  const matched = keyWords.filter(w => userNorm.includes(w)).length
-  const ratio = matched / keyWords.length
-  if (ratio >= 0.8) return points
-  if (ratio >= 0.5) return Math.floor(points * 0.6)
-  return 0
+export async function gradeEssay(
+  userAnswer: string,
+  correctAnswer: string,
+  points: number,
+  question?: string
+): Promise<number> {
+  if (!userAnswer.trim()) return 0
+
+  try {
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const prompt = `You are grading a free-text exam answer for a real estate sales training exam.
+
+${question ? `Question: ${question}\n` : ''}Model Answer: ${correctAnswer}
+Student's Answer: ${userAnswer}
+Maximum Points: ${points}
+
+Grade the student's answer based on conceptual accuracy and understanding. Exact wording does not matter — only whether the core idea is correct and sufficiently complete. Be fair but rigorous.
+
+Respond with valid JSON only, no other text: {"score": <integer from 0 to ${points}>}`
+
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 50,
+      messages: [{ role: 'user', content: prompt }],
+    })
+
+    const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+    const parsed = JSON.parse(text)
+    return Math.min(Math.max(0, Math.round(parsed.score)), points)
+  } catch {
+    // Fallback to keyword matching if AI call fails
+    const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
+    const keyWords = normalize(correctAnswer).split(' ').filter(w => w.length > 2)
+    if (keyWords.length === 0) return points
+    const userNorm = normalize(userAnswer)
+    const matched = keyWords.filter(w => userNorm.includes(w)).length
+    const ratio = matched / keyWords.length
+    if (ratio >= 0.8) return points
+    if (ratio >= 0.5) return Math.floor(points * 0.6)
+    return 0
+  }
 }
