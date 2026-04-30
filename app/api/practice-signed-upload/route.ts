@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const audioPath = `${user.id}/${Date.now()}.wav`
+  const audioPath = `${user.id}/${Date.now()}.mp3`
   const admin = createAdminClient()
   const { data, error } = await admin.storage
     .from('practice-recordings')
