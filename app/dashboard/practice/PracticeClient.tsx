@@ -864,9 +864,12 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
                 .filter(sub => scenarios.some(s => s.category === cat && s.subcategory === sub))
                 .map(sub => (
                   <div key={sub} style={{ marginBottom: 14 }}>
-                    <p style={{ fontSize: 8, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#D7FF00', marginBottom: 8, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
-                      {sub}
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                      <span style={{ color: '#D7FF00', fontSize: 8.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif", whiteSpace: 'nowrap' }}>
+                        {sub}
+                      </span>
+                      <div style={{ flex: 1, height: 1, background: 'rgba(215,255,0,0.12)' }} />
+                    </div>
 
                     {scenarios.filter(s => s.category === cat && s.subcategory === sub).map(s => {
                       const selected = selectedScenario === s.id
