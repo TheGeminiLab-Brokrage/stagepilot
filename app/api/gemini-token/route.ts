@@ -33,8 +33,9 @@ export async function POST(req: Request) {
     .single()
 
   let fullPrompt = scenario.prompt
+  const isEducational = scenario.subcategory === 'Educational'
 
-  if (profile?.company_id) {
+  if (isEducational && profile?.company_id) {
     // Fetch product_fact and common_question entries for injection at session start.
     // clinic_project entries are NOT injected — they're fetched on demand via search_clinic_projects tool.
     const { data: entries } = await supabase
@@ -56,6 +57,6 @@ export async function POST(req: Request) {
   return NextResponse.json({
     token: apiKey,
     systemPrompt: fullPrompt,
-    tools: [CLINIC_SEARCH_TOOL],
+    ...(isEducational && { tools: [CLINIC_SEARCH_TOOL] }),
   })
 }
