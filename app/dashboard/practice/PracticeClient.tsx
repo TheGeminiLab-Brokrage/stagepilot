@@ -101,14 +101,24 @@ async function createStereoMp3Blob(
   sessionStartMs: number,
   sampleRate: number,
 ): Promise<Blob> {
+  // Guard: if sessionStartMs is 0 (mic never initialised), use earliest AI chunk time.
+  // Without this, (chunk.wallStart - 0) is epoch-ms, making offsets trillions of
+  // samples → Float32Array allocation throws RangeError → whole save silently dies.
+  const effectiveStart =
+    sessionStartMs > 0
+      ? sessionStartMs
+      : (aiChunks.length > 0 ? aiChunks[0].wallStart : Date.now())
+
+  console.log('[SAVE] createStereoMp3Blob start — aiChunks:', aiChunks.length, 'micSamples:', micSamples.length, 'effectiveStart:', effectiveStart)
+
   let aiTrackLen = 0
   for (const chunk of aiChunks) {
-    const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
+    const offset = Math.round(((chunk.wallStart - effectiveStart) / 1000) * sampleRate)
     if (offset >= 0) aiTrackLen = Math.max(aiTrackLen, offset + chunk.samples.length)
   }
   const ai = new Float32Array(Math.max(aiTrackLen, 1))
   for (const chunk of aiChunks) {
-    const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
+    const offset = Math.round(((chunk.wallStart - effectiveStart) / 1000) * sampleRate)
     if (offset >= 0 && offset + chunk.samples.length <= ai.length) {
       ai.set(chunk.samples, offset)
     }
@@ -128,18 +138,20 @@ async function createStereoMp3Blob(
   const encoder = new Mp3Encoder(2, sampleRate, 96)
   const chunkSize = 1152
   const mp3Parts: Uint8Array[] = []
-  // Yield to the browser every 100 lamejs chunks so the UI stays responsive
   for (let i = 0; i < len; i += chunkSize) {
     const encoded = encoder.encodeBuffer(leftInt16.subarray(i, i + chunkSize), rightInt16.subarray(i, i + chunkSize))
-    if (encoded.length > 0) mp3Parts.push(new Uint8Array(encoded.buffer as ArrayBuffer))
+    // Use Uint8Array(encoded) — copies only the encoded bytes, not the full internal buffer
+    if (encoded.length > 0) mp3Parts.push(new Uint8Array(encoded))
     if (Math.floor(i / chunkSize) % 100 === 0) {
       await new Promise<void>(r => setTimeout(r, 0))
     }
   }
   const flushed = encoder.flush()
-  if (flushed.length > 0) mp3Parts.push(new Uint8Array(flushed.buffer as ArrayBuffer))
+  if (flushed.length > 0) mp3Parts.push(new Uint8Array(flushed))
 
-  return new Blob(mp3Parts as unknown as BlobPart[], { type: 'audio/mpeg' })
+  const blob = new Blob(mp3Parts as unknown as BlobPart[], { type: 'audio/mpeg' })
+  console.log('[SAVE] blob created, size:', blob.size, 'bytes')
+  return blob
 }
 
 
@@ -323,16 +335,24 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   }, [stopRingSound])
 
   const saveSessionToServer = useCallback(async (blob: Blob, durationSeconds: number) => {
-    // Always save locally first, immediately — independent of DB upload success
-    const localUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = localUrl
-    a.download = `practice-session-${Date.now()}.mp3`
-    a.style.display = 'none'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(localUrl), 5000)
+    console.log('[SAVE] saveSessionToServer called, blob size:', blob.size)
+
+    // Download locally — isolated in its own try/catch so a browser-download
+    // failure never blocks the DB upload path below.
+    try {
+      const localUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = localUrl
+      a.download = `practice-session-${Date.now()}.mp3`
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(localUrl), 5000)
+      console.log('[SAVE] local download triggered')
+    } catch (downloadErr) {
+      console.error('[SAVE] local download failed:', downloadErr)
+    }
 
     setSaveStatus('saving')
     setSaveError('')
@@ -399,14 +419,19 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     // Defer heavy MP3 encoding so the UI state update flushes first
     if (chunks.length > 0 || mic.length > 0) {
       const durationSeconds = Math.round((Date.now() - startMs) / 1000)
+      console.log('[SAVE] closeSession: deferring encode — chunks:', chunks.length, 'mic:', mic.length, 'startMs:', startMs, 'duration:', durationSeconds)
       setTimeout(async () => {
         try {
           const blob = await createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
-          saveSessionToServer(blob, durationSeconds)
+          await saveSessionToServer(blob, durationSeconds)
         } catch (e) {
-          console.error('[PracticeClient] MP3 encoding failed:', e)
+          console.error('[SAVE] closeSession: encoding/save failed:', e)
+          setSaveStatus('error')
+          setSaveError(e instanceof Error ? e.message : String(e))
         }
       }, 50)
+    } else {
+      console.warn('[SAVE] closeSession: no audio data to save — chunks:', chunks.length, 'mic:', mic.length)
     }
   }, [stopMic, stopPlayback, saveSessionToServer, setStatusSync])
 
@@ -742,14 +767,17 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     const startMs = micStartWallRef.current
     if (chunks.length > 0 || mic.length > 0) {
       const durationSeconds = Math.round((Date.now() - startMs) / 1000)
+      console.log('[SAVE] newConversation: deferring encode — chunks:', chunks.length, 'mic:', mic.length, 'startMs:', startMs)
       setTimeout(async () => {
         try {
           const blob = await createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
-          saveSessionToServer(blob, durationSeconds)
+          await saveSessionToServer(blob, durationSeconds)
         } catch (e) {
-          console.error('[PracticeClient] MP3 encoding failed in newConversation:', e)
+          console.error('[SAVE] newConversation: encoding/save failed:', e)
         }
       }, 50)
+    } else {
+      console.warn('[SAVE] newConversation: no audio data — chunks:', chunks.length, 'mic:', mic.length)
     }
 
     aiChunksRef.current = []
@@ -864,12 +892,9 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
                 .filter(sub => scenarios.some(s => s.category === cat && s.subcategory === sub))
                 .map(sub => (
                   <div key={sub} style={{ marginBottom: 14 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <span style={{ color: '#D7FF00', fontSize: 8.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif", whiteSpace: 'nowrap' }}>
-                        {sub}
-                      </span>
-                      <div style={{ flex: 1, height: 1, background: 'rgba(215,255,0,0.12)' }} />
-                    </div>
+                    <p style={{ fontSize: 8, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#D7FF00', marginBottom: 8, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
+                      {sub}
+                    </p>
 
                     {scenarios.filter(s => s.category === cat && s.subcategory === sub).map(s => {
                       const selected = selectedScenario === s.id

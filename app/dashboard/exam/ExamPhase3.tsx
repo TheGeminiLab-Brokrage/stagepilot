@@ -79,15 +79,20 @@ async function createStereoMp3Blob(
   sessionStartMs: number,
   sampleRate: number,
 ): Promise<Blob> {
-  // Build AI track with proper wall-clock offsets
+  // Guard: if sessionStartMs is 0, offsets become epoch-ms * sampleRate → RangeError
+  const effectiveStart =
+    sessionStartMs > 0
+      ? sessionStartMs
+      : (aiChunks.length > 0 ? aiChunks[0].wallStart : Date.now())
+
   let aiTrackLen = 0
   for (const chunk of aiChunks) {
-    const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
+    const offset = Math.round(((chunk.wallStart - effectiveStart) / 1000) * sampleRate)
     if (offset >= 0) aiTrackLen = Math.max(aiTrackLen, offset + chunk.samples.length)
   }
   const ai = new Float32Array(Math.max(aiTrackLen, 1))
   for (const chunk of aiChunks) {
-    const offset = Math.round(((chunk.wallStart - sessionStartMs) / 1000) * sampleRate)
+    const offset = Math.round(((chunk.wallStart - effectiveStart) / 1000) * sampleRate)
     if (offset >= 0 && offset + chunk.samples.length <= ai.length) {
       ai.set(chunk.samples, offset)
     }
@@ -98,7 +103,6 @@ async function createStereoMp3Blob(
 
   const len = Math.max(ai.length, mic.length)
 
-  // Convert to Int16 for lamejs
   const leftInt16 = new Int16Array(len)
   const rightInt16 = new Int16Array(len)
   for (let i = 0; i < len; i++) {
@@ -110,18 +114,18 @@ async function createStereoMp3Blob(
   const chunkSize = 1152
   const mp3Parts: Uint8Array[] = []
 
-  // Yield to the browser every 100 lamejs chunks so the UI stays responsive
   for (let i = 0; i < len; i += chunkSize) {
     const left = leftInt16.subarray(i, i + chunkSize)
     const right = rightInt16.subarray(i, i + chunkSize)
     const encoded = encoder.encodeBuffer(left, right)
-    if (encoded.length > 0) mp3Parts.push(new Uint8Array(encoded.buffer as ArrayBuffer))
+    // Use Uint8Array(encoded) — copies only the encoded bytes, not the full internal buffer
+    if (encoded.length > 0) mp3Parts.push(new Uint8Array(encoded))
     if (Math.floor(i / chunkSize) % 100 === 0) {
       await new Promise<void>(r => setTimeout(r, 0))
     }
   }
   const flushed = encoder.flush()
-  if (flushed.length > 0) mp3Parts.push(new Uint8Array(flushed.buffer as ArrayBuffer))
+  if (flushed.length > 0) mp3Parts.push(new Uint8Array(flushed))
 
   return new Blob(mp3Parts as unknown as BlobPart[], { type: 'audio/mpeg' })
 }
@@ -299,10 +303,16 @@ export default function ExamPhase3({ onComplete }: Props) {
     if (chunks.length === 0 && mic.length === 0) return
     const durationSeconds = Math.round((Date.now() - startMs) / 1000)
     const blob = await createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
+    console.log('[SAVE] exam blob created, size:', blob.size)
 
-    // Always save locally first, immediately — independent of DB upload success
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-    triggerDownload(blob, `exam-session-${ts}.mp3`)
+    // Download locally — isolated so a browser-download failure never blocks the DB upload
+    try {
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      triggerDownload(blob, `exam-session-${ts}.mp3`)
+      console.log('[SAVE] exam local download triggered')
+    } catch (downloadErr) {
+      console.error('[SAVE] exam local download failed:', downloadErr)
+    }
 
     setSaveStatus('saving')
     try {
