@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Mp3Encoder } from 'lamejs'
 import AiOrb from './AiOrb'
 
 // ─── Gemini Live API constants ─────────────────────────────────────────────────
@@ -95,30 +94,27 @@ function resampleLinear(input: Float32Array, fromRate: number, toRate: number): 
   return output
 }
 
-async function createStereoMp3Blob(
+async function createStereoWavBlob(
   aiChunks: AiChunk[],
   micSamples: Float32Array[],
   sessionStartMs: number,
   sampleRate: number,
 ): Promise<Blob> {
-  // Guard: if sessionStartMs is 0 (mic never initialised), use earliest AI chunk time.
-  // Without this, (chunk.wallStart - 0) is epoch-ms, making offsets trillions of
-  // samples → Float32Array allocation throws RangeError → whole save silently dies.
   const effectiveStart =
     sessionStartMs > 0
       ? sessionStartMs
       : (aiChunks.length > 0 ? aiChunks[0].wallStart : Date.now())
 
-  console.log('[SAVE] createStereoMp3Blob start — aiChunks:', aiChunks.length, 'micSamples:', micSamples.length, 'effectiveStart:', effectiveStart)
+  console.log('[SAVE] createStereoWavBlob start — aiChunks:', aiChunks.length, 'micSamples:', micSamples.length, 'effectiveStart:', effectiveStart)
 
   let aiTrackLen = 0
   for (const chunk of aiChunks) {
     const offset = Math.round(((chunk.wallStart - effectiveStart) / 1000) * sampleRate)
     if (offset >= 0) aiTrackLen = Math.max(aiTrackLen, offset + chunk.samples.length)
   }
-  const MAX_SAMPLES = 24000 * 3600 // 1 hour at 24 kHz — larger means effectiveStart is wrong
+  const MAX_SAMPLES = 24000 * 3600
   if (aiTrackLen > MAX_SAMPLES) {
-    throw new Error(`aiTrackLen too large (${aiTrackLen}) — effectiveStart may be wrong (effectiveStart=${effectiveStart})`)
+    throw new Error(`aiTrackLen too large (${aiTrackLen}) — effectiveStart=${effectiveStart}`)
   }
   const ai = new Float32Array(Math.max(aiTrackLen, 1))
   for (const chunk of aiChunks) {
@@ -132,28 +128,37 @@ async function createStereoMp3Blob(
   const mic = resampleLinear(micRaw, MIC_SAMPLE_RATE, sampleRate)
 
   const len = Math.max(ai.length, mic.length)
-  const leftInt16 = new Int16Array(len)
-  const rightInt16 = new Int16Array(len)
+
+  // WAV header (44 bytes) + interleaved stereo Int16 PCM
+  const dataSize = len * 2 * 2 // 2 channels × 2 bytes
+  const buffer = new ArrayBuffer(44 + dataSize)
+  const view = new DataView(buffer)
+  const writeStr = (off: number, s: string) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)) }
+
+  writeStr(0, 'RIFF')
+  view.setUint32(4, 36 + dataSize, true)
+  writeStr(8, 'WAVE')
+  writeStr(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)           // PCM
+  view.setUint16(22, 2, true)           // stereo
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 4, true)
+  view.setUint16(32, 4, true)
+  view.setUint16(34, 16, true)
+  writeStr(36, 'data')
+  view.setUint32(40, dataSize, true)
+
+  let off = 44
   for (let i = 0; i < len; i++) {
-    leftInt16[i] = Math.max(-32768, Math.min(32767, Math.round((ai[i] ?? 0) * 32767)))
-    rightInt16[i] = Math.max(-32768, Math.min(32767, Math.round((mic[i] ?? 0) * 32767)))
+    const l = Math.max(-32768, Math.min(32767, Math.round((ai[i] ?? 0) * 32767)))
+    const r = Math.max(-32768, Math.min(32767, Math.round((mic[i] ?? 0) * 32767)))
+    view.setInt16(off, l, true); off += 2
+    view.setInt16(off, r, true); off += 2
+    if (i % 50000 === 0 && i > 0) await new Promise<void>(res => setTimeout(res, 0))
   }
 
-  const encoder = new Mp3Encoder(2, sampleRate, 96)
-  const chunkSize = 1152
-  const mp3Parts: Uint8Array[] = []
-  for (let i = 0; i < len; i += chunkSize) {
-    const encoded = encoder.encodeBuffer(leftInt16.subarray(i, i + chunkSize), rightInt16.subarray(i, i + chunkSize))
-    // Use Uint8Array(encoded) — copies only the encoded bytes, not the full internal buffer
-    if (encoded.length > 0) mp3Parts.push(new Uint8Array(encoded))
-    if (Math.floor(i / chunkSize) % 100 === 0) {
-      await new Promise<void>(r => setTimeout(r, 0))
-    }
-  }
-  const flushed = encoder.flush()
-  if (flushed.length > 0) mp3Parts.push(new Uint8Array(flushed))
-
-  const blob = new Blob(mp3Parts as unknown as BlobPart[], { type: 'audio/mpeg' })
+  const blob = new Blob([buffer], { type: 'audio/wav' })
   console.log('[SAVE] blob created, size:', blob.size, 'bytes')
   return blob
 }
@@ -347,7 +352,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
     // is silently blocked by Brave / Firefox / strict Chrome settings.
     try {
       const localUrl = URL.createObjectURL(blob)
-      setDownloadUrl({ url: localUrl, filename: `practice-session-${Date.now()}.mp3` })
+      setDownloadUrl({ url: localUrl, filename: `practice-session-${Date.now()}.wav` })
       console.log('[SAVE] download URL set')
     } catch (downloadErr) {
       console.error('[SAVE] local download failed:', downloadErr)
@@ -366,7 +371,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
       const uploadRes = await fetch(signedUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': 'audio/mpeg' },
+        headers: { 'Content-Type': 'audio/wav' },
         body: blob,
       })
       if (!uploadRes.ok) throw new Error(`Storage upload failed: ${uploadRes.status}`)
@@ -421,7 +426,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       console.log('[SAVE] closeSession: deferring encode — chunks:', chunks.length, 'mic:', mic.length, 'startMs:', startMs, 'duration:', durationSeconds)
       setTimeout(async () => {
         try {
-          const blob = await createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
+          const blob = await createStereoWavBlob(chunks, mic, startMs, OUT_SAMPLE_RATE)
           await saveSessionToServer(blob, durationSeconds)
         } catch (e) {
           console.error('[SAVE] closeSession: encoding/save failed:', e)
@@ -769,7 +774,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       console.log('[SAVE] newConversation: deferring encode — chunks:', chunks.length, 'mic:', mic.length, 'startMs:', startMs)
       setTimeout(async () => {
         try {
-          const blob = await createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
+          const blob = await createStereoWavBlob(chunks, mic, startMs, OUT_SAMPLE_RATE)
           await saveSessionToServer(blob, durationSeconds)
         } catch (e) {
           console.error('[SAVE] newConversation: encoding/save failed:', e)
