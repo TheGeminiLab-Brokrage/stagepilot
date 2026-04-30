@@ -90,6 +90,10 @@ async function createStereoMp3Blob(
     const offset = Math.round(((chunk.wallStart - effectiveStart) / 1000) * sampleRate)
     if (offset >= 0) aiTrackLen = Math.max(aiTrackLen, offset + chunk.samples.length)
   }
+  const MAX_SAMPLES = 24000 * 3600 // 1 hour at 24 kHz — larger means effectiveStart is wrong
+  if (aiTrackLen > MAX_SAMPLES) {
+    throw new Error(`aiTrackLen too large (${aiTrackLen}) — effectiveStart may be wrong (effectiveStart=${effectiveStart})`)
+  }
   const ai = new Float32Array(Math.max(aiTrackLen, 1))
   for (const chunk of aiChunks) {
     const offset = Math.round(((chunk.wallStart - effectiveStart) / 1000) * sampleRate)
@@ -130,17 +134,6 @@ async function createStereoMp3Blob(
   return new Blob(mp3Parts as unknown as BlobPart[], { type: 'audio/mpeg' })
 }
 
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  setTimeout(() => URL.revokeObjectURL(url), 5000)
-}
 
 // ─── Goodbye detection ─────────────────────────────────────────────────────
 
@@ -196,6 +189,8 @@ export default function ExamPhase3({ onComplete }: Props) {
   const [audioLevel, setAudioLevel] = useState(0)
   const [canFinish, setCanFinish] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveError, setSaveError] = useState('')
+  const [downloadUrl, setDownloadUrl] = useState<{ url: string; filename: string } | null>(null)
 
   const statusRef = useRef<Status>('idle')
   const setStatusSync = useCallback((s: Status) => { statusRef.current = s; setStatus(s) }, [])
@@ -302,14 +297,25 @@ export default function ExamPhase3({ onComplete }: Props) {
   const saveRecording = useCallback(async (chunks: AiChunk[], mic: Float32Array[], startMs: number) => {
     if (chunks.length === 0 && mic.length === 0) return
     const durationSeconds = Math.round((Date.now() - startMs) / 1000)
-    const blob = await createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
-    console.log('[SAVE] exam blob created, size:', blob.size)
 
-    // Download locally — isolated so a browser-download failure never blocks the DB upload
+    let blob: Blob
+    try {
+      blob = await createStereoMp3Blob(chunks, mic, startMs, OUT_SAMPLE_RATE)
+      console.log('[SAVE] exam blob created, size:', blob.size)
+    } catch (encErr) {
+      const msg = encErr instanceof Error ? encErr.message : String(encErr)
+      console.error('[SAVE] exam encoding failed:', msg)
+      setSaveStatus('error')
+      setSaveError(msg)
+      return
+    }
+
+    // Store blob URL in state so a visible download button appears in the UI.
     try {
       const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      triggerDownload(blob, `exam-session-${ts}.mp3`)
-      console.log('[SAVE] exam local download triggered')
+      const localUrl = URL.createObjectURL(blob)
+      setDownloadUrl({ url: localUrl, filename: `exam-session-${ts}.mp3` })
+      console.log('[SAVE] exam download URL set')
     } catch (downloadErr) {
       console.error('[SAVE] exam local download failed:', downloadErr)
     }
@@ -333,9 +339,10 @@ export default function ExamPhase3({ onComplete }: Props) {
         body: JSON.stringify({ audioPath, durationSeconds }),
       })
       setSaveStatus('saved')
-    } catch {
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
       setSaveStatus('error')
-      // Local copy already saved above — no second download needed
+      setSaveError(msg)
     }
   }, [])
 
@@ -647,9 +654,28 @@ export default function ExamPhase3({ onComplete }: Props) {
         <span style={{ fontSize: 13, fontWeight: 600, color: status === 'error' ? '#f87171' : status === 'idle' ? 'rgba(255,255,255,0.3)' : '#D7FF00', fontFamily: "'Space Grotesk', sans-serif" }}>
           {statusLabels[status]}
         </span>
+        {downloadUrl && (
+          <a
+            href={downloadUrl.url}
+            download={downloadUrl.filename}
+            style={{ color: '#d7ff00', fontSize: 12, marginTop: 4, display: 'block', textDecoration: 'underline' }}
+            onClick={() => {
+              setTimeout(() => {
+                URL.revokeObjectURL(downloadUrl.url)
+                setDownloadUrl(null)
+              }, 2000)
+            }}
+          >
+            ⬇ تحميل التسجيل
+          </a>
+        )}
         {saveStatus === 'saving' && <div style={{ color: 'rgba(215,255,0,0.5)', fontSize: 12, marginTop: 4 }}>جاري حفظ التسجيل…</div>}
         {saveStatus === 'saved' && <div style={{ color: '#26D701', fontSize: 12, marginTop: 4 }}>✓ تم حفظ التسجيل</div>}
-        {saveStatus === 'error' && <div style={{ color: '#f87171', fontSize: 12, marginTop: 4 }}>فشل الرفع — تم التحميل محلياً</div>}
+        {saveStatus === 'error' && (
+          <div style={{ color: '#f87171', fontSize: 12, marginTop: 4 }}>
+            {saveError ? `خطأ: ${saveError}` : 'فشل الرفع — تم التحميل محلياً'}
+          </div>
+        )}
         {errorMsg && <div style={{ color: '#f87171', fontSize: 12, marginTop: 4 }}>{errorMsg}</div>}
       </div>
 

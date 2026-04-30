@@ -116,6 +116,10 @@ async function createStereoMp3Blob(
     const offset = Math.round(((chunk.wallStart - effectiveStart) / 1000) * sampleRate)
     if (offset >= 0) aiTrackLen = Math.max(aiTrackLen, offset + chunk.samples.length)
   }
+  const MAX_SAMPLES = 24000 * 3600 // 1 hour at 24 kHz — larger means effectiveStart is wrong
+  if (aiTrackLen > MAX_SAMPLES) {
+    throw new Error(`aiTrackLen too large (${aiTrackLen}) — effectiveStart may be wrong (effectiveStart=${effectiveStart})`)
+  }
   const ai = new Float32Array(Math.max(aiTrackLen, 1))
   for (const chunk of aiChunks) {
     const offset = Math.round(((chunk.wallStart - effectiveStart) / 1000) * sampleRate)
@@ -213,6 +217,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   const [panelOpen, setPanelOpen] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
+  const [downloadUrl, setDownloadUrl] = useState<{ url: string; filename: string } | null>(null)
   const [sessionStartMs, setSessionStartMs] = useState(0)
   const [audioLevel, setAudioLevel] = useState(0)
   const [toolCallNote, setToolCallNote] = useState<string | null>(null)
@@ -337,19 +342,13 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   const saveSessionToServer = useCallback(async (blob: Blob, durationSeconds: number) => {
     console.log('[SAVE] saveSessionToServer called, blob size:', blob.size)
 
-    // Download locally — isolated in its own try/catch so a browser-download
-    // failure never blocks the DB upload path below.
+    // Store blob URL in state so a visible download button appears in the UI.
+    // Programmatic a.click() inside setTimeout loses user-gesture context and
+    // is silently blocked by Brave / Firefox / strict Chrome settings.
     try {
       const localUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = localUrl
-      a.download = `practice-session-${Date.now()}.mp3`
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(localUrl), 5000)
-      console.log('[SAVE] local download triggered')
+      setDownloadUrl({ url: localUrl, filename: `practice-session-${Date.now()}.mp3` })
+      console.log('[SAVE] download URL set')
     } catch (downloadErr) {
       console.error('[SAVE] local download failed:', downloadErr)
     }
@@ -1060,6 +1059,22 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
           </span>
         </div>
 
+        {downloadUrl && (
+          <a
+            href={downloadUrl.url}
+            download={downloadUrl.filename}
+            className="mt-2 text-xs underline"
+            style={{ color: '#d7ff00' }}
+            onClick={() => {
+              setTimeout(() => {
+                URL.revokeObjectURL(downloadUrl.url)
+                setDownloadUrl(null)
+              }, 2000)
+            }}
+          >
+            ⬇ Download recording
+          </a>
+        )}
         {status === 'idle' && saveStatus === 'saving' && (
           <p className="mt-2 text-xs" style={{ color: 'rgba(215,255,0,0.5)' }}>Uploading session…</p>
         )}
@@ -1067,7 +1082,9 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
           <p className="mt-2 text-xs" style={{ color: '#26D701' }}>✓ Session saved</p>
         )}
         {status === 'idle' && saveStatus === 'error' && (
-          <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>Upload failed — saved locally</p>
+          <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>
+            {saveError ? `Save failed: ${saveError}` : 'Upload failed — saved locally'}
+          </p>
         )}
       </div>
 
