@@ -864,7 +864,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
                 .filter(sub => scenarios.some(s => s.category === cat && s.subcategory === sub))
                 .map(sub => (
                   <div key={sub} style={{ marginBottom: 14 }}>
-                    <p style={{ fontSize: 8, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)', marginBottom: 8, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
+                    <p style={{ fontSize: 8, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#D7FF00', marginBottom: 8, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
                       {sub}
                     </p>
 
