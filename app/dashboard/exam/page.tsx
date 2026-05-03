@@ -23,6 +23,7 @@ export default async function ExamPage() {
       userId={user.id}
       companyId={profile.company_id}
       userName={profile.full_name}
+      userEmail={user.email ?? ''}
     />
   )
 }

@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ExamPhase1 from './ExamPhase1'
 import ExamPhase2 from './ExamPhase2'
 import ExamPhase3 from './ExamPhase3'
 import ExamResults from './ExamResults'
 
 type ExamPhase = 'phase1' | 'phase2' | 'phase3' | 'results'
+type ExamGate = 'loading' | 'intro' | 'active' | 'blocked'
 
 interface GradeResult {
   id: string
@@ -23,6 +24,7 @@ interface Props {
   userId: string
   companyId: string
   userName: string
+  userEmail: string
 }
 
 const PHASE_LABELS: Record<ExamPhase, string> = {
@@ -32,7 +34,10 @@ const PHASE_LABELS: Record<ExamPhase, string> = {
   results: 'النتيجة',
 }
 
-export default function ExamClient({ userId, companyId, userName }: Props) {
+export default function ExamClient({ userId, companyId, userName, userEmail }: Props) {
+  const [gate, setGate] = useState<ExamGate>('loading')
+  const [startError, setStartError] = useState('')
+
   const [phase, setPhase] = useState<ExamPhase>('phase1')
 
   const [phase1Answers, setPhase1Answers] = useState<{ id: string; response: string }[]>([])
@@ -48,6 +53,43 @@ export default function ExamClient({ userId, companyId, userName }: Props) {
   const [phase2Questions, setPhase2Questions] = useState<{ id: string; scenario: string }[]>([])
 
   const [phase3Completed, setPhase3Completed] = useState(false)
+
+  // Check daily limit on mount — test account bypasses entirely
+  useEffect(() => {
+    if (userEmail === 'exam@test.com') {
+      setGate('intro')
+      return
+    }
+    fetch('/api/daily-limit')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.unlimited || (data.usedToday ?? 0) < 1) {
+          setGate('intro')
+        } else {
+          setGate('blocked')
+        }
+      })
+      .catch(() => setGate('intro')) // fail open so auth issues don't lock users out
+  }, [userEmail])
+
+  async function handleStartExam() {
+    setStartError('')
+    if (userEmail === 'exam@test.com') {
+      setGate('active')
+      return
+    }
+    try {
+      const res = await fetch('/api/exam/start-attempt', { method: 'POST' })
+      const data = await res.json()
+      if (data.allowed) {
+        setGate('active')
+      } else {
+        setGate('blocked')
+      }
+    } catch {
+      setStartError('حدث خطأ. حاول مرة أخرى.')
+    }
+  }
 
   function handlePhase1Complete(
     answers: { id: string; response: string }[],
@@ -121,6 +163,116 @@ export default function ExamClient({ userId, companyId, userName }: Props) {
 
   const phaseOrder: ExamPhase[] = ['phase1', 'phase2', 'phase3', 'results']
   const currentIdx = phaseOrder.indexOf(phase)
+
+  // ── Gate screens ───────────────────────────────────────────────────────────
+
+  if (gate === 'loading') {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100%', fontFamily: "'Montserrat', sans-serif",
+      }}>
+        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>جاري التحميل…</div>
+      </div>
+    )
+  }
+
+  if (gate === 'blocked') {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: '100%', fontFamily: "'Montserrat', sans-serif", textAlign: 'center', gap: 20,
+        padding: '0 24px',
+      }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'rgba(255,60,60,0.1)',
+          border: '1px solid rgba(255,60,60,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 28,
+        }}>
+          🔒
+        </div>
+        <div>
+          <p style={{ color: '#fff', fontSize: 16, fontWeight: 700, marginBottom: 10 }}>
+            لقد استخدمت محاولة الاختبار اليومية
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.7, maxWidth: 340 }}>
+            يُسمح بمحاولة واحدة فقط في اليوم. عد غداً للمحاولة مجدداً.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (gate === 'intro') {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: '100%', fontFamily: "'Montserrat', sans-serif", textAlign: 'center', gap: 28,
+        padding: '0 24px',
+      }}>
+        <div>
+          <p style={{
+            fontSize: 10, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase',
+            color: '#D7FF00', marginBottom: 14, fontFamily: "'Space Grotesk', sans-serif",
+          }}>
+            الاختبار التقييمي
+          </p>
+          <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 800, marginBottom: 12, lineHeight: 1.3 }}>
+            {userName}، أنت جاهز؟
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.75, maxWidth: 380 }}>
+            الاختبار يتكوّن من ٣ مراحل: أسئلة متعددة الخيارات، سيناريوهات، ومحاكاة مكالمة حيّة.
+          </p>
+        </div>
+
+        <div style={{
+          background: 'rgba(215,255,0,0.04)',
+          border: '1px solid rgba(215,255,0,0.15)',
+          borderRadius: 12, padding: '14px 20px',
+          display: 'flex', gap: 24,
+        }}>
+          {[
+            { label: 'المرحلة ١', desc: 'أسئلة' },
+            { label: 'المرحلة ٢', desc: 'سيناريوهات' },
+            { label: 'المرحلة ٣', desc: 'محاكاة' },
+          ].map((item) => (
+            <div key={item.label} style={{ textAlign: 'center' }}>
+              <p style={{ color: '#D7FF00', fontSize: 11, fontWeight: 700, marginBottom: 3, fontFamily: "'Space Grotesk', sans-serif" }}>
+                {item.label}
+              </p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>{item.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {userEmail !== 'exam@test.com' && (
+          <p style={{ color: 'rgba(255,100,100,0.7)', fontSize: 11, letterSpacing: '0.03em' }}>
+            تنبيه: لديك محاولة واحدة فقط في اليوم
+          </p>
+        )}
+
+        {startError && (
+          <p style={{ color: 'rgba(255,100,100,0.85)', fontSize: 12 }}>{startError}</p>
+        )}
+
+        <button
+          onClick={handleStartExam}
+          style={{
+            background: '#D7FF00', color: '#000',
+            border: 'none', borderRadius: 10, padding: '13px 40px',
+            fontSize: 14, fontWeight: 800, cursor: 'pointer',
+            fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.06em',
+          }}
+        >
+          ابدأ الاختبار
+        </button>
+      </div>
+    )
+  }
+
+  // ── Active exam ────────────────────────────────────────────────────────────
 
   return (
     <div

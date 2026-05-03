@@ -200,9 +200,11 @@ interface PracticeClientProps {
   userId: string
   companyId: string
   userName: string
+  role: string
+  userEmail: string
 }
 
-export default function PracticeClient({ userId, companyId, userName }: PracticeClientProps) {
+export default function PracticeClient({ userId, companyId, userName, role, userEmail }: PracticeClientProps) {
   const [status, setStatus] = useState<Status>('idle')
   const [turns, setTurns] = useState<Turn[]>([])
   const [errorMsg, setErrorMsg] = useState('')
@@ -212,6 +214,10 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
   const [downloadUrl, setDownloadUrl] = useState<{ url: string; filename: string } | null>(null)
+  const [dailyUsage, setDailyUsage] = useState<Record<string, number>>({})
+
+  const DAILY_LIMIT = 3
+  const isFreePlan = role === 'trainee' && userEmail !== 'trainee@test.com'
   const [sessionStartMs, setSessionStartMs] = useState(0)
   const [audioLevel, setAudioLevel] = useState(0)
   const [toolCallNote, setToolCallNote] = useState<string | null>(null)
@@ -255,6 +261,23 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       })
       .catch(console.error)
   }, [])
+
+  const refreshDailyUsage = useCallback(() => {
+    if (!isFreePlan) return
+    fetch('/api/daily-limit')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.unlimited) setDailyUsage(data.usage ?? {})
+      })
+      .catch(console.error)
+  }, [isFreePlan])
+
+  useEffect(() => { refreshDailyUsage() }, [refreshDailyUsage])
+
+  // Refresh usage count after a session is successfully saved
+  useEffect(() => {
+    if (saveStatus === 'saved') refreshDailyUsage()
+  }, [saveStatus, refreshDailyUsage])
 
   useEffect(() => {
     if (transcriptRef.current) {
@@ -608,6 +631,12 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
   )
 
   const startSession = useCallback(async () => {
+    if (isFreePlan && (dailyUsage[selectedScenarioRef.current] ?? 0) >= DAILY_LIMIT) {
+      setStatusSync('error')
+      setErrorMsg('لقد وصلت إلى الحد اليومي لهذا السيناريو. حاول مرة أخرى غداً.')
+      return
+    }
+
     setStatusSync('connecting')
     startRingSound()
     setErrorMsg('')
@@ -633,6 +662,12 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenario: selectedScenarioRef.current }),
       })
+      if (res.status === 429) {
+        setStatusSync('error')
+        setErrorMsg('لقد وصلت إلى الحد اليومي لهذا السيناريو. حاول مرة أخرى غداً.')
+        stopRingSound()
+        return
+      }
       if (!res.ok) throw new Error(`Token fetch failed: ${res.status}`)
       const json = await res.json()
       token = json.token
@@ -744,7 +779,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
       console.error(e)
       ws.close()
     }
-  }, [handleMessage, stopMic, stopPlayback, setStatusSync, scenarios, startRingSound])
+  }, [handleMessage, stopMic, stopPlayback, setStatusSync, scenarios, startRingSound, stopRingSound, isFreePlan, dailyUsage])
 
   const newConversation = useCallback(() => {
     wsRef.current?.close()
@@ -900,8 +935,10 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
 
                     {scenarios.filter(s => s.category === cat && s.subcategory === sub).map(s => {
                       const selected = selectedScenario === s.id
-                      const disabled = isActive || status === 'connecting'
+                      const scenarioLimitReached = isFreePlan && (dailyUsage[s.id] ?? 0) >= DAILY_LIMIT
+                      const disabled = isActive || status === 'connecting' || scenarioLimitReached
                       const isClient = sub === 'Clients'
+                      const usedToday = isFreePlan ? (dailyUsage[s.id] ?? 0) : 0
                       return (
                         <button
                           key={s.id}
@@ -957,15 +994,29 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
                           </p>
 
                           {/* Tag */}
-                          <span style={{
-                            display: 'inline-block',
-                            background: isClient ? 'rgba(215,255,0,0.09)' : 'rgba(255,255,255,0.05)',
-                            color: isClient ? 'rgba(215,255,0,0.75)' : 'rgba(255,255,255,0.32)',
-                            borderRadius: 4, padding: '3px 7px', fontSize: 9, lineHeight: 1.5,
-                            fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
-                          }}>
-                            {s.tag}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                            <span style={{
+                              display: 'inline-block',
+                              background: isClient ? 'rgba(215,255,0,0.09)' : 'rgba(255,255,255,0.05)',
+                              color: isClient ? 'rgba(215,255,0,0.75)' : 'rgba(255,255,255,0.32)',
+                              borderRadius: 4, padding: '3px 7px', fontSize: 9, lineHeight: 1.5,
+                              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+                            }}>
+                              {s.tag}
+                            </span>
+                            {isFreePlan && (
+                              <span style={{
+                                display: 'inline-block',
+                                background: scenarioLimitReached ? 'rgba(255,60,60,0.12)' : 'rgba(255,255,255,0.05)',
+                                color: scenarioLimitReached ? 'rgba(255,100,100,0.9)' : 'rgba(255,255,255,0.38)',
+                                borderRadius: 4, padding: '3px 7px', fontSize: 9, lineHeight: 1.5,
+                                fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+                                border: scenarioLimitReached ? '1px solid rgba(255,60,60,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                              }}>
+                                {scenarioLimitReached ? 'Limit reached' : `${DAILY_LIMIT - usedToday}/${DAILY_LIMIT} left today`}
+                              </span>
+                            )}
+                          </div>
                         </button>
                       )
                     })}
@@ -1201,7 +1252,7 @@ export default function PracticeClient({ userId, companyId, userName }: Practice
         {status === 'idle' || status === 'error' ? (
           <button
             onClick={startSession}
-            disabled={!selectedScenario}
+            disabled={!selectedScenario || (isFreePlan && (dailyUsage[selectedScenario] ?? 0) >= DAILY_LIMIT)}
             className="tgl-btn-glow flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
               background: '#D7FF00',

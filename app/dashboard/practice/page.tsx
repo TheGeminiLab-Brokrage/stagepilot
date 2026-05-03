@@ -14,7 +14,7 @@ export default async function PracticePage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, company_id')
+    .select('full_name, company_id, role')
     .eq('id', user.id)
     .single()
 
@@ -27,6 +27,8 @@ export default async function PracticePage() {
       userId={user.id}
       companyId={profile.company_id}
       userName={profile.full_name}
+      role={profile.role}
+      userEmail={user.email ?? ''}
     />
   )
 }
