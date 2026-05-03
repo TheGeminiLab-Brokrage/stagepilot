@@ -5,6 +5,7 @@ import CreateUserForm from './CreateUserForm'
 import UserTable from './UserTable'
 import PracticeSessionsTable from './PracticeSessionsTable'
 import ExamResultsTable from './ExamResultsTable'
+import ExamRecordingsTable from './ExamRecordingsTable'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -41,6 +42,20 @@ export default async function AdminPage() {
   const examResults = (rawExamResults ?? []).map((r: any) => ({
     ...r,
     user_name: (Array.isArray(r.profiles) ? r.profiles[0] : r.profiles)?.full_name ?? 'Unknown',
+  }))
+
+  // Fetch admin exam recordings
+  const { data: rawExamRecordings } = await adminClient
+    .from('exam_recordings')
+    .select(`id, audio_path, duration_seconds, created_at, profiles!user_id(full_name)`)
+    .eq('company_id', profile.company_id)
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const examRecordings = (rawExamRecordings ?? []).map((r: any) => ({
+    ...r,
+    profiles: Array.isArray(r.profiles) ? r.profiles[0] : r.profiles,
   }))
 
   // Fetch practice sessions with trainee names
@@ -96,6 +111,19 @@ export default async function AdminPage() {
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
           <ExamResultsTable results={examResults} />
+        </div>
+      </div>
+
+      {/* Admin AI Test Recordings */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-xl font-semibold text-amber-400">Admin AI Test Recordings</h1>
+            <p className="text-sm text-amber-600/70 mt-0.5">{examRecordings.length} recordings</p>
+          </div>
+        </div>
+        <div className="bg-gray-900 border border-amber-900/40 rounded-xl overflow-hidden">
+          <ExamRecordingsTable recordings={examRecordings} />
         </div>
       </div>
 
