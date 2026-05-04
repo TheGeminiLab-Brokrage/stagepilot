@@ -1,39 +1,31 @@
-import { redirect } from 'next/navigation'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import ExamPageWrapper from './ExamPageWrapper'
 
-export const dynamic = 'force-dynamic'
-
-export default async function ExamPage() {
+export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) redirect('/auth/login')
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, company_id, role')
+    .select('role')
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'exam') redirect('/auth/login')
+  if (!profile || profile.role !== 'exam') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const admin = createAdminClient()
-  const { data: rawResults } = await admin
+  const { data: results, error } = await admin
     .from('exam_results')
     .select('id, phase1_score, phase1_max, phase2_score, phase2_max, phase3_completed, phase1_details, phase2_details, created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(50)
 
-  return (
-    <ExamPageWrapper
-      userId={user.id}
-      companyId={profile.company_id}
-      userName={profile.full_name}
-      userEmail={user.email ?? ''}
-      initialResults={rawResults ?? []}
-    />
-  )
+  if (error) return NextResponse.json({ error: 'Failed to fetch results' }, { status: 500 })
+
+  return NextResponse.json({ results: results ?? [] })
 }
