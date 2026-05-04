@@ -30,6 +30,7 @@ interface Props {
 export default function ExamPhase2({ onComplete }: Props) {
   const [questions, setQuestions] = useState<Question[] | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [current, setCurrent] = useState(0)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -70,8 +71,6 @@ export default function ExamPhase2({ onComplete }: Props) {
     }
   }
 
-  const answered = questions ? questions.filter(q => answers[q.id]).length : 0
-
   if (!started) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-6" dir="rtl">
@@ -101,121 +100,166 @@ export default function ExamPhase2({ onComplete }: Props) {
 
   if (!questions) return null
 
+  const q = questions[current]
+  const isLast = current === questions.length - 1
+  const currentAnswered = !!answers[q.id]
+
+  const progressPct = ((current + 1) / questions.length) * 100
+
   return (
     <div className="flex flex-col h-full" dir="rtl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: "'Space Grotesk', sans-serif" }}>
-          المرحلة الثانية — سيناريوهات العملاء
-        </span>
-        <span style={{ color: '#D7FF00', fontSize: 13, fontWeight: 700 }}>
-          {answered} / {questions.length} اتجاوب
-        </span>
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: "'Space Grotesk', sans-serif" }}>
+            المرحلة الثانية — سيناريوهات العملاء
+          </span>
+          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
+            السؤال {current + 1} / {questions.length}
+          </span>
+        </div>
+        <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+          <div
+            style={{
+              height: '100%',
+              width: `${progressPct}%`,
+              background: '#D7FF00',
+              borderRadius: 2,
+              transition: 'width 0.3s ease',
+            }}
+          />
+        </div>
       </div>
 
-      {/* Scrollable questions */}
-      <div className="flex-1 overflow-y-auto space-y-5 pl-1">
-        {questions.map((q, idx) => (
-          <div
-            key={q.id}
-            style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: answers[q.id] ? '1px solid rgba(215,255,0,0.25)' : '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 14,
-              padding: '22px 24px',
-              transition: 'border-color 0.2s',
-            }}
-          >
-            {/* Q number + subtype */}
-            <div className="flex items-center gap-3 mb-4">
-              <span
-                style={{
-                  width: 28, height: 28, borderRadius: '50%',
-                  background: answers[q.id] ? '#D7FF00' : 'rgba(255,255,255,0.1)',
-                  color: answers[q.id] ? '#000' : 'rgba(255,255,255,0.5)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 12, fontWeight: 700, flexShrink: 0,
-                  transition: 'all 0.2s',
-                }}
-              >
-                {idx + 1}
-              </span>
-              <span
-                style={{
-                  fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-                  background: q.subtype === 'narrative' ? 'rgba(99,102,241,0.15)' : 'rgba(245,158,11,0.15)',
-                  border: q.subtype === 'narrative' ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(245,158,11,0.3)',
-                  color: q.subtype === 'narrative' ? 'rgba(165,180,252,0.9)' : 'rgba(252,211,77,0.9)',
-                  fontFamily: "'Space Grotesk', sans-serif",
-                }}
-              >
-                {q.subtype === 'narrative' ? 'سيناريو' : 'ميزانية'}
-              </span>
-            </div>
+      {/* Single question */}
+      <div className="flex-1 overflow-y-auto">
+        <div
+          style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: currentAnswered ? '1px solid rgba(215,255,0,0.25)' : '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 14,
+            padding: '22px 24px',
+            transition: 'border-color 0.2s',
+          }}
+        >
+          {/* Q number + subtype */}
+          <div className="flex items-center gap-3 mb-4">
+            <span
+              style={{
+                width: 28, height: 28, borderRadius: '50%',
+                background: currentAnswered ? '#D7FF00' : 'rgba(255,255,255,0.1)',
+                color: currentAnswered ? '#000' : 'rgba(255,255,255,0.5)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 12, fontWeight: 700, flexShrink: 0,
+                transition: 'all 0.2s',
+              }}
+            >
+              {current + 1}
+            </span>
+            <span
+              style={{
+                fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+                background: q.subtype === 'narrative' ? 'rgba(99,102,241,0.15)' : 'rgba(245,158,11,0.15)',
+                border: q.subtype === 'narrative' ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(245,158,11,0.3)',
+                color: q.subtype === 'narrative' ? 'rgba(165,180,252,0.9)' : 'rgba(252,211,77,0.9)',
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              {q.subtype === 'narrative' ? 'سيناريو' : 'ميزانية'}
+            </span>
+          </div>
 
-            <p style={{ color: '#fff', fontSize: 14, lineHeight: 1.75, marginBottom: 18 }}>
-              {q.scenario}
-            </p>
+          <p style={{ color: '#fff', fontSize: 14, lineHeight: 1.75, marginBottom: 18 }}>
+            {q.scenario}
+          </p>
 
-            <div className="space-y-2">
-              {q.choices.map(choice => {
-                const selected = answers[q.id] === choice.label
-                return (
-                  <button
-                    key={choice.label}
-                    onClick={() => setAnswers(a => ({ ...a, [q.id]: choice.label }))}
+          <div className="space-y-2">
+            {q.choices.map(choice => {
+              const selected = answers[q.id] === choice.label
+              return (
+                <button
+                  key={choice.label}
+                  onClick={() => setAnswers(a => ({ ...a, [q.id]: choice.label }))}
+                  style={{
+                    width: '100%', textAlign: 'right', padding: '10px 14px',
+                    borderRadius: 8, border: selected ? '1.5px solid #D7FF00' : '1px solid rgba(255,255,255,0.08)',
+                    background: selected ? 'rgba(215,255,0,0.1)' : 'rgba(255,255,255,0.02)',
+                    color: selected ? '#D7FF00' : 'rgba(255,255,255,0.65)',
+                    cursor: 'pointer', fontSize: 13, transition: 'all 0.15s',
+                    display: 'flex', gap: 10, alignItems: 'center',
+                  }}
+                >
+                  <span
                     style={{
-                      width: '100%', textAlign: 'right', padding: '10px 14px',
-                      borderRadius: 8, border: selected ? '1.5px solid #D7FF00' : '1px solid rgba(255,255,255,0.08)',
-                      background: selected ? 'rgba(215,255,0,0.1)' : 'rgba(255,255,255,0.02)',
-                      color: selected ? '#D7FF00' : 'rgba(255,255,255,0.65)',
-                      cursor: 'pointer', fontSize: 13, transition: 'all 0.15s',
-                      display: 'flex', gap: 10, alignItems: 'center',
+                      width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                      border: selected ? '2px solid #D7FF00' : '2px solid rgba(255,255,255,0.2)',
+                      background: selected ? '#D7FF00' : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 10, fontWeight: 700, color: selected ? '#000' : 'transparent',
                     }}
                   >
-                    <span
-                      style={{
-                        width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                        border: selected ? '2px solid #D7FF00' : '2px solid rgba(255,255,255,0.2)',
-                        background: selected ? '#D7FF00' : 'transparent',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 10, fontWeight: 700, color: selected ? '#000' : 'transparent',
-                      }}
-                    >
-                      {selected ? '✓' : ''}
-                    </span>
-                    <span>{choice.label}) {choice.text}</span>
-                  </button>
-                )
-              })}
-            </div>
+                    {selected ? '✓' : ''}
+                  </span>
+                  <span>{choice.label}) {choice.text}</span>
+                </button>
+              )
+            })}
           </div>
-        ))}
+        </div>
       </div>
 
-      {/* Submit */}
+      {/* Navigation */}
       <div className="flex items-center justify-between mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         {error && <span style={{ color: '#f87171', fontSize: 12 }}>{error}</span>}
-        <div className="mr-auto flex items-center gap-4">
-          {answered < questions.length && (
-            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
-              لسه فيه {questions.length - answered} سؤال
-            </span>
-          )}
+
+        {/* Previous */}
+        {current > 0 ? (
+          <button
+            onClick={() => setCurrent(c => c - 1)}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.15)',
+              color: 'rgba(255,255,255,0.6)',
+              borderRadius: 10, padding: '10px 22px', fontSize: 13,
+              cursor: 'pointer', fontWeight: 600,
+            }}
+          >
+            → السابق
+          </button>
+        ) : (
+          <div />
+        )}
+
+        {/* Next or Submit */}
+        {isLast ? (
           <button
             onClick={submitPhase}
-            disabled={answered < questions.length || submitting}
+            disabled={!currentAnswered || submitting}
             style={{
-              background: answered < questions.length || submitting ? 'rgba(215,255,0,0.25)' : '#D7FF00',
+              background: !currentAnswered || submitting ? 'rgba(215,255,0,0.25)' : '#D7FF00',
               color: '#000', fontWeight: 700, borderRadius: 10,
               padding: '11px 32px', fontSize: 14, border: 'none',
-              cursor: answered < questions.length || submitting ? 'not-allowed' : 'pointer',
+              cursor: !currentAnswered || submitting ? 'not-allowed' : 'pointer',
               transition: 'background 0.15s',
             }}
           >
             {submitting ? 'جاري التصحيح…' : 'تسليم المرحلة الثانية ✓'}
           </button>
-        </div>
+        ) : (
+          <button
+            onClick={() => setCurrent(c => c + 1)}
+            disabled={!currentAnswered}
+            style={{
+              background: currentAnswered ? '#D7FF00' : 'rgba(215,255,0,0.25)',
+              color: '#000', fontWeight: 700, borderRadius: 10,
+              padding: '11px 28px', fontSize: 14, border: 'none',
+              cursor: currentAnswered ? 'pointer' : 'not-allowed',
+              transition: 'background 0.15s',
+            }}
+          >
+            التالي ←
+          </button>
+        )}
       </div>
     </div>
   )

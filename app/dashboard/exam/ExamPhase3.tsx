@@ -183,6 +183,7 @@ export default function ExamPhase3({ onComplete }: Props) {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
   const [downloadUrl, setDownloadUrl] = useState<{ url: string; filename: string } | null>(null)
+  const [sessionUsed, setSessionUsed] = useState(false)
 
   const statusRef = useRef<Status>('idle')
   const setStatusSync = useCallback((s: Status) => { statusRef.current = s; setStatus(s) }, [])
@@ -535,6 +536,7 @@ export default function ExamPhase3({ onComplete }: Props) {
   }, [setStatusSync])
 
   const startSession = useCallback(async () => {
+    setSessionUsed(true)
     setStatusSync('connecting')
     startRingSound()
     setErrorMsg('')
@@ -691,7 +693,7 @@ export default function ExamPhase3({ onComplete }: Props) {
 
       {/* Controls */}
       <div className="flex items-center gap-3 justify-center mt-auto">
-        {status === 'idle' && (
+        {status === 'idle' && !sessionUsed && (
           <button
             onClick={startSession}
             style={{ background: '#D7FF00', color: '#000', fontWeight: 700, borderRadius: 10, padding: '12px 32px', fontSize: 14, border: 'none', cursor: 'pointer' }}
