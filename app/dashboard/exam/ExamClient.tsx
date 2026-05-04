@@ -147,6 +147,10 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
   }
 
   function handleReset() {
+    if (userEmail !== 'exam@test.com') {
+      setGate('blocked')
+      return
+    }
     setPhase('phase1')
     setPhase1Answers([])
     setPhase1Results([])

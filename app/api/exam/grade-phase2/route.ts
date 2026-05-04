@@ -30,6 +30,11 @@ export async function POST(req: Request) {
   let totalScore = 0
   const maxScore = answers.length * POINTS_PER_Q
 
+  function getChoiceText(letter: string, choices: { label: string; text: string }[] = []): string {
+    const c = choices.find(ch => ch.label === letter)
+    return c ? `${c.label}) ${c.text}` : letter
+  }
+
   const results = answers.map(({ id, response }) => {
     const q = bankMap.get(id)
     if (!q) return { id, correct: false, pointsEarned: 0, correctAnswer: '', reasoning: '' }
@@ -38,7 +43,9 @@ export async function POST(req: Request) {
     const pointsEarned = correct ? POINTS_PER_Q : 0
     totalScore += pointsEarned
 
-    return { id, correct, pointsEarned, correctAnswer: q.answer, reasoning: q.reasoning, maxPoints: POINTS_PER_Q, questionText: q.scenario, userAnswer: response }
+    const correctAnswer = getChoiceText(q.answer, q.choices)
+    const userAnswer = getChoiceText(response, q.choices)
+    return { id, correct, pointsEarned, correctAnswer, reasoning: q.reasoning, maxPoints: POINTS_PER_Q, questionText: q.scenario, userAnswer }
   })
 
   return NextResponse.json({ results, totalScore, maxScore })

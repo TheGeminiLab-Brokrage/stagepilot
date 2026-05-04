@@ -29,6 +29,10 @@ export async function POST(req: Request) {
   let totalScore = 0
   let maxScore = 0
 
+  function getChoiceText(letter: string, choices: string[] = []): string {
+    return choices.find(c => c.charAt(0) === letter) ?? letter
+  }
+
   const results = await Promise.all(answers.map(async ({ id, response }) => {
     const q = bankMap.get(id)
     if (!q) return { id, correct: false, pointsEarned: 0, correctAnswer: '' }
@@ -47,7 +51,9 @@ export async function POST(req: Request) {
     }
 
     totalScore += pointsEarned
-    return { id, correct, pointsEarned, correctAnswer: q.answer, maxPoints: q.points, questionText: q.question, userAnswer: response }
+    const correctAnswer = q.type === 'mcq' ? getChoiceText(q.answer, q.choices ?? []) : q.answer
+    const userAnswer = q.type === 'mcq' ? getChoiceText(response, q.choices ?? []) : response
+    return { id, correct, pointsEarned, correctAnswer, maxPoints: q.points, questionText: q.question, userAnswer }
   }))
 
   return NextResponse.json({ results, totalScore, maxScore })
