@@ -25,6 +25,7 @@ interface ExamResult {
   phase1_details?: QuestionDetail[]
   phase2_details?: QuestionDetail[]
   created_at: string
+  report_downloaded_at?: string | null
 }
 
 function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => void }) {
@@ -182,6 +183,7 @@ function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => 
 function DownloadButton({ result }: { result: ExamResult }) {
   const [open, setOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [downloaded, setDownloaded] = useState(!!result.report_downloaded_at)
   const [dropPos, setDropPos] = useState({ top: 0, right: 0 })
   const btnRef = useRef<HTMLButtonElement>(null)
 
@@ -191,6 +193,18 @@ function DownloadButton({ result }: { result: ExamResult }) {
       setDropPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
     }
     setOpen(o => !o)
+  }
+
+  if (downloaded) {
+    return (
+      <span style={{
+        fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
+        background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.2)',
+        border: '1px solid rgba(255,255,255,0.07)', display: 'inline-block',
+      }}>
+        تم التحميل
+      </span>
+    )
   }
 
   async function download(format: 'pdf' | 'word') {
@@ -220,6 +234,13 @@ function DownloadButton({ result }: { result: ExamResult }) {
         const { generateWord } = await import('@/lib/report-generator')
         await generateWord(reportData, result.user_name, summary)
       }
+
+      await fetch('/api/exam/mark-downloaded', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resultId: result.id }),
+      })
+      setDownloaded(true)
     } catch (e) {
       console.error('Report generation failed', e)
     } finally {

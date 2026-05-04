@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'exam') {
+  if (!profile || (profile.role !== 'exam' && profile.role !== 'super_admin')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -21,12 +21,17 @@ export async function POST(request: NextRequest) {
   if (!resultId) return NextResponse.json({ error: 'Missing resultId' }, { status: 400 })
 
   const admin = createAdminClient()
-  const { error } = await admin
+  const query = admin
     .from('exam_results')
     .update({ report_downloaded_at: new Date().toISOString() })
     .eq('id', resultId)
-    .eq('user_id', user.id)
 
+  // Exam users can only mark their own results; admins can mark any
+  if (profile.role === 'exam') {
+    query.eq('user_id', user.id)
+  }
+
+  const { error } = await query
   if (error) return NextResponse.json({ error: 'Failed to mark download' }, { status: 500 })
 
   return NextResponse.json({ ok: true })

@@ -76,25 +76,11 @@ ${correctQuestionsText || 'لا توجد إجابات صحيحة'}
       recommendation: parsed.recommendation ?? '',
     })
   } catch {
-    const correctSample = [...correctPhase1, ...correctPhase2].slice(0, 5)
-    const wrongAll = [...wrongPhase1, ...wrongPhase2]
-
-    const strengthsText = correctSample.length > 0
-      ? `أجاب المتقدم بشكل صحيح على: ${correctSample.map(q => q.questionText ?? q.id).join('، ')}.`
-      : 'لم يُسجَّل أداء صحيح في هذا الاختبار.'
-
-    const weaknessesText = wrongAll.length > 0
-      ? `أخطأ المتقدم في الأسئلة التالية:\n${wrongAll.map(q => `- ${q.questionText ?? q.id} (الإجابة الصحيحة: ${q.correctAnswer})`).join('\n')}`
-      : 'لا توجد أخطاء واضحة — أحسنت!'
-
-    const recommendationText = wrongAll.length > 0
-      ? `يُنصح بمراجعة الأسئلة التالية وفهم إجاباتها الصحيحة:\n${wrongAll.map(q => `- ${q.questionText ?? q.id}`).join('\n')}`
-      : 'استمر في المستوى الممتاز والحرص على تطبيق ما تعلمته في المواقف العملية.'
-
+    const unavailable = 'لا يمكن الوصول إلى هذه الميزة حاليًا، يرجى التواصل معنا.\nCan\'t access this feature right now, please contact us.'
     return NextResponse.json({
-      strengths: strengthsText,
-      weaknesses: weaknessesText,
-      recommendation: recommendationText,
+      strengths: unavailable,
+      weaknesses: unavailable,
+      recommendation: unavailable,
     })
   }
 }

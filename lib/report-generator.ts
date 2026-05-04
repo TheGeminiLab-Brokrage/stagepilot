@@ -29,6 +29,8 @@ export interface ReportSummary {
   recommendation: string
 }
 
+// ─── PDF ─────────────────────────────────────────────────────────────────────
+
 function buildReportHTML(data: ExamReportData, userName: string, summary: ReportSummary): string {
   const total = data.phase1_score + data.phase2_score
   const max = data.phase1_max + data.phase2_max
@@ -37,110 +39,92 @@ function buildReportHTML(data: ExamReportData, userName: string, summary: Report
   const dateStr = new Date(data.created_at).toLocaleDateString('ar-EG', { day: '2-digit', month: 'long', year: 'numeric' })
 
   const renderQuestion = (q: QuestionDetail, index: number) => `
-    <div style="margin-bottom:10px; padding:12px 14px; border-radius:8px;
+    <div style="margin-bottom:10px;padding:12px 14px;border-radius:8px;
       background:${q.correct ? '#f0fdf4' : '#fff5f5'};
       border:1px solid ${q.correct ? '#86efac' : '#fca5a5'};">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
         <div style="flex:1;">
-          <p style="color:#6b7280; font-size:10px; margin:0 0 4px; font-family:monospace;">س${index + 1}</p>
-          <p style="color:#111827; font-size:13px; line-height:1.6; margin:0 0 8px;">${q.questionText ?? q.id}</p>
-          <div style="font-size:12px; color:#4b5563;">
-            إجابة المتقدم: <span style="color:${q.correct ? '#16a34a' : '#dc2626'}; font-weight:600;">${q.userAnswer ?? '—'}</span>
-            ${!q.correct ? `&nbsp;&nbsp; الإجابة الصحيحة: <span style="color:#16a34a; font-weight:600;">${q.correctAnswer}</span>` : ''}
+          <p style="color:#6b7280;font-size:10px;margin:0 0 4px;font-family:monospace;">س${index + 1}</p>
+          <p style="color:#111827;font-size:13px;line-height:1.6;margin:0 0 8px;">${q.questionText ?? q.id}</p>
+          <div style="font-size:12px;color:#4b5563;">
+            إجابة المتقدم: <span style="color:${q.correct ? '#16a34a' : '#dc2626'};font-weight:600;">${q.userAnswer ?? '—'}</span>
+            ${!q.correct ? `&nbsp;&nbsp; الإجابة الصحيحة: <span style="color:#16a34a;font-weight:600;">${q.correctAnswer}</span>` : ''}
           </div>
-          ${!q.correct && q.reasoning ? `<p style="color:#6b7280; font-size:11px; margin:6px 0 0; line-height:1.6;">${q.reasoning}</p>` : ''}
+          ${!q.correct && q.reasoning ? `<p style="color:#6b7280;font-size:11px;margin:6px 0 0;line-height:1.6;">${q.reasoning}</p>` : ''}
         </div>
-        <span style="font-size:13px; font-weight:700; color:${q.correct ? '#16a34a' : '#dc2626'}; white-space:nowrap;">
+        <span style="font-size:13px;font-weight:700;color:${q.correct ? '#16a34a' : '#dc2626'};white-space:nowrap;">
           ${q.pointsEarned}/${q.maxPoints}
         </span>
       </div>
     </div>`
+
+  const pageBreak = `<div class="html2pdf__page-break"></div>`
 
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8"/>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 14px; color: #111827; background: #fff; direction: rtl; }
-  .page { padding: 40px; max-width: 800px; margin: 0 auto; }
-  h2 { font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 3px solid #D7FF00; }
-  .section { margin-bottom: 32px; }
-  .section-break { page-break-before: always; break-before: page; }
-  .header-card { background: #111827; color: #fff; border-radius: 12px; padding: 28px 32px; margin-bottom: 32px; }
-  .header-name { font-size: 26px; font-weight: 800; color: #fff; margin-bottom: 6px; }
-  .header-meta { color: #9ca3af; font-size: 13px; margin-bottom: 16px; }
-  .badge { display: inline-block; padding: 5px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; }
-  .pass { background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.4); }
-  .fail { background: rgba(248,113,113,0.2); color: #fca5a5; border: 1px solid rgba(248,113,113,0.4); }
-  .score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
-  .score-card { border: 1px solid rgba(215,255,0,0.25); border-radius: 8px; padding: 14px; text-align: center; background: #fafafa; }
-  .score-card .label { font-size: 11px; color: #6b7280; margin-bottom: 6px; }
-  .score-card .value { font-size: 20px; font-weight: 800; color: #111827; }
-  .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 24px; }
-  .summary-section { margin-bottom: 18px; }
-  .summary-section:last-child { margin-bottom: 0; }
-  .summary-label { font-size: 12px; font-weight: 800; color: #D7FF00; background: #111827; display: inline-block; padding: 3px 10px; border-radius: 4px; margin-bottom: 8px; letter-spacing: 0.04em; }
-  .summary-text { font-size: 13px; color: #334155; line-height: 1.7; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',Tahoma,Arial,sans-serif; font-size:14px; color:#111827; background:#fff; direction:rtl; }
+  .page { padding:40px; max-width:800px; margin:0 auto; }
+  h2 { font-size:18px; font-weight:800; color:#111827; margin-bottom:14px; padding-bottom:10px; border-bottom:3px solid #D7FF00; }
+  .header-card { background:#111827; color:#fff; border-radius:12px; padding:28px 32px; margin-bottom:28px; }
+  .header-name { font-size:26px; font-weight:800; color:#fff; margin-bottom:6px; }
+  .header-meta { color:#9ca3af; font-size:13px; margin-bottom:14px; }
+  .badge { display:inline-block; padding:5px 16px; border-radius:20px; font-size:13px; font-weight:700; }
+  .pass { background:rgba(16,185,129,0.2); color:#6ee7b7; border:1px solid rgba(16,185,129,0.4); }
+  .fail { background:rgba(248,113,113,0.2); color:#fca5a5; border:1px solid rgba(248,113,113,0.4); }
+  .scores { margin-bottom:0; }
+  .score-row { display:flex; gap:16px; margin-bottom:8px; font-size:14px; color:#374151; }
+  .score-label { color:#6b7280; min-width:140px; }
+  .score-value { font-weight:700; color:#111827; }
+  .score-total { font-size:16px; font-weight:800; color:#D7FF00; background:#111827; padding:10px 16px; border-radius:8px; display:inline-block; margin-top:8px; }
+  .section { margin-bottom:0; }
+  .summary-label { font-size:12px; font-weight:800; color:#D7FF00; background:#111827; display:inline-block; padding:3px 10px; border-radius:4px; margin-bottom:8px; }
+  .summary-text { font-size:13px; color:#334155; line-height:1.7; margin-bottom:20px; white-space:pre-line; }
 </style>
 </head>
 <body>
 <div class="page">
 
-  <!-- Header -->
+  <!-- Page 1: Header + Scores -->
   <div class="header-card">
     <div class="header-name">${userName}</div>
     <div class="header-meta">${dateStr}</div>
     <span class="badge ${passed ? 'pass' : 'fail'}">${passed ? '✓ ناجح' : '✗ راسب'}</span>
   </div>
 
-  <!-- Score summary -->
-  <div class="score-grid">
-    <div class="score-card">
-      <div class="label">المرحلة الأولى</div>
-      <div class="value">${data.phase1_score}/${data.phase1_max}</div>
-    </div>
-    <div class="score-card">
-      <div class="label">المرحلة الثانية</div>
-      <div class="value">${data.phase2_score}/${data.phase2_max}</div>
-    </div>
-    <div class="score-card">
-      <div class="label">الإجمالي</div>
-      <div class="value">${total}/${max} <span style="font-size:14px;color:#6b7280;">(${pct}%)</span></div>
-    </div>
+  <h2>ملخص الدرجات</h2>
+  <div class="scores">
+    <div class="score-row"><span class="score-label">المرحلة الأولى:</span><span class="score-value">${data.phase1_score}/${data.phase1_max}</span></div>
+    <div class="score-row"><span class="score-label">المرحلة الثانية:</span><span class="score-value">${data.phase2_score}/${data.phase2_max}</span></div>
+    <div class="score-total">الإجمالي: ${total}/${max} (${pct}%)</div>
   </div>
 
-  <!-- Phase 1 -->
   ${data.phase1_details?.length ? `
-  <div class="section section-break">
+  ${pageBreak}
+  <div class="section">
     <h2>المرحلة الأولى — الأسئلة</h2>
     ${data.phase1_details.map((q, i) => renderQuestion(q, i)).join('')}
   </div>` : ''}
 
-  <!-- Phase 2 -->
   ${data.phase2_details?.length ? `
-  <div class="section section-break">
+  ${pageBreak}
+  <div class="section">
     <h2>المرحلة الثانية — السيناريوهات</h2>
     ${data.phase2_details.map((q, i) => renderQuestion(q, i)).join('')}
   </div>` : ''}
 
-  <!-- AI Summary -->
-  <div class="section section-break">
+  ${pageBreak}
+  <div class="section">
     <h2>ملخص التقييم</h2>
-    <div class="summary-card">
-      <div class="summary-section">
-        <div class="summary-label">✓ نقاط القوة</div>
-        <div class="summary-text">${summary.strengths}</div>
-      </div>
-      <div class="summary-section">
-        <div class="summary-label">✗ نقاط تحتاج تطوير</div>
-        <div class="summary-text">${summary.weaknesses}</div>
-      </div>
-      <div class="summary-section">
-        <div class="summary-label">📚 توصيات للدراسة</div>
-        <div class="summary-text">${summary.recommendation}</div>
-      </div>
-    </div>
+    <div class="summary-label">✓ نقاط القوة</div>
+    <div class="summary-text">${summary.strengths}</div>
+    <div class="summary-label">✗ نقاط تحتاج تطوير</div>
+    <div class="summary-text">${summary.weaknesses}</div>
+    <div class="summary-label">📚 توصيات للدراسة</div>
+    <div class="summary-text">${summary.recommendation}</div>
   </div>
 
 </div>
@@ -149,12 +133,12 @@ function buildReportHTML(data: ExamReportData, userName: string, summary: Report
 }
 
 export async function generatePDF(data: ExamReportData, userName: string, summary: ReportSummary): Promise<void> {
-  const html2pdf = (await import('html2pdf.js')).default
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const html2pdf = (await import('html2pdf.js')).default as any
   const html = buildReportHTML(data, userName, summary)
   const dateStr = new Date(data.created_at).toISOString().slice(0, 10)
   const filename = `exam-report-${userName.replace(/\s+/g, '-')}-${dateStr}.pdf`
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await html2pdf()
     .set({
       margin: 0,
@@ -162,11 +146,13 @@ export async function generatePDF(data: ExamReportData, userName: string, summar
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'] },
-    } as any)
+      pagebreak: { mode: 'legacy' },
+    })
     .from(html)
     .save()
 }
+
+// ─── Word ─────────────────────────────────────────────────────────────────────
 
 export async function generateWord(data: ExamReportData, userName: string, summary: ReportSummary): Promise<void> {
   const {
@@ -180,12 +166,24 @@ export async function generateWord(data: ExamReportData, userName: string, summa
   const passed = pct >= 60
   const dateStr = new Date(data.created_at).toLocaleDateString('ar-EG', { day: '2-digit', month: 'long', year: 'numeric' })
 
-  const rtlParagraph = (text: string, bold = false, size = 24, color = '111827', shadingFill?: string) =>
+  // Helper: single RTL paragraph with optional shading
+  const rtlP = (text: string, opts: {
+    bold?: boolean; size?: number; color?: string;
+    fill?: string; spacing?: { before?: number; after?: number }
+  } = {}) =>
     new Paragraph({
       bidirectional: true,
       alignment: AlignmentType.RIGHT,
-      children: [new TextRun({ text, bold, size, color: shadingFill ? 'FFFFFF' : color, font: 'Arial' })],
-      ...(shadingFill ? { shading: { type: ShadingType.CLEAR, fill: shadingFill } } : {}),
+      ...(opts.fill ? { shading: { type: ShadingType.CLEAR, fill: opts.fill } } : {}),
+      spacing: opts.spacing ?? {},
+      children: [new TextRun({
+        text,
+        bold: opts.bold ?? false,
+        size: opts.size ?? 24,
+        color: opts.color ?? '111827',
+        font: 'Arial',
+        rightToLeft: true,
+      })],
     })
 
   const sectionHeading = (text: string, pageBreak = false) =>
@@ -194,9 +192,9 @@ export async function generateWord(data: ExamReportData, userName: string, summa
       bidirectional: true,
       alignment: AlignmentType.RIGHT,
       pageBreakBefore: pageBreak,
-      children: [new TextRun({ text, bold: true, size: 32, color: '111827', font: 'Arial' })],
+      children: [new TextRun({ text, bold: true, size: 32, color: '111827', font: 'Arial', rightToLeft: true })],
       border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: 'D7FF00' } },
-      spacing: { before: pageBreak ? 0 : 400, after: 200 },
+      spacing: { before: pageBreak ? 0 : 400, after: 240 },
     })
 
   const questionParagraphs = (questions: QuestionDetail[], phaseLabel: string) => {
@@ -211,8 +209,8 @@ export async function generateWord(data: ExamReportData, userName: string, summa
           spacing: { before: 160, after: 60 },
           shading: { type: ShadingType.CLEAR, fill: q.correct ? 'f0fdf4' : 'fff5f5' },
           children: [
-            new TextRun({ text: `${phaseLabel} — س${i + 1}: `, bold: true, size: 22, color: '374151', font: 'Arial' }),
-            new TextRun({ text: q.questionText ?? q.id, size: 22, color: '111827', font: 'Arial' }),
+            new TextRun({ text: `${phaseLabel} — س${i + 1}: `, bold: true, size: 22, color: '374151', font: 'Arial', rightToLeft: true }),
+            new TextRun({ text: q.questionText ?? q.id, size: 22, color: '111827', font: 'Arial', rightToLeft: true }),
           ],
         }),
         new Paragraph({
@@ -220,104 +218,76 @@ export async function generateWord(data: ExamReportData, userName: string, summa
           alignment: AlignmentType.RIGHT,
           spacing: { before: 40, after: 40 },
           children: [
-            new TextRun({ text: 'إجابة المتقدم: ', size: 20, color: '6b7280', font: 'Arial' }),
-            new TextRun({ text: q.userAnswer ?? '—', bold: true, size: 20, color: q.correct ? '16a34a' : 'dc2626', font: 'Arial' }),
+            new TextRun({ text: 'إجابة المتقدم: ', size: 20, color: '6b7280', font: 'Arial', rightToLeft: true }),
+            new TextRun({ text: q.userAnswer ?? '—', bold: true, size: 20, color: q.correct ? '16a34a' : 'dc2626', font: 'Arial', rightToLeft: true }),
             ...(q.correct ? [] : [
-              new TextRun({ text: '    |    الإجابة الصحيحة: ', size: 20, color: '6b7280', font: 'Arial' }),
-              new TextRun({ text: q.correctAnswer, bold: true, size: 20, color: '16a34a', font: 'Arial' }),
+              new TextRun({ text: '    |    الإجابة الصحيحة: ', size: 20, color: '6b7280', font: 'Arial', rightToLeft: true }),
+              new TextRun({ text: q.correctAnswer, bold: true, size: 20, color: '16a34a', font: 'Arial', rightToLeft: true }),
             ]),
-            new TextRun({ text: `    (${q.pointsEarned}/${q.maxPoints})`, size: 20, color: q.correct ? '16a34a' : 'dc2626', font: 'Arial' }),
+            new TextRun({ text: `    (${q.pointsEarned}/${q.maxPoints})`, size: 20, color: q.correct ? '16a34a' : 'dc2626', font: 'Arial', rightToLeft: true }),
           ],
         }),
         ...((!q.correct && q.reasoning) ? [new Paragraph({
           bidirectional: true,
           alignment: AlignmentType.RIGHT,
           spacing: { before: 20, after: 80 },
-          children: [new TextRun({ text: q.reasoning, italics: true, size: 18, color: '6b7280', font: 'Arial' })],
+          children: [new TextRun({ text: q.reasoning, italics: true, size: 18, color: '6b7280', font: 'Arial', rightToLeft: true })],
         })] : []),
       )
     }
     return rows
   }
 
+  const summaryLabelP = (text: string) =>
+    new Paragraph({
+      bidirectional: true,
+      alignment: AlignmentType.RIGHT,
+      shading: { type: ShadingType.CLEAR, fill: '111827' },
+      spacing: { before: 200, after: 60 },
+      children: [new TextRun({ text, bold: true, size: 22, color: 'D7FF00', font: 'Arial', rightToLeft: true })],
+    })
+
   const doc = new Document({
     sections: [{
-      properties: {
-        page: { size: { orientation: 'portrait' } },
-        // @ts-expect-error bidi is valid but not in all type defs
-        bidi: true,
-      },
+      properties: { page: { size: { orientation: 'portrait' } } },
       children: [
-        // Header block — dark background with username as H1
+        // ── Page 1: Header band + Scores ──────────────────────────────────
         new Paragraph({
           heading: HeadingLevel.HEADING_1,
           bidirectional: true,
           alignment: AlignmentType.RIGHT,
           shading: { type: ShadingType.CLEAR, fill: '111827' },
           spacing: { after: 0 },
-          children: [new TextRun({ text: `المتقدم: ${userName}`, bold: true, size: 48, color: 'FFFFFF', font: 'Arial' })],
+          children: [new TextRun({ text: `المتقدم: ${userName}`, bold: true, size: 48, color: 'FFFFFF', font: 'Arial', rightToLeft: true })],
         }),
-        new Paragraph({
-          bidirectional: true,
-          alignment: AlignmentType.RIGHT,
-          shading: { type: ShadingType.CLEAR, fill: '111827' },
-          spacing: { after: 0 },
-          children: [new TextRun({ text: `التاريخ: ${dateStr}`, size: 22, color: '9ca3af', font: 'Arial' })],
-        }),
-        new Paragraph({
-          bidirectional: true,
-          alignment: AlignmentType.RIGHT,
-          shading: { type: ShadingType.CLEAR, fill: '111827' },
-          spacing: { after: 400 },
-          children: [new TextRun({ text: `النتيجة: ${passed ? '✓ ناجح' : '✗ راسب'}`, bold: true, size: 26, color: passed ? '6ee7b7' : 'fca5a5', font: 'Arial' })],
-        }),
+        rtlP(`التاريخ: ${dateStr}`, { size: 22, color: '9ca3af', fill: '111827', spacing: { after: 0 } }),
+        rtlP(`النتيجة: ${passed ? '✓ ناجح' : '✗ راسب'}`, { bold: true, size: 26, color: passed ? '6ee7b7' : 'fca5a5', fill: '111827', spacing: { after: 400 } }),
 
-        // Scores — new page
-        sectionHeading('ملخص الدرجات', true),
-        rtlParagraph(`المرحلة الأولى: ${data.phase1_score}/${data.phase1_max}`, false, 22),
-        rtlParagraph(`المرحلة الثانية: ${data.phase2_score}/${data.phase2_max}`, false, 22),
-        rtlParagraph(`الإجمالي: ${total}/${max} (${pct}%)`, true, 26, passed ? '166534' : '991b1b'),
+        sectionHeading('ملخص الدرجات'),
+        rtlP(`المرحلة الأولى: ${data.phase1_score}/${data.phase1_max}`, { size: 22, spacing: { after: 60 } }),
+        rtlP(`المرحلة الثانية: ${data.phase2_score}/${data.phase2_max}`, { size: 22, spacing: { after: 60 } }),
+        rtlP(`الإجمالي: ${total}/${max} (${pct}%)`, { bold: true, size: 26, color: passed ? '166534' : '991b1b', spacing: { after: 0 } }),
 
-        // Phase 1 details — new page
+        // ── Phase 1: new page ─────────────────────────────────────────────
         ...(data.phase1_details?.length ? [
           sectionHeading('المرحلة الأولى — الأسئلة', true),
           ...questionParagraphs(data.phase1_details, 'المرحلة الأولى'),
         ] : []),
 
-        // Phase 2 details — new page
+        // ── Phase 2: new page ─────────────────────────────────────────────
         ...(data.phase2_details?.length ? [
           sectionHeading('المرحلة الثانية — السيناريوهات', true),
           ...questionParagraphs(data.phase2_details, 'المرحلة الثانية'),
         ] : []),
 
-        // AI Summary — new page
+        // ── Summary: new page ─────────────────────────────────────────────
         sectionHeading('ملخص التقييم', true),
-        new Paragraph({
-          bidirectional: true,
-          alignment: AlignmentType.RIGHT,
-          shading: { type: ShadingType.CLEAR, fill: '111827' },
-          spacing: { before: 0, after: 40 },
-          children: [new TextRun({ text: '✓ نقاط القوة', bold: true, size: 22, color: 'D7FF00', font: 'Arial' })],
-        }),
-        rtlParagraph(summary.strengths, false, 22),
-        new Paragraph({ spacing: { before: 200 }, children: [] }),
-        new Paragraph({
-          bidirectional: true,
-          alignment: AlignmentType.RIGHT,
-          shading: { type: ShadingType.CLEAR, fill: '111827' },
-          spacing: { before: 0, after: 40 },
-          children: [new TextRun({ text: '✗ نقاط تحتاج تطوير', bold: true, size: 22, color: 'D7FF00', font: 'Arial' })],
-        }),
-        rtlParagraph(summary.weaknesses, false, 22),
-        new Paragraph({ spacing: { before: 200 }, children: [] }),
-        new Paragraph({
-          bidirectional: true,
-          alignment: AlignmentType.RIGHT,
-          shading: { type: ShadingType.CLEAR, fill: '111827' },
-          spacing: { before: 0, after: 40 },
-          children: [new TextRun({ text: '📚 توصيات للدراسة', bold: true, size: 22, color: 'D7FF00', font: 'Arial' })],
-        }),
-        rtlParagraph(summary.recommendation, false, 22),
+        summaryLabelP('✓ نقاط القوة'),
+        rtlP(summary.strengths, { size: 22, spacing: { after: 0 } }),
+        summaryLabelP('✗ نقاط تحتاج تطوير'),
+        rtlP(summary.weaknesses, { size: 22, spacing: { after: 0 } }),
+        summaryLabelP('📚 توصيات للدراسة'),
+        rtlP(summary.recommendation, { size: 22, spacing: { after: 0 } }),
       ],
     }],
   })
