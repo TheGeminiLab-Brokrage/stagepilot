@@ -154,6 +154,7 @@ export async function generatePDF(data: ExamReportData, userName: string, summar
   const dateStr = new Date(data.created_at).toISOString().slice(0, 10)
   const filename = `exam-report-${userName.replace(/\s+/g, '-')}-${dateStr}.pdf`
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await html2pdf()
     .set({
       margin: 0,
@@ -162,7 +163,7 @@ export async function generatePDF(data: ExamReportData, userName: string, summar
       html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['css', 'legacy'] },
-    })
+    } as any)
     .from(html)
     .save()
 }

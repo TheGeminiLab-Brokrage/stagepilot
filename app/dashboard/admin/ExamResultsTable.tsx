@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import type { ExamReportData, ReportSummary } from '@/lib/report-generator'
 
 interface QuestionDetail {
@@ -182,6 +182,16 @@ function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => 
 function DownloadButton({ result }: { result: ExamResult }) {
   const [open, setOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [dropPos, setDropPos] = useState({ top: 0, right: 0 })
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  function toggleOpen() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      setDropPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    }
+    setOpen(o => !o)
+  }
 
   async function download(format: 'pdf' | 'word') {
     setOpen(false)
@@ -218,9 +228,10 @@ function DownloadButton({ result }: { result: ExamResult }) {
   }
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    <div style={{ display: 'inline-block' }}>
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={toggleOpen}
         disabled={generating}
         style={{
           fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
@@ -237,7 +248,7 @@ function DownloadButton({ result }: { result: ExamResult }) {
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
           <div
             style={{
-              position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 50,
+              position: 'fixed', top: dropPos.top, right: dropPos.right, zIndex: 50,
               background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: 8, overflow: 'hidden', minWidth: 120,
             }}
