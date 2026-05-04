@@ -205,6 +205,15 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
             يُسمح بمحاولة واحدة فقط في اليوم. عد غداً للمحاولة مجدداً.
           </p>
         </div>
+        <a
+          href="/auth/login"
+          style={{
+            color: 'rgba(215,255,0,0.6)', fontSize: 12, textDecoration: 'underline',
+            cursor: 'pointer', marginTop: 8,
+          }}
+        >
+          تسجيل الخروج
+        </a>
       </div>
     )
   }
