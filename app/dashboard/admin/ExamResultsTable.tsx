@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import type { ExamReportData, ReportSummary } from '@/lib/report-generator'
 
 interface QuestionDetail {
@@ -181,19 +181,8 @@ function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => 
 }
 
 function DownloadButton({ result }: { result: ExamResult }) {
-  const [open, setOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [downloaded, setDownloaded] = useState(!!result.report_downloaded_at)
-  const [dropPos, setDropPos] = useState({ top: 0, right: 0 })
-  const btnRef = useRef<HTMLButtonElement>(null)
-
-  function toggleOpen() {
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect()
-      setDropPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-    }
-    setOpen(o => !o)
-  }
 
   if (downloaded) {
     return (
@@ -207,8 +196,7 @@ function DownloadButton({ result }: { result: ExamResult }) {
     )
   }
 
-  async function download(format: 'pdf' | 'word') {
-    setOpen(false)
+  async function download() {
     setGenerating(true)
     try {
       const res = await fetch('/api/exam/generate-report-summary', {
@@ -226,15 +214,8 @@ function DownloadButton({ result }: { result: ExamResult }) {
       })
       const summary: ReportSummary = await res.json()
       const reportData = result as unknown as ExamReportData
-
-      if (format === 'pdf') {
-        const { generatePDF } = await import('@/lib/report-generator')
-        await generatePDF(reportData, result.user_name, summary)
-      } else {
-        const { generateWord } = await import('@/lib/report-generator')
-        await generateWord(reportData, result.user_name, summary)
-      }
-
+      const { generateWord } = await import('@/lib/report-generator')
+      await generateWord(reportData, result.user_name, summary)
       await fetch('/api/exam/mark-downloaded', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -249,53 +230,19 @@ function DownloadButton({ result }: { result: ExamResult }) {
   }
 
   return (
-    <div style={{ display: 'inline-block' }}>
-      <button
-        ref={btnRef}
-        onClick={toggleOpen}
-        disabled={generating}
-        style={{
-          fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
-          background: generating ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
-          color: generating ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.5)',
-          border: '1px solid rgba(255,255,255,0.1)', cursor: generating ? 'default' : 'pointer',
-          transition: 'all 0.15s',
-        }}
-      >
-        {generating ? '...' : '↓ تقرير'}
-      </button>
-      {open && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
-          <div
-            style={{
-              position: 'fixed', top: dropPos.top, right: dropPos.right, zIndex: 50,
-              background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 8, overflow: 'hidden', minWidth: 120,
-            }}
-          >
-            {([['pdf', '📄 PDF'], ['word', '📝 Word']] as const).map(([fmt, label]) => (
-              <button
-                key={fmt}
-                onClick={() => download(fmt)}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'right',
-                  padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                  color: 'rgba(255,255,255,0.7)', background: 'none',
-                  border: 'none', cursor: 'pointer',
-                  transition: 'background 0.1s',
-                  fontFamily: 'inherit',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+    <button
+      onClick={download}
+      disabled={generating}
+      style={{
+        fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
+        background: generating ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
+        color: generating ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.5)',
+        border: '1px solid rgba(255,255,255,0.1)', cursor: generating ? 'default' : 'pointer',
+        transition: 'all 0.15s',
+      }}
+    >
+      {generating ? '...' : '↓ تقرير'}
+    </button>
   )
 }
 

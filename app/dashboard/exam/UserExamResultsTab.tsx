@@ -226,27 +226,22 @@ function AudioPlayer({ resultId }: { resultId: string }) {
 }
 
 function DownloadButton({ result, userName }: { result: ExamResult; userName: string }) {
-  const [open, setOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [downloaded, setDownloaded] = useState(!!result.report_downloaded_at)
 
   if (downloaded) {
     return (
-      <span
-        style={{
-          fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
-          background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.2)',
-          border: '1px solid rgba(255,255,255,0.08)', display: 'inline-block',
-          cursor: 'default',
-        }}
-      >
+      <span style={{
+        fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
+        background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.2)',
+        border: '1px solid rgba(255,255,255,0.08)', display: 'inline-block', cursor: 'default',
+      }}>
         تم التحميل
       </span>
     )
   }
 
-  async function download(format: 'pdf' | 'word') {
-    setOpen(false)
+  async function download() {
     setGenerating(true)
     try {
       const res = await fetch('/api/exam/generate-report-summary', {
@@ -263,17 +258,8 @@ function DownloadButton({ result, userName }: { result: ExamResult; userName: st
         }),
       })
       const summary: ReportSummary = await res.json()
-      const reportData: ExamReportData = result as ExamReportData
-
-      if (format === 'pdf') {
-        const { generatePDF } = await import('@/lib/report-generator')
-        await generatePDF(reportData, userName, summary)
-      } else {
-        const { generateWord } = await import('@/lib/report-generator')
-        await generateWord(reportData, userName, summary)
-      }
-
-      // Mark as downloaded in DB, then update local state
+      const { generateWord } = await import('@/lib/report-generator')
+      await generateWord(result as ExamReportData, userName, summary)
       await fetch('/api/exam/mark-downloaded', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -288,52 +274,19 @@ function DownloadButton({ result, userName }: { result: ExamResult; userName: st
   }
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        disabled={generating}
-        style={{
-          fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
-          background: generating ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
-          color: generating ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)',
-          border: '1px solid rgba(255,255,255,0.12)', cursor: generating ? 'default' : 'pointer',
-          transition: 'all 0.15s',
-        }}
-      >
-        {generating ? 'جاري التوليد…' : 'تنزيل التقرير ↓'}
-      </button>
-      {open && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
-          <div
-            style={{
-              position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50,
-              background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 8, overflow: 'hidden', minWidth: 130,
-            }}
-          >
-            {([['pdf', '📄 PDF'], ['word', '📝 Word']] as const).map(([fmt, label]) => (
-              <button
-                key={fmt}
-                onClick={() => download(fmt)}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'right',
-                  padding: '10px 14px', fontSize: 12, fontWeight: 600,
-                  color: 'rgba(255,255,255,0.7)', background: 'none',
-                  border: 'none', cursor: 'pointer',
-                  transition: 'background 0.1s',
-                  fontFamily: "'Montserrat', sans-serif",
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+    <button
+      onClick={download}
+      disabled={generating}
+      style={{
+        fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
+        background: generating ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
+        color: generating ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)',
+        border: '1px solid rgba(255,255,255,0.12)', cursor: generating ? 'default' : 'pointer',
+        transition: 'all 0.15s',
+      }}
+    >
+      {generating ? 'جاري التوليد…' : 'تنزيل التقرير'}
+    </button>
   )
 }
 
