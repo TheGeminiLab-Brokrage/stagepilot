@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import PracticeClient from './PracticeClient'
+import { SCENARIOS } from '@/lib/gemini-scenarios'
+import PracticePageWrapper from './PracticePageWrapper'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,13 +23,24 @@ export default async function PracticePage() {
     redirect('/auth/login')
   }
 
+  const { data: rawSessions } = await supabase
+    .from('practice_sessions')
+    .select('id, scenario_id, audio_path, duration_seconds, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  const scenarioLabels = Object.fromEntries(SCENARIOS.map(s => [s.id, s.label]))
+
   return (
-    <PracticeClient
+    <PracticePageWrapper
       userId={user.id}
       companyId={profile.company_id}
       userName={profile.full_name}
       role={profile.role}
       userEmail={user.email ?? ''}
+      initialSessions={rawSessions ?? []}
+      scenarioLabels={scenarioLabels}
     />
   )
 }
