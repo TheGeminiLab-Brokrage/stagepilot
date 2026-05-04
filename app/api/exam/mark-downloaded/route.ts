@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export async function GET() {
+export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -17,15 +17,17 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  const { resultId } = await request.json()
+  if (!resultId) return NextResponse.json({ error: 'Missing resultId' }, { status: 400 })
+
   const admin = createAdminClient()
-  const { data: results, error } = await admin
+  const { error } = await admin
     .from('exam_results')
-    .select('id, phase1_score, phase1_max, phase2_score, phase2_max, phase3_completed, phase1_details, phase2_details, created_at, report_downloaded_at')
+    .update({ report_downloaded_at: new Date().toISOString() })
+    .eq('id', resultId)
     .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(50)
 
-  if (error) return NextResponse.json({ error: 'Failed to fetch results' }, { status: 500 })
+  if (error) return NextResponse.json({ error: 'Failed to mark download' }, { status: 500 })
 
-  return NextResponse.json({ results: results ?? [] })
+  return NextResponse.json({ ok: true })
 }

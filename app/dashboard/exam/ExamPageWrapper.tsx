@@ -2,30 +2,7 @@
 
 import { useState } from 'react'
 import ExamClient from './ExamClient'
-import UserExamResultsTab from './UserExamResultsTab'
-
-interface QuestionDetail {
-  id: string
-  correct: boolean
-  pointsEarned: number
-  correctAnswer: string
-  maxPoints: number
-  questionText?: string
-  userAnswer?: string
-  reasoning?: string
-}
-
-interface ExamResult {
-  id: string
-  phase1_score: number
-  phase1_max: number
-  phase2_score: number
-  phase2_max: number
-  phase3_completed: boolean
-  phase1_details?: QuestionDetail[]
-  phase2_details?: QuestionDetail[]
-  created_at: string
-}
+import UserExamResultsTab, { type ExamResult } from './UserExamResultsTab'
 
 interface Props {
   userId: string

@@ -76,12 +76,25 @@ ${correctQuestionsText || 'لا توجد إجابات صحيحة'}
       recommendation: parsed.recommendation ?? '',
     })
   } catch {
+    const correctSample = [...correctPhase1, ...correctPhase2].slice(0, 5)
+    const wrongAll = [...wrongPhase1, ...wrongPhase2]
+
+    const strengthsText = correctSample.length > 0
+      ? `أجاب المتقدم بشكل صحيح على: ${correctSample.map(q => q.questionText ?? q.id).join('، ')}.`
+      : 'لم يُسجَّل أداء صحيح في هذا الاختبار.'
+
+    const weaknessesText = wrongAll.length > 0
+      ? `أخطأ المتقدم في الأسئلة التالية:\n${wrongAll.map(q => `- ${q.questionText ?? q.id} (الإجابة الصحيحة: ${q.correctAnswer})`).join('\n')}`
+      : 'لا توجد أخطاء واضحة — أحسنت!'
+
+    const recommendationText = wrongAll.length > 0
+      ? `يُنصح بمراجعة الأسئلة التالية وفهم إجاباتها الصحيحة:\n${wrongAll.map(q => `- ${q.questionText ?? q.id}`).join('\n')}`
+      : 'استمر في المستوى الممتاز والحرص على تطبيق ما تعلمته في المواقف العملية.'
+
     return NextResponse.json({
-      strengths: 'أجاب المتقدم بشكل صحيح على عدد من الأسئلة.',
-      weaknesses: wrongPhase1.length + wrongPhase2.length > 0
-        ? `أخطأ المتقدم في ${wrongPhase1.length} سؤال من المرحلة الأولى و${wrongPhase2.length} سيناريو من المرحلة الثانية.`
-        : 'لا توجد أخطاء واضحة.',
-      recommendation: 'يُنصح بمراجعة الأسئلة التي أُخطئ فيها وفهم الإجابات الصحيحة.',
+      strengths: strengthsText,
+      weaknesses: weaknessesText,
+      recommendation: recommendationText,
     })
   }
 }

@@ -237,7 +237,7 @@ function DownloadButton({ result }: { result: ExamResult }) {
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
           <div
             style={{
-              position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 50,
+              position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 50,
               background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: 8, overflow: 'hidden', minWidth: 120,
             }}

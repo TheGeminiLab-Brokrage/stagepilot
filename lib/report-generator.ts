@@ -64,21 +64,23 @@ function buildReportHTML(data: ExamReportData, userName: string, summary: Report
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 14px; color: #111827; background: #fff; direction: rtl; }
   .page { padding: 40px; max-width: 800px; margin: 0 auto; }
-  h1 { font-size: 22px; font-weight: 800; color: #111827; }
-  h2 { font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid #e5e7eb; }
+  h2 { font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 3px solid #D7FF00; }
   .section { margin-bottom: 32px; }
-  .header-card { background: #111827; color: #fff; border-radius: 12px; padding: 24px; margin-bottom: 32px; }
-  .badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; }
-  .pass { background: #dcfce7; color: #166534; }
-  .fail { background: #fee2e2; color: #991b1b; }
+  .section-break { page-break-before: always; break-before: page; }
+  .header-card { background: #111827; color: #fff; border-radius: 12px; padding: 28px 32px; margin-bottom: 32px; }
+  .header-name { font-size: 26px; font-weight: 800; color: #fff; margin-bottom: 6px; }
+  .header-meta { color: #9ca3af; font-size: 13px; margin-bottom: 16px; }
+  .badge { display: inline-block; padding: 5px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; }
+  .pass { background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.4); }
+  .fail { background: rgba(248,113,113,0.2); color: #fca5a5; border: 1px solid rgba(248,113,113,0.4); }
   .score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
-  .score-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; text-align: center; }
+  .score-card { border: 1px solid rgba(215,255,0,0.25); border-radius: 8px; padding: 14px; text-align: center; background: #fafafa; }
   .score-card .label { font-size: 11px; color: #6b7280; margin-bottom: 6px; }
   .score-card .value { font-size: 20px; font-weight: 800; color: #111827; }
-  .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; }
-  .summary-section { margin-bottom: 16px; }
+  .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 24px; }
+  .summary-section { margin-bottom: 18px; }
   .summary-section:last-child { margin-bottom: 0; }
-  .summary-label { font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-label { font-size: 12px; font-weight: 800; color: #D7FF00; background: #111827; display: inline-block; padding: 3px 10px; border-radius: 4px; margin-bottom: 8px; letter-spacing: 0.04em; }
   .summary-text { font-size: 13px; color: #334155; line-height: 1.7; }
 </style>
 </head>
@@ -87,9 +89,8 @@ function buildReportHTML(data: ExamReportData, userName: string, summary: Report
 
   <!-- Header -->
   <div class="header-card">
-    <p style="color:#9ca3af; font-size:11px; margin-bottom:8px; letter-spacing:0.1em;">تقرير الاختبار التقييمي — StagePilot</p>
-    <h1 style="color:#fff; margin-bottom:6px;">${userName}</h1>
-    <p style="color:#9ca3af; font-size:13px; margin-bottom:16px;">${dateStr}</p>
+    <div class="header-name">${userName}</div>
+    <div class="header-meta">${dateStr}</div>
     <span class="badge ${passed ? 'pass' : 'fail'}">${passed ? '✓ ناجح' : '✗ راسب'}</span>
   </div>
 
@@ -111,20 +112,20 @@ function buildReportHTML(data: ExamReportData, userName: string, summary: Report
 
   <!-- Phase 1 -->
   ${data.phase1_details?.length ? `
-  <div class="section">
+  <div class="section section-break">
     <h2>المرحلة الأولى — الأسئلة</h2>
     ${data.phase1_details.map((q, i) => renderQuestion(q, i)).join('')}
   </div>` : ''}
 
   <!-- Phase 2 -->
   ${data.phase2_details?.length ? `
-  <div class="section">
+  <div class="section section-break">
     <h2>المرحلة الثانية — السيناريوهات</h2>
     ${data.phase2_details.map((q, i) => renderQuestion(q, i)).join('')}
   </div>` : ''}
 
   <!-- AI Summary -->
-  <div class="section">
+  <div class="section section-break">
     <h2>ملخص التقييم</h2>
     <div class="summary-card">
       <div class="summary-section">
@@ -148,7 +149,6 @@ function buildReportHTML(data: ExamReportData, userName: string, summary: Report
 }
 
 export async function generatePDF(data: ExamReportData, userName: string, summary: ReportSummary): Promise<void> {
-  // Dynamically import to avoid SSR issues
   const html2pdf = (await import('html2pdf.js')).default
   const html = buildReportHTML(data, userName, summary)
   const dateStr = new Date(data.created_at).toISOString().slice(0, 10)
@@ -161,6 +161,7 @@ export async function generatePDF(data: ExamReportData, userName: string, summar
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] },
     })
     .from(html)
     .save()
@@ -178,21 +179,23 @@ export async function generateWord(data: ExamReportData, userName: string, summa
   const passed = pct >= 60
   const dateStr = new Date(data.created_at).toLocaleDateString('ar-EG', { day: '2-digit', month: 'long', year: 'numeric' })
 
-  const rtlParagraph = (text: string, bold = false, size = 24, color = '111827') =>
+  const rtlParagraph = (text: string, bold = false, size = 24, color = '111827', shadingFill?: string) =>
     new Paragraph({
       bidirectional: true,
       alignment: AlignmentType.RIGHT,
-      children: [new TextRun({ text, bold, size, color, font: 'Arial' })],
+      children: [new TextRun({ text, bold, size, color: shadingFill ? 'FFFFFF' : color, font: 'Arial' })],
+      ...(shadingFill ? { shading: { type: ShadingType.CLEAR, fill: shadingFill } } : {}),
     })
 
-  const sectionHeading = (text: string) =>
+  const sectionHeading = (text: string, pageBreak = false) =>
     new Paragraph({
       heading: HeadingLevel.HEADING_2,
       bidirectional: true,
       alignment: AlignmentType.RIGHT,
-      children: [new TextRun({ text, bold: true, size: 28, color: '111827', font: 'Arial' })],
-      border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'e5e7eb' } },
-      spacing: { before: 400, after: 200 },
+      pageBreakBefore: pageBreak,
+      children: [new TextRun({ text, bold: true, size: 32, color: '111827', font: 'Arial' })],
+      border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: 'D7FF00' } },
+      spacing: { before: pageBreak ? 0 : 400, after: 200 },
     })
 
   const questionParagraphs = (questions: QuestionDetail[], phaseLabel: string) => {
@@ -238,47 +241,81 @@ export async function generateWord(data: ExamReportData, userName: string, summa
 
   const doc = new Document({
     sections: [{
-      properties: { page: { size: { orientation: 'portrait' } } },
+      properties: {
+        page: { size: { orientation: 'portrait' } },
+        // @ts-expect-error bidi is valid but not in all type defs
+        bidi: true,
+      },
       children: [
-        // Title
+        // Header block — dark background with username as H1
         new Paragraph({
           heading: HeadingLevel.HEADING_1,
           bidirectional: true,
           alignment: AlignmentType.RIGHT,
-          children: [new TextRun({ text: 'تقرير الاختبار التقييمي — StagePilot', bold: true, size: 36, color: '111827', font: 'Arial' })],
-          spacing: { after: 200 },
+          shading: { type: ShadingType.CLEAR, fill: '111827' },
+          spacing: { after: 0 },
+          children: [new TextRun({ text: `المتقدم: ${userName}`, bold: true, size: 48, color: 'FFFFFF', font: 'Arial' })],
         }),
-        rtlParagraph(`المتقدم: ${userName}`, true, 26),
-        rtlParagraph(`التاريخ: ${dateStr}`, false, 22, '6b7280'),
-        rtlParagraph(`النتيجة: ${passed ? '✓ ناجح' : '✗ راسب'}`, true, 24, passed ? '166534' : '991b1b'),
+        new Paragraph({
+          bidirectional: true,
+          alignment: AlignmentType.RIGHT,
+          shading: { type: ShadingType.CLEAR, fill: '111827' },
+          spacing: { after: 0 },
+          children: [new TextRun({ text: `التاريخ: ${dateStr}`, size: 22, color: '9ca3af', font: 'Arial' })],
+        }),
+        new Paragraph({
+          bidirectional: true,
+          alignment: AlignmentType.RIGHT,
+          shading: { type: ShadingType.CLEAR, fill: '111827' },
+          spacing: { after: 400 },
+          children: [new TextRun({ text: `النتيجة: ${passed ? '✓ ناجح' : '✗ راسب'}`, bold: true, size: 26, color: passed ? '6ee7b7' : 'fca5a5', font: 'Arial' })],
+        }),
 
-        // Scores
-        sectionHeading('ملخص الدرجات'),
+        // Scores — new page
+        sectionHeading('ملخص الدرجات', true),
         rtlParagraph(`المرحلة الأولى: ${data.phase1_score}/${data.phase1_max}`, false, 22),
         rtlParagraph(`المرحلة الثانية: ${data.phase2_score}/${data.phase2_max}`, false, 22),
-        rtlParagraph(`الإجمالي: ${total}/${max} (${pct}%)`, true, 24),
+        rtlParagraph(`الإجمالي: ${total}/${max} (${pct}%)`, true, 26, passed ? '166534' : '991b1b'),
 
-        // Phase 1 details
+        // Phase 1 details — new page
         ...(data.phase1_details?.length ? [
-          sectionHeading('المرحلة الأولى — الأسئلة'),
+          sectionHeading('المرحلة الأولى — الأسئلة', true),
           ...questionParagraphs(data.phase1_details, 'المرحلة الأولى'),
         ] : []),
 
-        // Phase 2 details
+        // Phase 2 details — new page
         ...(data.phase2_details?.length ? [
-          sectionHeading('المرحلة الثانية — السيناريوهات'),
+          sectionHeading('المرحلة الثانية — السيناريوهات', true),
           ...questionParagraphs(data.phase2_details, 'المرحلة الثانية'),
         ] : []),
 
-        // AI Summary
-        sectionHeading('ملخص التقييم'),
-        rtlParagraph('✓ نقاط القوة', true, 22, '166534'),
+        // AI Summary — new page
+        sectionHeading('ملخص التقييم', true),
+        new Paragraph({
+          bidirectional: true,
+          alignment: AlignmentType.RIGHT,
+          shading: { type: ShadingType.CLEAR, fill: '111827' },
+          spacing: { before: 0, after: 40 },
+          children: [new TextRun({ text: '✓ نقاط القوة', bold: true, size: 22, color: 'D7FF00', font: 'Arial' })],
+        }),
         rtlParagraph(summary.strengths, false, 22),
-        new Paragraph({ spacing: { before: 160 }, children: [] }),
-        rtlParagraph('✗ نقاط تحتاج تطوير', true, 22, '991b1b'),
+        new Paragraph({ spacing: { before: 200 }, children: [] }),
+        new Paragraph({
+          bidirectional: true,
+          alignment: AlignmentType.RIGHT,
+          shading: { type: ShadingType.CLEAR, fill: '111827' },
+          spacing: { before: 0, after: 40 },
+          children: [new TextRun({ text: '✗ نقاط تحتاج تطوير', bold: true, size: 22, color: 'D7FF00', font: 'Arial' })],
+        }),
         rtlParagraph(summary.weaknesses, false, 22),
-        new Paragraph({ spacing: { before: 160 }, children: [] }),
-        rtlParagraph('📚 توصيات للدراسة', true, 22, '1e40af'),
+        new Paragraph({ spacing: { before: 200 }, children: [] }),
+        new Paragraph({
+          bidirectional: true,
+          alignment: AlignmentType.RIGHT,
+          shading: { type: ShadingType.CLEAR, fill: '111827' },
+          spacing: { before: 0, after: 40 },
+          children: [new TextRun({ text: '📚 توصيات للدراسة', bold: true, size: 22, color: 'D7FF00', font: 'Arial' })],
+        }),
         rtlParagraph(summary.recommendation, false, 22),
       ],
     }],
