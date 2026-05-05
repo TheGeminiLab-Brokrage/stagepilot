@@ -40,7 +40,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
 
   const [phase, setPhase] = useState<ExamPhase>('phase1')
 
-  const TIMER_DURATION = 120 // change to 1800 for production
+  const TIMER_DURATION = 1800 // 30 minutes
   const [timeLeft, setTimeLeft] = useState(TIMER_DURATION)
   const [timerExpired, setTimerExpired] = useState(false)
   const [forceSubmitP1, setForceSubmitP1] = useState(false)
