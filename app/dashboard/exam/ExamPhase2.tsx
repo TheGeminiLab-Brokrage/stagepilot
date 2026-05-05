@@ -130,7 +130,7 @@ export default function ExamPhase2({ onComplete, forceSubmitTrigger }: Props) {
   const progressPct = ((current + 1) / questions.length) * 100
 
   return (
-    <div className="flex flex-col h-full" dir="rtl">
+    <div className="flex flex-col overflow-y-auto" dir="rtl">
       {/* Header */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
@@ -155,16 +155,15 @@ export default function ExamPhase2({ onComplete, forceSubmitTrigger }: Props) {
       </div>
 
       {/* Single question */}
-      <div className="flex-1 overflow-y-auto">
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: currentAnswered ? '1px solid rgba(215,255,0,0.25)' : '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 14,
-            padding: '22px 24px',
-            transition: 'border-color 0.2s',
-          }}
-        >
+      <div
+        style={{
+          background: 'rgba(255,255,255,0.03)',
+          border: currentAnswered ? '1px solid rgba(215,255,0,0.25)' : '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 14,
+          padding: '22px 24px',
+          transition: 'border-color 0.2s',
+        }}
+      >
           {/* Q number + subtype */}
           <div className="flex items-center gap-3 mb-4">
             <span
@@ -229,10 +228,9 @@ export default function ExamPhase2({ onComplete, forceSubmitTrigger }: Props) {
             })}
           </div>
         </div>
-      </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-between mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         {error && <span style={{ color: '#f87171', fontSize: 12 }}>{error}</span>}
 
         {/* Previous */}

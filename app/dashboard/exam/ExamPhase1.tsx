@@ -152,9 +152,9 @@ export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full" dir="rtl">
+    <div className="flex flex-col overflow-y-auto" dir="rtl">
       {/* Progress */}
-      <div className="mb-6">
+      <div className="mb-4">
         <div className="flex justify-between items-center mb-2">
           <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: "'Space Grotesk', sans-serif" }}>
             المرحلة الأولى — الأسئلة
@@ -177,12 +177,12 @@ export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
 
       {/* Question card */}
       <div
-        className="flex-1 flex flex-col gap-5 overflow-y-auto"
+        className="flex flex-col gap-4"
         style={{
           background: 'rgba(255,255,255,0.03)',
           border: `1px solid ${typeBorder[q.type]}`,
           borderRadius: 16,
-          padding: '28px 32px',
+          padding: '22px 28px',
         }}
       >
         {/* Type badge + points */}
@@ -284,7 +284,7 @@ export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
       </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-between mt-5">
+      <div className="flex items-center justify-between mt-4">
         <button
           onClick={() => setCurrent(c => Math.max(0, c - 1))}
           disabled={current === 0}
