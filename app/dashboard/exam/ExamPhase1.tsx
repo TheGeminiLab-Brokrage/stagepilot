@@ -154,7 +154,7 @@ export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
   return (
     <div className="flex flex-col overflow-y-auto" dir="rtl">
       {/* Progress */}
-      <div className="mb-4">
+      <div className="mb-3">
         <div className="flex justify-between items-center mb-2">
           <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: "'Space Grotesk', sans-serif" }}>
             المرحلة الأولى — الأسئلة
@@ -177,12 +177,12 @@ export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
 
       {/* Question card */}
       <div
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-3"
         style={{
           background: 'rgba(255,255,255,0.03)',
           border: `1px solid ${typeBorder[q.type]}`,
           borderRadius: 16,
-          padding: '22px 28px',
+          padding: '14px 20px',
         }}
       >
         {/* Type badge + points */}
@@ -205,13 +205,13 @@ export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
         </div>
 
         {/* Question text */}
-        <p style={{ color: '#fff', fontSize: 17, lineHeight: 1.7, fontWeight: 500 }}>
+        <p style={{ color: '#fff', fontSize: 15, lineHeight: 1.6, fontWeight: 500 }}>
           {q.question}
         </p>
 
         {/* MCQ choices */}
         {q.type === 'mcq' && q.choices && (
-          <div className="space-y-3 mt-2">
+          <div className="space-y-2">
             {q.choices.map((choice, i) => {
               const selected = currentAnswer === choice.charAt(0)
               return (
@@ -219,11 +219,11 @@ export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
                   key={i}
                   onClick={() => setAnswers(a => ({ ...a, [q.id]: choice.charAt(0) }))}
                   style={{
-                    width: '100%', textAlign: 'right', padding: '12px 16px',
+                    width: '100%', textAlign: 'right', padding: '9px 14px',
                     borderRadius: 10, border: selected ? '1.5px solid #D7FF00' : '1px solid rgba(255,255,255,0.1)',
                     background: selected ? 'rgba(215,255,0,0.1)' : 'rgba(255,255,255,0.03)',
                     color: selected ? '#D7FF00' : 'rgba(255,255,255,0.7)',
-                    cursor: 'pointer', fontSize: 14, transition: 'all 0.15s',
+                    cursor: 'pointer', fontSize: 13, transition: 'all 0.15s',
                     display: 'block',
                   }}
                 >
@@ -284,7 +284,7 @@ export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
       </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-between mt-4">
+      <div className="flex items-center justify-between mt-3">
         <button
           onClick={() => setCurrent(c => Math.max(0, c - 1))}
           disabled={current === 0}
