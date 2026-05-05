@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface Question {
   id: string
@@ -20,6 +20,7 @@ interface GradeResult {
 
 interface Props {
   onComplete: (answers: { id: string; response: string }[], results: GradeResult[], totalScore: number, maxScore: number, questions: Question[]) => void
+  forceSubmitTrigger: boolean
 }
 
 const typeLabel: Record<string, string> = {
@@ -40,7 +41,7 @@ const typeBorder: Record<string, string> = {
   essay: 'rgba(245,158,11,0.4)',
 }
 
-export default function ExamPhase1({ onComplete }: Props) {
+export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
   const [questions, setQuestions] = useState<Question[] | null>(null)
   const [current, setCurrent] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
@@ -48,6 +49,28 @@ export default function ExamPhase1({ onComplete }: Props) {
   const [grading, setGrading] = useState(false)
   const [error, setError] = useState('')
   const [started, setStarted] = useState(false)
+
+  const forceSubmitFiredRef = useRef(false)
+  useEffect(() => {
+    if (!forceSubmitTrigger) return
+    if (forceSubmitFiredRef.current) return
+    forceSubmitFiredRef.current = true
+    if (!questions || questions.length === 0) {
+      onComplete([], [], 0, 0, [])
+      return
+    }
+    const answersArr = questions.map(q => ({ id: q.id, response: answers[q.id] ?? '' }))
+    setGrading(true)
+    fetch('/api/exam/grade-phase1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers: answersArr }),
+    })
+      .then(r => r.json())
+      .then(data => onComplete(answersArr, data.results, data.totalScore, data.maxScore, questions))
+      .catch(() => onComplete(answersArr, [], 0, 0, questions))
+      .finally(() => setGrading(false))
+  }, [forceSubmitTrigger])
 
   async function startExam() {
     setLoading(true)
