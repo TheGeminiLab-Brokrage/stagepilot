@@ -355,7 +355,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
 
   return (
     <div
-      className="flex flex-col h-full"
+      className="flex flex-col"
       style={{ fontFamily: "'Montserrat', sans-serif" }}
     >
       <style>{`
@@ -424,7 +424,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
       )}
 
       {/* Phase content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div>
         {phase === 'phase1' && (
           <ExamPhase1 onComplete={handlePhase1Complete} forceSubmitTrigger={forceSubmitP1} />
         )}

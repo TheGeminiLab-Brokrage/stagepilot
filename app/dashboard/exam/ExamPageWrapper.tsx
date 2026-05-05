@@ -75,7 +75,7 @@ export default function ExamPageWrapper({ userId, companyId, userName, userEmail
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col">
         {activeTab === 'exam' && (
           <ExamClient
             userId={userId}
