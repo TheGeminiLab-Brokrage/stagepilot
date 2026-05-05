@@ -18,6 +18,15 @@ export async function POST(req: Request) {
 
   const { phase1Score, phase1Max, phase2Score, phase2Max, phase3Completed, phase1Details, phase2Details } = await req.json()
 
+  const sixtySecondsAgo = new Date(Date.now() - 60_000).toISOString()
+  const { data: existing } = await supabase
+    .from('exam_results')
+    .select('id')
+    .eq('user_id', user.id)
+    .gte('created_at', sixtySecondsAgo)
+    .maybeSingle()
+  if (existing) return NextResponse.json({ success: true })
+
   const { error } = await supabase.from('exam_results').insert({
     user_id: user.id,
     company_id: profile.company_id,

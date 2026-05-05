@@ -48,6 +48,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
   const [timerKey, setTimerKey] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const skipPhase2Ref = useRef(false)
+  const hasSubmittedRef = useRef(false)
 
   const [phase1Answers, setPhase1Answers] = useState<{ id: string; response: string }[]>([])
   const [phase1Results, setPhase1Results] = useState<GradeResult[]>([])
@@ -178,6 +179,8 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
   }
 
   async function handlePhase3Complete() {
+    if (hasSubmittedRef.current) return
+    hasSubmittedRef.current = true
     setPhase3Completed(true)
 
     // Save to DB
@@ -224,6 +227,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
     setTimerExpired(false)
     setTimeLeft(TIMER_DURATION)
     skipPhase2Ref.current = false
+    hasSubmittedRef.current = false
     setTimerKey(k => k + 1)
   }
 
