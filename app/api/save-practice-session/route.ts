@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
   // 3. Insert practice_sessions record only (audio already in storage)
   const admin = createAdminClient()
-  const { error: insertError } = await admin
+  const { data: inserted, error: insertError } = await admin
     .from('practice_sessions')
     .insert({
       user_id: user.id,
@@ -35,10 +35,12 @@ export async function POST(request: NextRequest) {
       audio_path: audioPath,
       duration_seconds: isNaN(durationSec) ? null : durationSec,
     })
+    .select('id')
+    .single()
 
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, sessionId: inserted?.id ?? null })
 }

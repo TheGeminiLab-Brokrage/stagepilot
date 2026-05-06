@@ -172,9 +172,10 @@ function playCallEndSound(existingCtx?: AudioContext | null) {
 
 interface Props {
   onComplete: () => void
+  onRecordingSaved?: (audioPath: string) => void
 }
 
-export default function ExamPhase3({ onComplete }: Props) {
+export default function ExamPhase3({ onComplete, onRecordingSaved }: Props) {
   const [status, setStatus] = useState<Status>('idle')
   const [turns, setTurns] = useState<Turn[]>([])
   const [errorMsg, setErrorMsg] = useState('')
@@ -332,6 +333,7 @@ export default function ExamPhase3({ onComplete }: Props) {
         body: JSON.stringify({ audioPath, durationSeconds }),
       })
       setSaveStatus('saved')
+      onRecordingSaved?.(audioPath)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       setSaveStatus('error')

@@ -63,6 +63,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
   const [phase2Questions, setPhase2Questions] = useState<{ id: string; scenario: string }[]>([])
 
   const [phase3Completed, setPhase3Completed] = useState(false)
+  const phase3AudioPathRef = useRef<string | null>(null)
 
   // Check daily limit on mount — test account bypasses entirely
   useEffect(() => {
@@ -178,6 +179,10 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
     setPhase('phase3')
   }
 
+  function handlePhase3RecordingSaved(audioPath: string) {
+    phase3AudioPathRef.current = audioPath
+  }
+
   async function handlePhase3Complete() {
     if (hasSubmittedRef.current) return
     hasSubmittedRef.current = true
@@ -200,6 +205,15 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
       })
     } catch {
       // Non-blocking — results screen still shows
+    }
+
+    // Fire grading after result is saved (fire and forget)
+    if (phase3AudioPathRef.current) {
+      fetch('/api/exam/trigger-grading', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioPath: phase3AudioPathRef.current }),
+      }).catch(() => {})
     }
 
     setPhase('results')
@@ -432,7 +446,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
           <ExamPhase2 onComplete={handlePhase2Complete} forceSubmitTrigger={forceSubmitP2} />
         )}
         {phase === 'phase3' && (
-          <ExamPhase3 onComplete={handlePhase3Complete} />
+          <ExamPhase3 onComplete={handlePhase3Complete} onRecordingSaved={handlePhase3RecordingSaved} />
         )}
         {phase === 'results' && (
           <ExamResults

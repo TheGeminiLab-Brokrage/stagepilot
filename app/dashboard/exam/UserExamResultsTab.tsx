@@ -14,6 +14,22 @@ interface QuestionDetail {
   reasoning?: string
 }
 
+interface CriterionGrade {
+  score: number
+  max: number
+  feedback: string
+}
+
+interface CallGrade {
+  total_score: number
+  ice_breaking: CriterionGrade
+  discovery_questions: CriterionGrade
+  unit_recommendation: CriterionGrade
+  action_taking: CriterionGrade
+  overall_feedback: string
+  graded_at: string
+}
+
 export interface ExamResult {
   id: string
   phase1_score: number
@@ -25,6 +41,99 @@ export interface ExamResult {
   phase2_details?: QuestionDetail[]
   created_at: string
   report_downloaded_at?: string | null
+  call_grade?: CallGrade | null
+}
+
+const CRITERIA_LABELS: Record<keyof Omit<CallGrade, 'total_score' | 'overall_feedback' | 'graded_at'>, string> = {
+  ice_breaking: 'كسر الجليد',
+  discovery_questions: 'أسئلة الاستكشاف',
+  unit_recommendation: 'توصية الوحدة',
+  action_taking: 'اتخاذ الإجراء',
+}
+
+function GradeModal({ grade, onClose }: { grade: CallGrade; onClose: () => void }) {
+  const criteria = (['ice_breaking', 'discovery_questions', 'unit_recommendation', 'action_taking'] as const)
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ color: '#D7FF00', fontWeight: 700, fontSize: 16 }}>تقييم المكالمة</div>
+            <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 2 }}>الدرجة الإجمالية: {grade.total_score}/100</div>
+          </div>
+          <button onClick={onClose} style={{ color: 'rgba(255,255,255,0.4)', fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }} dir="rtl">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+            {criteria.map(key => {
+              const c = grade[key]
+              const pct = Math.round((c.score / c.max) * 100)
+              const color = pct >= 70 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#f87171'
+              return (
+                <div key={key} style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{CRITERIA_LABELS[key]}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color }}>{c.score}/{c.max}</span>
+                  </div>
+                  <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', marginBottom: 10 }}>
+                    <div style={{ height: '100%', borderRadius: 2, background: color, width: `${pct}%`, transition: 'width 0.4s ease' }} />
+                  </div>
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 1.7, margin: 0 }}>{c.feedback}</p>
+                </div>
+              )
+            })}
+          </div>
+
+          {grade.overall_feedback && (
+            <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(215,255,0,0.04)', border: '1px solid rgba(215,255,0,0.15)' }}>
+              <div style={{ color: '#D7FF00', fontSize: 12, fontWeight: 600, marginBottom: 6 }}>التقييم العام</div>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: 1.8, margin: 0 }}>{grade.overall_feedback}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CallGradeCell({ grade, phase3Completed }: { grade?: CallGrade | null; phase3Completed: boolean }) {
+  const [open, setOpen] = useState(false)
+
+  if (!phase3Completed) return <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>—</span>
+
+  if (!grade) {
+    return (
+      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>جاري التحليل...</span>
+    )
+  }
+
+  const color = grade.total_score >= 70 ? '#10b981' : grade.total_score >= 40 ? '#f59e0b' : '#f87171'
+
+  return (
+    <>
+      {open && <GradeModal grade={grade} onClose={() => setOpen(false)} />}
+      <button
+        onClick={() => setOpen(true)}
+        style={{
+          fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 6,
+          background: `rgba(${color === '#10b981' ? '16,185,129' : color === '#f59e0b' ? '245,158,11' : '248,113,113'},0.12)`,
+          color,
+          border: `1px solid ${color}33`,
+          cursor: 'pointer', transition: 'all 0.15s',
+        }}
+      >
+        {grade.total_score}/100
+      </button>
+    </>
+  )
 }
 
 function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => void }) {
@@ -329,7 +438,7 @@ export default function UserExamResultsTab({ results, userName }: { results: Exa
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                {['المرحلة الأولى', 'المرحلة الثانية', 'الإجمالي', 'النتيجة', 'التاريخ', 'التفاصيل', 'المكالمة', 'تنزيل'].map(h => (
+                {['المرحلة الأولى', 'المرحلة الثانية', 'الإجمالي', 'النتيجة', 'التاريخ', 'التفاصيل', 'المكالمة', 'تقييم المكالمة', 'تنزيل'].map(h => (
                   <th
                     key={h}
                     className="px-4 py-3 text-xs font-semibold uppercase tracking-wider"
@@ -393,6 +502,9 @@ export default function UserExamResultsTab({ results, userName }: { results: Exa
                         ? <AudioPlayer resultId={r.id} />
                         : <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>—</span>
                       }
+                    </td>
+                    <td className="px-4 py-3" style={{ textAlign: 'right' }}>
+                      <CallGradeCell grade={r.call_grade} phase3Completed={r.phase3_completed} />
                     </td>
                     <td className="px-4 py-3" style={{ textAlign: 'right' }}>
                       <DownloadButton result={r} userName={userName} />

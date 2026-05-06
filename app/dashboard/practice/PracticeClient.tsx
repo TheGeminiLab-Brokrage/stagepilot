@@ -400,6 +400,20 @@ export default function PracticeClient({ userId, companyId, userName, role, user
       const metaText = await metaRes.text()
       if (!metaRes.ok) throw new Error(`Metadata save failed: ${metaRes.status} - ${metaText}`)
 
+      // Fire grading (fire and forget)
+      const metaJson = JSON.parse(metaText) as { sessionId?: string }
+      if (metaJson.sessionId) {
+        fetch('/api/practice/trigger-grading', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: metaJson.sessionId,
+            audioPath,
+            scenarioId: selectedScenarioRef.current,
+          }),
+        }).catch(() => {})
+      }
+
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch (e) {
