@@ -302,20 +302,20 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        height: '100%', fontFamily: "'Montserrat', sans-serif", textAlign: 'center', gap: 28,
-        padding: '0 24px',
+        height: '100%', fontFamily: "'Montserrat', sans-serif", textAlign: 'center', gap: 40,
+        padding: '0 32px',
       }}>
         <div>
           <p style={{
-            fontSize: 10, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase',
-            color: '#D7FF00', marginBottom: 14, fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: 13, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase',
+            color: '#D7FF00', marginBottom: 18, fontFamily: "'Space Grotesk', sans-serif",
           }}>
             الاختبار التقييمي
           </p>
-          <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 800, marginBottom: 12, lineHeight: 1.3 }}>
+          <h1 style={{ color: '#fff', fontSize: 40, fontWeight: 800, marginBottom: 16, lineHeight: 1.2 }}>
             {userName}، أنت جاهز؟
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.75, maxWidth: 380 }}>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 17, lineHeight: 1.75, maxWidth: 480 }}>
             الاختبار يتكوّن من ٣ مراحل: أسئلة متعددة الخيارات، سيناريوهات، ومحاكاة مكالمة حيّة.
           </p>
         </div>
@@ -323,8 +323,8 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
         <div style={{
           background: 'rgba(215,255,0,0.04)',
           border: '1px solid rgba(215,255,0,0.15)',
-          borderRadius: 12, padding: '14px 20px',
-          display: 'flex', gap: 24,
+          borderRadius: 14, padding: '20px 40px',
+          display: 'flex', gap: 48,
         }}>
           {[
             { label: 'المرحلة ٣', desc: 'محاكاة' },
@@ -332,30 +332,30 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
             { label: 'المرحلة ١', desc: 'أسئلة' },
           ].map((item) => (
             <div key={item.label} style={{ textAlign: 'center' }}>
-              <p style={{ color: '#D7FF00', fontSize: 11, fontWeight: 700, marginBottom: 3, fontFamily: "'Space Grotesk', sans-serif" }}>
+              <p style={{ color: '#D7FF00', fontSize: 14, fontWeight: 700, marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
                 {item.label}
               </p>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>{item.desc}</p>
+              <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>{item.desc}</p>
             </div>
           ))}
         </div>
 
         {userEmail !== 'exam@test.com' && (
-          <p style={{ color: 'rgba(255,100,100,0.7)', fontSize: 11, letterSpacing: '0.03em' }}>
+          <p style={{ color: 'rgba(255,100,100,0.7)', fontSize: 13, letterSpacing: '0.03em' }}>
             تنبيه: لديك محاولة واحدة فقط في اليوم
           </p>
         )}
 
         {startError && (
-          <p style={{ color: 'rgba(255,100,100,0.85)', fontSize: 12 }}>{startError}</p>
+          <p style={{ color: 'rgba(255,100,100,0.85)', fontSize: 14 }}>{startError}</p>
         )}
 
         <button
           onClick={handleStartExam}
           style={{
             background: '#D7FF00', color: '#000',
-            border: 'none', borderRadius: 10, padding: '13px 40px',
-            fontSize: 14, fontWeight: 800, cursor: 'pointer',
+            border: 'none', borderRadius: 12, padding: '18px 72px',
+            fontSize: 18, fontWeight: 800, cursor: 'pointer',
             fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.06em',
           }}
         >
