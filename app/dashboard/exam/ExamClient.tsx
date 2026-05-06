@@ -327,9 +327,9 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
           display: 'flex', gap: 24,
         }}>
           {[
-            { label: 'المرحلة ١', desc: 'أسئلة' },
-            { label: 'المرحلة ٢', desc: 'سيناريوهات' },
             { label: 'المرحلة ٣', desc: 'محاكاة' },
+            { label: 'المرحلة ٢', desc: 'سيناريوهات' },
+            { label: 'المرحلة ١', desc: 'أسئلة' },
           ].map((item) => (
             <div key={item.label} style={{ textAlign: 'center' }}>
               <p style={{ color: '#D7FF00', fontSize: 11, fontWeight: 700, marginBottom: 3, fontFamily: "'Space Grotesk', sans-serif" }}>
