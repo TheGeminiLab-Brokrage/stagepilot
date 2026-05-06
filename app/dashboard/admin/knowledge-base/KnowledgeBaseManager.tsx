@@ -609,8 +609,8 @@ function SheetConnectionsPanel() {
                         className="flex-1 px-3 py-1.5 rounded-lg text-xs text-white focus:outline-none"
                         style={inputStyle}
                       >
-                        <option value="">— skip —</option>
-                        {wizardHeaders.map((h) => <option key={h} value={h}>{h}</option>)}
+                        <option value="" style={{ color: '#000' }}>— skip —</option>
+                        {wizardHeaders.map((h) => <option key={h} value={h} style={{ color: '#000' }}>{h}</option>)}
                       </select>
                     </div>
                   ))}
