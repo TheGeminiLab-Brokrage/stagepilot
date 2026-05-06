@@ -41,9 +41,9 @@ export default function ExamPageWrapper({ userId, companyId, userName, userEmail
             key={key}
             onClick={() => setActiveTab(key)}
             style={{
-              padding: '8px 20px',
+              padding: '11px 28px',
               borderRadius: '8px 8px 0 0',
-              fontSize: 13,
+              fontSize: 16,
               fontWeight: 700,
               border: 'none',
               cursor: 'pointer',

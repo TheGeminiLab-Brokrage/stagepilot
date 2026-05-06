@@ -307,7 +307,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
       }}>
         <div>
           <p style={{
-            fontSize: 13, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase',
+            fontSize: 16, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase',
             color: '#D7FF00', marginBottom: 18, fontFamily: "'Space Grotesk', sans-serif",
           }}>
             الاختبار التقييمي
