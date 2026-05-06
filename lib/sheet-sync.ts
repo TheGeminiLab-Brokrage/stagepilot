@@ -8,6 +8,7 @@ export interface SheetConnection {
   company_id: string
   sheet_id: string
   tab_name: string
+  header_row?: number
   scenario_ids: string[]
   category: Category
   column_mapping: Record<string, string>
@@ -55,12 +56,12 @@ export async function getSheetTabs(sheetId: string): Promise<string[]> {
     .filter(Boolean)
 }
 
-export async function getSheetHeaders(sheetId: string, tabName: string): Promise<string[]> {
+export async function getSheetHeaders(sheetId: string, tabName: string, headerRow = 1): Promise<string[]> {
   const auth = getGoogleAuth()
   const sheets = google.sheets({ version: 'v4', auth })
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
-    range: `'${tabName}'!A1:Z1`,
+    range: `'${tabName}'!A${headerRow}:Z${headerRow}`,
   })
   return (response.data.values?.[0] ?? []) as string[]
 }
@@ -93,10 +94,11 @@ export async function syncSheetConnection(connection: SheetConnection): Promise<
     })
 
     const rows = response.data.values ?? []
-    if (rows.length < 2) return result
+    const headerIdx = (connection.header_row ?? 1) - 1
+    if (rows.length <= headerIdx) return result
 
-    const headers = rows[0] as string[]
-    const dataRows = rows.slice(1)
+    const headers = rows[headerIdx] as string[]
+    const dataRows = rows.slice(headerIdx + 1)
 
     const fieldToIndex: Record<string, number> = {}
     for (const [field, header] of Object.entries(connection.column_mapping)) {
@@ -118,7 +120,7 @@ export async function syncSheetConnection(connection: SheetConnection): Promise<
 
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i] as string[]
-      const sourceRef = `${refPrefix}row:${i + 2}`
+      const sourceRef = `${refPrefix}row:${i + headerIdx + 2}`
       seenRefs.add(sourceRef)
 
       const fields: Record<string, string> = {}

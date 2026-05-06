@@ -197,6 +197,7 @@ function SheetConnectionsPanel() {
   const [wizardTab, setWizardTab] = useState('')
   const [wizardCategory, setWizardCategory] = useState<Category>('clinic_project')
   const [wizardScenarios, setWizardScenarios] = useState<string[]>([])
+  const [wizardHeaderRow, setWizardHeaderRow] = useState(1)
   const [wizardHeaders, setWizardHeaders] = useState<string[]>([])
   const [wizardMapping, setWizardMapping] = useState<Record<string, string>>({})
   const [wizardServiceEmail, setWizardServiceEmail] = useState('')
@@ -219,6 +220,7 @@ function SheetConnectionsPanel() {
     setWizardTab('')
     setWizardCategory('clinic_project')
     setWizardScenarios([])
+    setWizardHeaderRow(1)
     setWizardHeaders([])
     setWizardMapping({})
     setWizardServiceEmail('')
@@ -253,7 +255,7 @@ function SheetConnectionsPanel() {
       const res = await fetch('/api/admin/sheet-connections/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheet_url: wizardUrl, tab_name: wizardTab }),
+        body: JSON.stringify({ sheet_url: wizardUrl, tab_name: wizardTab, header_row: wizardHeaderRow }),
       })
       const data = await res.json()
       if (data.error) { setWizardError(data.error); return }
@@ -275,6 +277,7 @@ function SheetConnectionsPanel() {
           name: wizardName,
           sheet_url: wizardUrl,
           tab_name: wizardTab,
+          header_row: wizardHeaderRow,
           scenario_ids: wizardScenarios,
           category: wizardCategory,
           column_mapping: wizardMapping,
@@ -516,6 +519,17 @@ function SheetConnectionsPanel() {
                     <option value="">Select tab…</option>
                     {wizardTabs.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Header Row <span className="text-gray-600">(which row has the column names?)</span></label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={wizardHeaderRow}
+                    onChange={(e) => setWizardHeaderRow(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-24 px-3 py-2 rounded-lg text-sm text-white focus:outline-none"
+                    style={inputStyle}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-2">Data Category</label>

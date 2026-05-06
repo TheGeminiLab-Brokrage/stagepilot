@@ -39,6 +39,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     company_id: conn.company_id,
     sheet_id: conn.sheet_id,
     tab_name: conn.tab_name,
+    header_row: conn.header_row ?? 1,
     scenario_ids: conn.scenario_ids ?? [],
     category: conn.category,
     column_mapping: conn.column_mapping ?? {},

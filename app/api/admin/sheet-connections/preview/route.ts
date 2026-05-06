@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error }, { status })
 
   const body = await req.json()
-  const { sheet_url, tab_name } = body
+  const { sheet_url, tab_name, header_row } = body
 
   const serviceAccountEmail = getServiceAccountEmail()
   if (!serviceAccountEmail) {
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
 
   try {
     if (tab_name) {
-      const headers = await getSheetHeaders(sheetId, tab_name)
+      const headers = await getSheetHeaders(sheetId, tab_name, header_row ?? 1)
       return NextResponse.json({ service_account_email: serviceAccountEmail, headers })
     } else {
       const tabs = await getSheetTabs(sheetId)

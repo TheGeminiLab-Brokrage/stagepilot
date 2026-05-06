@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error }, { status })
 
   const body = await req.json()
-  const { name, sheet_url, tab_name, scenario_ids, category, column_mapping } = body
+  const { name, sheet_url, tab_name, header_row, scenario_ids, category, column_mapping } = body
 
   if (!name || !sheet_url || !tab_name || !category || !column_mapping) {
     return NextResponse.json({ error: 'name, sheet_url, tab_name, category, and column_mapping are required' }, { status: 400 })
@@ -54,6 +54,7 @@ export async function POST(req: Request) {
       name,
       sheet_id,
       tab_name,
+      header_row: header_row ?? 1,
       scenario_ids: scenario_ids ?? [],
       category,
       column_mapping,
@@ -69,6 +70,7 @@ export async function POST(req: Request) {
     company_id: companyId!,
     sheet_id,
     tab_name,
+    header_row: header_row ?? 1,
     scenario_ids: scenario_ids ?? [],
     category,
     column_mapping,
