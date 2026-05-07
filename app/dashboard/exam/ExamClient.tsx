@@ -303,9 +303,9 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
 
   if (gate === 'intro') {
     const phases = [
-      { label: t('examIntroPhase3Label'), desc: t('examIntroPhase3Desc') },
-      { label: t('examIntroPhase2Label'), desc: t('examIntroPhase2Desc') },
       { label: t('examIntroPhase1Label'), desc: t('examIntroPhase1Desc') },
+      { label: t('examIntroPhase2Label'), desc: t('examIntroPhase2Desc') },
+      { label: t('examIntroPhase3Label'), desc: t('examIntroPhase3Desc') },
     ]
     return (
       <div style={{
