@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useT, useLanguage } from '@/lib/language-context'
 import type { ExamReportData, ReportSummary } from '@/lib/report-generator'
 
 interface QuestionDetail {
@@ -44,15 +45,17 @@ export interface ExamResult {
   call_grade?: CallGrade | null
 }
 
-const CRITERIA_LABELS: Record<keyof Omit<CallGrade, 'total_score' | 'overall_feedback' | 'graded_at'>, string> = {
-  ice_breaking: 'كسر الجليد',
-  discovery_questions: 'أسئلة الاستكشاف',
-  unit_recommendation: 'توصية الوحدة',
-  action_taking: 'اتخاذ الإجراء',
-}
-
 function GradeModal({ grade, onClose }: { grade: CallGrade; onClose: () => void }) {
+  const t = useT()
+  const { lang } = useLanguage()
   const criteria = (['ice_breaking', 'discovery_questions', 'unit_recommendation', 'action_taking'] as const)
+
+  const criteriaLabels: Record<typeof criteria[number], string> = {
+    ice_breaking: t('criteriaIceBreaking'),
+    discovery_questions: t('criteriaDiscovery'),
+    unit_recommendation: t('criteriaUnitRec'),
+    action_taking: t('criteriaActionTaking'),
+  }
 
   return (
     <div
@@ -65,13 +68,13 @@ function GradeModal({ grade, onClose }: { grade: CallGrade; onClose: () => void 
       >
         <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ color: '#D7FF00', fontWeight: 700, fontSize: 16 }}>تقييم المكالمة</div>
-            <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 2 }}>الدرجة الإجمالية: {grade.total_score}/100</div>
+            <div style={{ color: '#D7FF00', fontWeight: 700, fontSize: 16 }}>{t('gradeModalTitle')}</div>
+            <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 2 }}>{t('gradeModalTotalScore')} {grade.total_score}/100</div>
           </div>
           <button onClick={onClose} style={{ color: 'rgba(255,255,255,0.4)', fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>✕</button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }} dir="rtl">
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
             {criteria.map(key => {
               const c = grade[key]
@@ -80,7 +83,7 @@ function GradeModal({ grade, onClose }: { grade: CallGrade; onClose: () => void 
               return (
                 <div key={key} style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{CRITERIA_LABELS[key]}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{criteriaLabels[key]}</span>
                     <span style={{ fontSize: 14, fontWeight: 700, color }}>{c.score}/{c.max}</span>
                   </div>
                   <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', marginBottom: 10 }}>
@@ -94,7 +97,7 @@ function GradeModal({ grade, onClose }: { grade: CallGrade; onClose: () => void 
 
           {grade.overall_feedback && (
             <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(215,255,0,0.04)', border: '1px solid rgba(215,255,0,0.15)' }}>
-              <div style={{ color: '#D7FF00', fontSize: 12, fontWeight: 600, marginBottom: 6 }}>التقييم العام</div>
+              <div style={{ color: '#D7FF00', fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{t('gradeModalOverall')}</div>
               <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: 1.8, margin: 0 }}>{grade.overall_feedback}</p>
             </div>
           )}
@@ -105,13 +108,14 @@ function GradeModal({ grade, onClose }: { grade: CallGrade; onClose: () => void 
 }
 
 function CallGradeCell({ grade, phase3Completed }: { grade?: CallGrade | null; phase3Completed: boolean }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
 
   if (!phase3Completed) return <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>—</span>
 
   if (!grade) {
     return (
-      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>جاري التحليل...</span>
+      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>{t('userExamAnalyzing')}</span>
     )
   }
 
@@ -137,6 +141,8 @@ function CallGradeCell({ grade, phase3Completed }: { grade?: CallGrade | null; p
 }
 
 function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => void }) {
+  const t = useT()
+  const { lang } = useLanguage()
   const [tab, setTab] = useState<'p1' | 'p2'>('p1')
 
   return (
@@ -158,7 +164,7 @@ function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => 
       >
         <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ color: '#D7FF00', fontWeight: 700, fontSize: 16 }}>تفاصيل الاختبار</div>
+            <div style={{ color: '#D7FF00', fontWeight: 700, fontSize: 16 }}>{t('userExamDetailsTitle')}</div>
             <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 2 }}>
               {new Date(result.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
             </div>
@@ -172,7 +178,10 @@ function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => 
         </div>
 
         <div style={{ display: 'flex', gap: 4, padding: '12px 24px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          {([['p1', `المرحلة الأولى (${result.phase1_score}/${result.phase1_max})`], ['p2', `المرحلة الثانية (${result.phase2_score}/${result.phase2_max})`]] as const).map(([key, label]) => (
+          {([
+            ['p1', `${t('userExamColPhase1')} (${result.phase1_score}/${result.phase1_max})`],
+            ['p2', `${t('userExamColPhase2')} (${result.phase2_score}/${result.phase2_max})`],
+          ] as const).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -190,11 +199,11 @@ function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => 
           ))}
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }} dir="rtl">
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
           {tab === 'p1' && (
             <div className="space-y-3">
               {!result.phase1_details?.length && (
-                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>لا توجد تفاصيل محفوظة لهذا الاختبار.</p>
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>{t('userExamNoDetails')}</p>
               )}
               {result.phase1_details?.map((q, i) => (
                 <div
@@ -213,11 +222,11 @@ function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => 
                       </p>
                       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-                          إجابتك: <span style={{ color: q.correct ? '#10b981' : '#f87171', fontWeight: 600 }}>{q.userAnswer || '—'}</span>
+                          {t('userExamYourAnswer')} <span style={{ color: q.correct ? '#10b981' : '#f87171', fontWeight: 600 }}>{q.userAnswer || '—'}</span>
                         </span>
                         {!q.correct && (
                           <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-                            الإجابة الصحيحة: <span style={{ color: '#10b981', fontWeight: 600 }}>{q.correctAnswer}</span>
+                            {t('userExamCorrectAnswer')} <span style={{ color: '#10b981', fontWeight: 600 }}>{q.correctAnswer}</span>
                           </span>
                         )}
                       </div>
@@ -234,7 +243,7 @@ function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => 
           {tab === 'p2' && (
             <div className="space-y-3">
               {!result.phase2_details?.length && (
-                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>لا توجد تفاصيل محفوظة لهذا الاختبار.</p>
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>{t('userExamNoDetails')}</p>
               )}
               {result.phase2_details?.map((q, i) => (
                 <div
@@ -253,11 +262,11 @@ function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => 
                       </p>
                       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: q.reasoning && !q.correct ? 6 : 0 }}>
                         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-                          إجابتك: <span style={{ color: q.correct ? '#10b981' : '#f87171', fontWeight: 600 }}>{q.userAnswer || '—'}</span>
+                          {t('userExamYourAnswer')} <span style={{ color: q.correct ? '#10b981' : '#f87171', fontWeight: 600 }}>{q.userAnswer || '—'}</span>
                         </span>
                         {!q.correct && (
                           <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-                            الإجابة الصحيحة: <span style={{ color: '#10b981', fontWeight: 600 }}>{q.correctAnswer}</span>
+                            {t('userExamCorrectAnswer')} <span style={{ color: '#10b981', fontWeight: 600 }}>{q.correctAnswer}</span>
                           </span>
                         )}
                       </div>
@@ -282,6 +291,7 @@ function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => 
 }
 
 function AudioPlayer({ resultId }: { resultId: string }) {
+  const t = useT()
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -305,7 +315,7 @@ function AudioPlayer({ resultId }: { resultId: string }) {
   }
 
   if (error) {
-    return <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>لا يوجد تسجيل</span>
+    return <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>{t('userExamNoRecording')}</span>
   }
 
   if (!loaded) {
@@ -320,7 +330,7 @@ function AudioPlayer({ resultId }: { resultId: string }) {
           transition: 'all 0.15s',
         }}
       >
-        {loading ? '...' : '▶ تشغيل المكالمة'}
+        {loading ? '...' : t('userExamLoadRecording')}
       </button>
     )
   }
@@ -335,6 +345,7 @@ function AudioPlayer({ resultId }: { resultId: string }) {
 }
 
 function DownloadButton({ result, userName }: { result: ExamResult; userName: string }) {
+  const t = useT()
   const [generating, setGenerating] = useState(false)
   const [downloaded, setDownloaded] = useState(!!result.report_downloaded_at)
 
@@ -345,7 +356,7 @@ function DownloadButton({ result, userName }: { result: ExamResult; userName: st
         background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.2)',
         border: '1px solid rgba(255,255,255,0.08)', display: 'inline-block', cursor: 'default',
       }}>
-        تم التحميل
+        {t('userExamDownloaded')}
       </span>
     )
   }
@@ -394,12 +405,14 @@ function DownloadButton({ result, userName }: { result: ExamResult; userName: st
         transition: 'all 0.15s',
       }}
     >
-      {generating ? 'جاري التوليد…' : 'تنزيل التقرير'}
+      {generating ? t('userExamGenerating') : t('userExamDownloadReport')}
     </button>
   )
 }
 
 export default function UserExamResultsTab({ results, userName }: { results: ExamResult[]; userName: string }) {
+  const t = useT()
+  const { lang } = useLanguage()
   const [selected, setSelected] = useState<ExamResult | null>(null)
 
   if (results.length === 0) {
@@ -409,7 +422,7 @@ export default function UserExamResultsTab({ results, userName }: { results: Exa
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           padding: '64px 24px', gap: 16, textAlign: 'center',
         }}
-        dir="rtl"
+        dir={lang === 'ar' ? 'rtl' : 'ltr'}
       >
         <div style={{
           width: 56, height: 56, borderRadius: '50%',
@@ -419,30 +432,42 @@ export default function UserExamResultsTab({ results, userName }: { results: Exa
           📋
         </div>
         <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, maxWidth: 320, lineHeight: 1.7 }}>
-          لم تُكمل أي اختبار بعد. بعد إنهاء الاختبار ستظهر نتائجك هنا.
+          {t('userExamEmpty')}
         </p>
       </div>
     )
   }
 
+  const cols = [
+    t('userExamColPhase1'),
+    t('userExamColPhase2'),
+    t('userExamColTotal'),
+    t('userExamColResult'),
+    t('userExamColDate'),
+    t('userExamColDetails'),
+    t('userExamColRecording'),
+    t('userExamColCallGrade'),
+    t('userExamColDownload'),
+  ]
+
   return (
     <>
       {selected && <DetailsModal result={selected} onClose={() => setSelected(null)} />}
 
-      <div dir="rtl">
+      <div dir={lang === 'ar' ? 'rtl' : 'ltr'}>
         <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, marginBottom: 16 }}>
-          {results.length} {results.length === 1 ? 'اختبار مكتمل' : 'اختبارات مكتملة'}
+          {results.length} {results.length === 1 ? t('userExamCount1') : t('userExamCountN')}
         </p>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                {['المرحلة الأولى', 'المرحلة الثانية', 'الإجمالي', 'النتيجة', 'التاريخ', 'التفاصيل', 'المكالمة', 'تقييم المكالمة', 'تنزيل'].map(h => (
+                {cols.map(h => (
                   <th
                     key={h}
                     className="px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                    style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'right' }}
+                    style={{ color: 'rgba(255,255,255,0.3)', textAlign: lang === 'ar' ? 'right' : 'left' }}
                   >
                     {h}
                   </th>
@@ -458,16 +483,16 @@ export default function UserExamResultsTab({ results, userName }: { results: Exa
 
                 return (
                   <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <td className="px-4 py-3" style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'right' }}>
+                    <td className="px-4 py-3" style={{ color: 'rgba(255,255,255,0.6)', textAlign: lang === 'ar' ? 'right' : 'left' }}>
                       {r.phase1_score}/{r.phase1_max}
                     </td>
-                    <td className="px-4 py-3" style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'right' }}>
+                    <td className="px-4 py-3" style={{ color: 'rgba(255,255,255,0.6)', textAlign: lang === 'ar' ? 'right' : 'left' }}>
                       {r.phase2_score}/{r.phase2_max}
                     </td>
-                    <td className="px-4 py-3" style={{ color: '#D7FF00', fontWeight: 700, textAlign: 'right' }}>
+                    <td className="px-4 py-3" style={{ color: '#D7FF00', fontWeight: 700, textAlign: lang === 'ar' ? 'right' : 'left' }}>
                       {total}/{max} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: 11 }}>({pct}%)</span>
                     </td>
-                    <td className="px-4 py-3" style={{ textAlign: 'right' }}>
+                    <td className="px-4 py-3" style={{ textAlign: lang === 'ar' ? 'right' : 'left' }}>
                       <span
                         style={{
                           padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
@@ -476,13 +501,13 @@ export default function UserExamResultsTab({ results, userName }: { results: Exa
                           border: `1px solid ${passed ? 'rgba(16,185,129,0.3)' : 'rgba(248,113,113,0.3)'}`,
                         }}
                       >
-                        {passed ? 'ناجح' : 'راسب'}
+                        {passed ? t('userExamPassed') : t('userExamFailed')}
                       </span>
                     </td>
-                    <td className="px-4 py-3" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, textAlign: 'right' }}>
+                    <td className="px-4 py-3" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, textAlign: lang === 'ar' ? 'right' : 'left' }}>
                       {new Date(r.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
-                    <td className="px-4 py-3" style={{ textAlign: 'right' }}>
+                    <td className="px-4 py-3" style={{ textAlign: lang === 'ar' ? 'right' : 'left' }}>
                       <button
                         onClick={() => setSelected(r)}
                         style={{
@@ -494,19 +519,19 @@ export default function UserExamResultsTab({ results, userName }: { results: Exa
                         onMouseEnter={e => (e.currentTarget.style.background = 'rgba(215,255,0,0.15)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'rgba(215,255,0,0.08)')}
                       >
-                        عرض التفاصيل
+                        {t('userExamViewDetails')}
                       </button>
                     </td>
-                    <td className="px-4 py-3" style={{ textAlign: 'right' }}>
+                    <td className="px-4 py-3" style={{ textAlign: lang === 'ar' ? 'right' : 'left' }}>
                       {r.phase3_completed
                         ? <AudioPlayer resultId={r.id} />
                         : <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>—</span>
                       }
                     </td>
-                    <td className="px-4 py-3" style={{ textAlign: 'right' }}>
+                    <td className="px-4 py-3" style={{ textAlign: lang === 'ar' ? 'right' : 'left' }}>
                       <CallGradeCell grade={r.call_grade} phase3Completed={r.phase3_completed} />
                     </td>
-                    <td className="px-4 py-3" style={{ textAlign: 'right' }}>
+                    <td className="px-4 py-3" style={{ textAlign: lang === 'ar' ? 'right' : 'left' }}>
                       <DownloadButton result={r} userName={userName} />
                     </td>
                   </tr>

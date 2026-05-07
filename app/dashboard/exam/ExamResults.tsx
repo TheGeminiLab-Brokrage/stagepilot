@@ -1,5 +1,7 @@
 'use client'
 
+import { useT, useLanguage } from '@/lib/language-context'
+
 interface Props {
   phase1Score: number
   phase1Max: number
@@ -15,8 +17,11 @@ interface Props {
 }
 
 export default function ExamResults({ userName, onReset }: Props) {
+  const t = useT()
+  const { lang } = useLanguage()
+
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-8" dir="rtl">
+    <div className="flex flex-col items-center justify-center h-full gap-8" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       <div
         style={{
           width: 80, height: 80, borderRadius: '50%',
@@ -31,13 +36,13 @@ export default function ExamResults({ userName, onReset }: Props) {
 
       <div className="text-center space-y-3">
         <div style={{ color: '#D7FF00', fontSize: 26, fontWeight: 800, fontFamily: "'Space Grotesk', sans-serif" }}>
-          تم إنهاء الاختبار
+          {t('examCompletedTitle')}
         </div>
         <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15 }}>
           {userName}
         </div>
         <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, maxWidth: 400, lineHeight: 1.7 }}>
-          شكراً! تم تسجيل إجاباتك بنجاح. سيتم مراجعة نتيجتك من قِبل الإدارة وسيتم إبلاغك بها.
+          {t('examCompletedBody')}
         </div>
       </div>
 
@@ -52,7 +57,7 @@ export default function ExamResults({ userName, onReset }: Props) {
           onMouseEnter={e => { (e.target as HTMLButtonElement).style.opacity = '0.85' }}
           onMouseLeave={e => { (e.target as HTMLButtonElement).style.opacity = '1' }}
         >
-          إعادة الامتحان ↺
+          {t('examRetakeBtn')}
         </button>
         <button
           onClick={onReset}
@@ -64,7 +69,7 @@ export default function ExamResults({ userName, onReset }: Props) {
           onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; (e.target as HTMLButtonElement).style.color = '#fff' }}
           onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; (e.target as HTMLButtonElement).style.color = 'rgba(255,255,255,0.6)' }}
         >
-          العودة للرئيسية
+          {t('examBackHomeBtn')}
         </button>
       </div>
     </div>

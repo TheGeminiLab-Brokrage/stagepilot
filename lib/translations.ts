@@ -143,6 +143,65 @@ const en = {
   stageInterestedFollowUp: 'interested / follow up',
   stageNotInterested: 'not interested',
   stageLowBudget: 'low budget',
+
+  // ── UserExamResultsTab columns ────────────────────────────────────────────
+  userExamColPhase1: 'Phase 1',
+  userExamColPhase2: 'Phase 2',
+  userExamColTotal: 'Total',
+  userExamColResult: 'Result',
+  userExamColDate: 'Date',
+  userExamColDetails: 'Details',
+  userExamColRecording: 'Recording',
+  userExamColCallGrade: 'Call Grade',
+  userExamColDownload: 'Download',
+
+  // ── UserExamResultsTab content ────────────────────────────────────────────
+  userExamPassed: 'Pass',
+  userExamFailed: 'Fail',
+  userExamViewDetails: 'View Details',
+  userExamDetailsTitle: 'Exam Details',
+  userExamNoDetails: 'No details saved for this exam.',
+  userExamYourAnswer: 'Your answer:',
+  userExamCorrectAnswer: 'Correct answer:',
+  userExamNoRecording: 'No recording',
+  userExamLoadRecording: '▶ Load Recording',
+  userExamDownloadReport: 'Download Report',
+  userExamGenerating: 'Generating…',
+  userExamDownloaded: 'Downloaded',
+  userExamAnalyzing: 'Analyzing…',
+  userExamEmpty: 'No exams completed yet. Your results will appear here after finishing the exam.',
+  userExamCount1: 'exam completed',
+  userExamCountN: 'exams completed',
+
+  // ── GradeModal ────────────────────────────────────────────────────────────
+  gradeModalTitle: 'Call Assessment',
+  gradeModalTotalScore: 'Total Score:',
+  gradeModalOverall: 'Overall Feedback',
+  criteriaIceBreaking: 'Ice Breaking',
+  criteriaDiscovery: 'Discovery Questions',
+  criteriaUnitRec: 'Unit Recommendation',
+  criteriaActionTaking: 'Action Taking',
+
+  // ── ExamResults completion screen ─────────────────────────────────────────
+  examCompletedTitle: 'Exam Completed',
+  examCompletedBody: 'Thank you! Your answers have been recorded. Your result will be reviewed by the administration and you will be notified.',
+  examRetakeBtn: 'Retake Exam ↺',
+  examBackHomeBtn: 'Back to Home',
+
+  // ── PracticeClient ────────────────────────────────────────────────────────
+  practiceStatusIdle: 'Ready to Practice',
+  practiceStatusConnecting: 'Connecting',
+  practiceStatusListening: 'Listening',
+  practiceStatusSpeaking: 'Speaking',
+  practiceStatusEnding: 'Ending…',
+  practiceStatusError: 'Connection Error',
+  practiceScenarios: 'Scenarios',
+  practiceClients: 'Clients',
+  practiceEducational: 'Educational',
+  practiceStart: 'Start',
+  practiceSaving: 'Saving…',
+  practiceNew: '↺ New',
+  practiceEndSession: 'End Session',
 }
 
 const ar: typeof en = {
@@ -290,6 +349,65 @@ const ar: typeof en = {
   stageInterestedFollowUp: 'مهتم / متابعة',
   stageNotInterested: 'غير مهتم',
   stageLowBudget: 'ميزانية منخفضة',
+
+  // ── UserExamResultsTab columns ────────────────────────────────────────────
+  userExamColPhase1: 'المرحلة الأولى',
+  userExamColPhase2: 'المرحلة الثانية',
+  userExamColTotal: 'الإجمالي',
+  userExamColResult: 'النتيجة',
+  userExamColDate: 'التاريخ',
+  userExamColDetails: 'التفاصيل',
+  userExamColRecording: 'المكالمة',
+  userExamColCallGrade: 'تقييم المكالمة',
+  userExamColDownload: 'تنزيل',
+
+  // ── UserExamResultsTab content ────────────────────────────────────────────
+  userExamPassed: 'ناجح',
+  userExamFailed: 'راسب',
+  userExamViewDetails: 'عرض التفاصيل',
+  userExamDetailsTitle: 'تفاصيل الاختبار',
+  userExamNoDetails: 'لا توجد تفاصيل محفوظة لهذا الاختبار.',
+  userExamYourAnswer: 'إجابتك:',
+  userExamCorrectAnswer: 'الإجابة الصحيحة:',
+  userExamNoRecording: 'لا يوجد تسجيل',
+  userExamLoadRecording: '▶ تشغيل المكالمة',
+  userExamDownloadReport: 'تنزيل التقرير',
+  userExamGenerating: 'جاري التوليد…',
+  userExamDownloaded: 'تم التحميل',
+  userExamAnalyzing: 'جاري التحليل…',
+  userExamEmpty: 'لم تُكمل أي اختبار بعد. بعد إنهاء الاختبار ستظهر نتائجك هنا.',
+  userExamCount1: 'اختبار مكتمل',
+  userExamCountN: 'اختبارات مكتملة',
+
+  // ── GradeModal ────────────────────────────────────────────────────────────
+  gradeModalTitle: 'تقييم المكالمة',
+  gradeModalTotalScore: 'الدرجة الإجمالية:',
+  gradeModalOverall: 'التقييم العام',
+  criteriaIceBreaking: 'كسر الجليد',
+  criteriaDiscovery: 'أسئلة الاستكشاف',
+  criteriaUnitRec: 'توصية الوحدة',
+  criteriaActionTaking: 'اتخاذ الإجراء',
+
+  // ── ExamResults completion screen ─────────────────────────────────────────
+  examCompletedTitle: 'تم إنهاء الاختبار',
+  examCompletedBody: 'شكراً! تم تسجيل إجاباتك بنجاح. سيتم مراجعة نتيجتك من قِبل الإدارة وسيتم إبلاغك بها.',
+  examRetakeBtn: 'إعادة الامتحان ↺',
+  examBackHomeBtn: 'العودة للرئيسية',
+
+  // ── PracticeClient ────────────────────────────────────────────────────────
+  practiceStatusIdle: 'جاهز للتدريب',
+  practiceStatusConnecting: 'جاري الاتصال',
+  practiceStatusListening: 'يستمع',
+  practiceStatusSpeaking: 'يتحدث',
+  practiceStatusEnding: 'جاري الإنهاء…',
+  practiceStatusError: 'خطأ في الاتصال',
+  practiceScenarios: 'السيناريوهات',
+  practiceClients: 'العملاء',
+  practiceEducational: 'تعليمي',
+  practiceStart: 'ابدأ',
+  practiceSaving: 'جاري الحفظ…',
+  practiceNew: '↺ جديد',
+  practiceEndSession: 'إنهاء الجلسة',
 }
 
 export const translations = { en, ar }

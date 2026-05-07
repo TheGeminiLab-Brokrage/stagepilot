@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Mp3Encoder } from '@breezystack/lamejs'
 import AiOrb from './AiOrb'
+import { useT } from '@/lib/language-context'
 
 // ─── Gemini Live API constants ─────────────────────────────────────────────────
 const MODEL = 'models/gemini-3.1-flash-live-preview'
@@ -205,6 +206,7 @@ interface PracticeClientProps {
 }
 
 export default function PracticeClient({ userId, companyId, userName, role, userEmail }: PracticeClientProps) {
+  const t = useT()
   const [status, setStatus] = useState<Status>('idle')
   const [turns, setTurns] = useState<Turn[]>([])
   const [errorMsg, setErrorMsg] = useState('')
@@ -838,12 +840,12 @@ export default function PracticeClient({ userId, companyId, userName, role, user
   const currentScenario = scenarios.find(s => s.id === selectedScenario)
 
   const statusLabel: Record<Status, string> = {
-    idle:       'Ready to Practice',
-    connecting: 'Connecting',
-    listening:  'Listening',
-    speaking:   'Speaking',
-    ending:     'Ending…',
-    error:      'Connection Error',
+    idle:       t('practiceStatusIdle'),
+    connecting: t('practiceStatusConnecting'),
+    listening:  t('practiceStatusListening'),
+    speaking:   t('practiceStatusSpeaking'),
+    ending:     t('practiceStatusEnding'),
+    error:      t('practiceStatusError'),
   }
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
@@ -906,7 +908,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
           flexShrink: 0,
         }}>
           <span style={{ color: '#D7FF00', fontSize: 10, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif" }}>
-            Scenarios
+            {t('practiceScenarios')}
           </span>
           <button
             onClick={() => setPanelOpen(false)}
@@ -937,13 +939,13 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                     {sub === 'Educational' ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                         <span style={{ color: '#D7FF00', fontSize: 8.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif", whiteSpace: 'nowrap' }}>
-                          {sub}
+                          {t('practiceEducational')}
                         </span>
                         <div style={{ flex: 1, height: 1, background: 'rgba(215,255,0,0.12)' }} />
                       </div>
                     ) : (
                       <p style={{ fontSize: 8, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#D7FF00', marginBottom: 8, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
-                        {sub}
+                        {t('practiceClients')}
                       </p>
                     )}
 
@@ -1257,7 +1259,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
             onMouseEnter={e => { (e.target as HTMLButtonElement).style.borderColor = 'rgba(215,255,0,0.4)'; (e.target as HTMLButtonElement).style.color = '#D7FF00' }}
             onMouseLeave={e => { (e.target as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.15)'; (e.target as HTMLButtonElement).style.color = 'rgba(255,255,255,0.5)' }}
           >
-            ↺ New
+            {t('practiceNew')}
           </button>
         ) : (
           <div />
@@ -1279,7 +1281,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
               <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" />
               <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.93V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.07A7 7 0 0 0 19 11Z" />
             </svg>
-            {saveStatus === 'saving' ? 'Saving…' : 'Start'}
+            {saveStatus === 'saving' ? t('practiceSaving') : t('practiceStart')}
           </button>
         ) : status === 'connecting' || status === 'ending' ? (
           <button
@@ -1288,7 +1290,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
             style={{ background: 'rgba(215,255,0,0.2)', color: '#D7FF00', border: '1px solid rgba(215,255,0,0.3)', fontFamily: "'Space Grotesk', sans-serif" }}
           >
             <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
-            {status === 'ending' ? 'Ending…' : 'Connecting'}
+            {status === 'ending' ? t('practiceStatusEnding') : t('practiceStatusConnecting')}
           </button>
         ) : (
           <button
@@ -1307,7 +1309,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <rect x="4" y="4" width="16" height="16" rx="2" />
             </svg>
-            End Session
+            {t('practiceEndSession')}
           </button>
         )}
       </div>
