@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
+import { headers, cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import LogoutButton from './LogoutButton'
 import GeminiVoiceButton from './components/GeminiVoiceButton'
@@ -20,6 +20,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const role = profile?.role ?? 'agent'
 
+  const cookieStore = await cookies()
+  const langCookie = cookieStore.get('sp_lang')?.value
+  const initialLang = (langCookie === 'en' || langCookie === 'ar') ? langCookie : 'ar'
+
   // Trainee redirect: they only access /dashboard/practice
   const headersList = await headers()
   const pathname = headersList.get('x-pathname') ?? ''
@@ -31,7 +35,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <LanguageWrapper>
+    <LanguageWrapper initialLang={initialLang}>
       <Navbar role={role} fullName={profile?.full_name} rightSlot={<LogoutButton />} />
 
       <div className="flex-1 overflow-y-auto flex flex-col">

@@ -22,6 +22,11 @@ export interface Scenario {
   iconType: 'tooth' | 'sparkle' | 'chart' | 'tower';
   context: string;
   practiceGoal: string;
+  nameAr?: string;
+  jobAr?: string;
+  tagAr?: string;
+  contextAr?: string;
+  practiceGoalAr?: string;
 }
 
 export const SCENARIOS: Scenario[] = [
@@ -39,6 +44,11 @@ export const SCENARIOS: Scenario[] = [
     iconType: "tooth",
     context: "She filled out a Facebook ad form about a clinic unit in El Tagamo3 El Khamis. She's at work between patients — distracted and neutral. She doesn't know who's calling or from which company.",
     practiceGoal: "Master discovery with a guarded professional. She opens cold and warms up only if you earn it. The hidden layer: the clinic is for her son finishing his dentistry degree — she won't mention it unless you ask the right question.",
+    nameAr: "د. ياسمين",
+    jobAr: "طبيبة أسنان",
+    tagAr: "إعلان فيسبوك — وحدة عيادة",
+    contextAr: "ملأت نموذج إعلان فيسبوك عن وحدة عيادة في التجمع الخامس. مشغولة بين المرضى — مشتتة وغير مبالية. لا تعرف من يتصل ولا من أي شركة.",
+    practiceGoalAr: "أتقن الاستكشاف مع متخصصة متحفظة. تبدأ بارودة وتنفتح فقط إذا استحققتها. الطبقة الخفية: العيادة لابنها الذي يكمل دكتوراه الأسنان — لن تذكره إلا إذا سألت السؤال الصح.",
   },
   {
     id: "dr_mariam",
@@ -54,6 +64,11 @@ export const SCENARIOS: Scenario[] = [
     iconType: "sparkle",
     context: "She submitted a clinic unit inquiry online. Calm and professional, she evaluates every answer quietly. She has strict technical requirements for a cosmetic clinic — layout, electrical load, privacy, and building image all matter.",
     practiceGoal: "Navigate a technically demanding buyer who deflects every meeting attempt. She'll only agree to a site visit for Mercon VX 90 or VX Golden Square — and only after all her requirements are genuinely satisfied, not just acknowledged.",
+    nameAr: "د. مريم",
+    jobAr: "طبيبة تجميل وتخسيس",
+    tagAr: "استفسار وحدة عيادة",
+    contextAr: "قدّمت استفساراً عن وحدة عيادة عبر الإنترنت. هادئة ومحترفة، تُقيّم كل إجابة بصمت. اشتراطات تقنية صارمة: التصميم، الحمل الكهربائي، الخصوصية، وصورة المبنى.",
+    practiceGoalAr: "تعامل مع مشترية متطلبة تقنياً تصرف كل محاولة لتحديد موعد. ستوافق فقط على ميركون VX 90 أو VX Golden Square — وبعد استيفاء جميع متطلباتها فعلياً لا مجرد الإقرار بها.",
   },
   {
     id: "mohammed_tgl",
@@ -69,6 +84,10 @@ export const SCENARIOS: Scenario[] = [
     iconType: "chart",
     context: "TGL's senior internal strategist with command over 40+ clinic unit projects across New Cairo. He'll ask your name first, then guide you through any project, location, price range, or buyer type you want to understand.",
     practiceGoal: "Every answer comes in two layers: the direct facts, then one strategic angle you probably haven't considered. Use him before real calls to learn the full TGL portfolio, sharpen comparisons, and find the right project for the right doctor.",
+    jobAr: "استراتيجي مبيعات TGL",
+    tagAr: "+٤٠ مشروع عيادة",
+    contextAr: "كبير الاستراتيجيين الداخليين في TGL، خبرة معمقة في +٤٠ مشروع وحدة عيادة بالقاهرة الجديدة. سيسألك عن اسمك أولاً، ثم يرشدك في أي مشروع أو موقع أو فئة سعرية أو نوع مشترٍ.",
+    practiceGoalAr: "كل إجابة في طبقتين: الحقائق المباشرة، ثم زاوية استراتيجية نادراً ما تخطر على البال. استخدمه قبل المكالمات الحقيقية لتتعلم محفظة TGL كاملاً وتجد المشروع الصح للطبيب الصح.",
   },
   {
     id: "mohammed_madinet_masr",
@@ -84,6 +103,10 @@ export const SCENARIOS: Scenario[] = [
     iconType: "tower",
     context: "Madinet Masr's internal strategist with deep knowledge of Taj City and Sarai across all phases — unit types, pricing, payment plans, delivery timelines, and the developer's 65-year track record.",
     practiceGoal: "Master the Madinet Masr pitch. Learn when to lead with Taj City vs Sarai, how to use the developer's history as a trust anchor, and how to answer price and delivery questions with the precision that closes deals.",
+    jobAr: "استراتيجي مدينة مصر",
+    tagAr: "طاج سيتي وسراي",
+    contextAr: "استراتيجي داخلي في مدينة مصر، خبير معمق في طاج سيتي وسراي عبر جميع المراحل — أنواع الوحدات والأسعار وخطط السداد ومواعيد التسليم وسجل الشركة الممتد لـ٦٥ عاماً.",
+    practiceGoalAr: "أتقن عرض مدينة مصر. تعلّم متى تبدأ بطاج سيتي أو سراي، وكيف توظّف تاريخ الشركة أداةً للثقة، وكيف تجيب عن أسئلة السعر والتسليم بدقة تغلق الصفقات.",
   },
   {
     id: "mona_hassan",
@@ -99,6 +122,10 @@ export const SCENARIOS: Scenario[] = [
     iconType: "tower",
     context: "A busy businesswoman who came across a Madinet Masr ad for Sarai. Privately interested but never shows it. She runs a silent two-phase knowledge test from the first exchange — the agent doesn't know they're being scored.",
     practiceGoal: "The highest-pressure scenario in the suite. Phase 1: prove you know Madinet Masr's credibility and track record. Score below 70% and she ends the call — politely, but firmly. Pass Phase 1 and she opens up to Sarai details.",
+    jobAr: "سيدة أعمال",
+    tagAr: "مدينة مصر — سراي",
+    contextAr: "سيدة أعمال مشغولة صادفت إعلان مدينة مصر عن سراي. مهتمة في الخفاء ولا تُظهر ذلك. تُجري اختباراً صامتاً ثنائي المرحلة منذ أول تبادل — الموظف لا يعلم أنه يُقيَّم.",
+    practiceGoalAr: "أعلى سيناريو ضغطاً في المجموعة. المرحلة الأولى: أثبت معرفتك بمصداقية مدينة مصر وسجلها. أقل من ٧٠٪ وتنهي المكالمة — بأدب لكن بحزم. اجتز المرحلة الأولى وستنفتح معك على تفاصيل سراي.",
   },
 ]
 

@@ -3,8 +3,8 @@ import { SCENARIOS } from '@/lib/gemini-scenarios'
 
 // Returns scenario metadata — prompts never leave the server via this route
 export async function GET() {
-  const list = SCENARIOS.map(({ id, label, defaultVoice, description, category, subcategory, name, job, tag, iconType, context, practiceGoal }) => ({
-    id, label, defaultVoice, description, category, subcategory, name, job, tag, iconType, context, practiceGoal,
+  const list = SCENARIOS.map(({ id, label, defaultVoice, description, category, subcategory, name, job, tag, iconType, context, practiceGoal, nameAr, jobAr, tagAr, contextAr, practiceGoalAr }) => ({
+    id, label, defaultVoice, description, category, subcategory, name, job, tag, iconType, context, practiceGoal, nameAr, jobAr, tagAr, contextAr, practiceGoalAr,
   }))
   return NextResponse.json(list)
 }

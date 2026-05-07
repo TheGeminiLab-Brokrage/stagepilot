@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Mp3Encoder } from '@breezystack/lamejs'
 import AiOrb from './AiOrb'
-import { useT } from '@/lib/language-context'
+import { useT, useLanguage } from '@/lib/language-context'
 
 // ─── Gemini Live API constants ─────────────────────────────────────────────────
 const MODEL = 'models/gemini-3.1-flash-live-preview'
@@ -33,6 +33,11 @@ interface ScenarioOption {
   iconType?: 'tooth' | 'sparkle' | 'chart' | 'tower'
   context?: string
   practiceGoal?: string
+  nameAr?: string
+  jobAr?: string
+  tagAr?: string
+  contextAr?: string
+  practiceGoalAr?: string
 }
 
 interface AiChunk {
@@ -205,8 +210,17 @@ interface PracticeClientProps {
   userEmail: string
 }
 
+const AVATAR: Record<string, string> = {
+  dr_yasmine: '/avatars/yasmin.jpg',
+  dr_mariam: '/avatars/mariam.jpg',
+  mohammed_tgl: '/avatars/mohammed-tgl.jpg',
+  mohammed_madinet_masr: '/avatars/mohammed-madinet-masr.jpg',
+  mona_hassan: '/avatars/mona.jpg',
+}
+
 export default function PracticeClient({ userId, companyId, userName, role, userEmail }: PracticeClientProps) {
   const t = useT()
+  const { lang } = useLanguage()
   const [status, setStatus] = useState<Status>('idle')
   const [turns, setTurns] = useState<Turn[]>([])
   const [errorMsg, setErrorMsg] = useState('')
@@ -955,83 +969,125 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                       const disabled = isActive || status === 'connecting' || scenarioLimitReached
                       const isClient = sub === 'Clients'
                       const usedToday = isFreePlan ? (dailyUsage[s.id] ?? 0) : 0
+                      const displayName = lang === 'ar' ? (s.nameAr ?? s.name ?? s.label) : (s.name || s.label)
+                      const displayJob  = lang === 'ar' ? (s.jobAr  ?? s.job  ?? '') : (s.job  ?? '')
+                      const displayTag  = lang === 'ar' ? (s.tagAr  ?? s.tag  ?? '') : (s.tag  ?? '')
+                      const displayCtx  = lang === 'ar' ? (s.contextAr     ?? s.context     ?? '') : (s.context     ?? '')
+                      const displayGoal = lang === 'ar' ? (s.practiceGoalAr ?? s.practiceGoal ?? '') : (s.practiceGoal ?? '')
+
                       return (
                         <button
                           key={s.id}
                           onClick={() => { if (!disabled) { setSelectedScenario(s.id); setPanelOpen(false) } }}
                           disabled={disabled}
                           style={{
-                            display: 'block', width: '100%', textAlign: 'left',
+                            display: 'block', width: '100%', textAlign: 'unset',
                             background: selected ? 'rgba(215,255,0,0.06)' : 'rgba(255,255,255,0.02)',
                             border: selected ? '1px solid rgba(215,255,0,0.45)' : '1px solid rgba(255,255,255,0.06)',
                             boxShadow: selected ? '0 0 18px rgba(215,255,0,0.08)' : 'none',
-                            borderRadius: 11, padding: '13px 13px 11px',
-                            marginBottom: 7, cursor: disabled ? 'not-allowed' : 'pointer',
+                            borderRadius: 14, padding: '16px 13px 13px',
+                            marginBottom: 10, cursor: disabled ? 'not-allowed' : 'pointer',
                             opacity: disabled ? 0.35 : 1,
                             transition: 'all 0.15s ease',
                           }}
                         >
-                          {/* Header row: icon + name + job */}
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 11 }}>
-                            <div style={{
-                              width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-                              background: isClient ? 'rgba(215,255,0,0.1)' : 'rgba(255,255,255,0.06)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                              <ScenarioIcon iconType={s.iconType} isClient={isClient} />
-                            </div>
-                            <div style={{ paddingTop: 2 }}>
-                              <p style={{ color: '#fff', fontSize: 12.5, fontWeight: 700, lineHeight: 1.2, marginBottom: 3, fontFamily: "'Montserrat', sans-serif" }}>
-                                {s.name || s.label}
-                              </p>
-                              <p style={{ color: 'rgba(255,255,255,0.38)', fontSize: 9.5, lineHeight: 1.3, fontFamily: "'Montserrat', sans-serif" }}>
-                                {s.job}
-                              </p>
-                            </div>
+                          {/* Circular photo */}
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+                            <img
+                              src={AVATAR[s.id] ?? ''}
+                              alt={displayName}
+                              style={{
+                                width: 64, height: 64, borderRadius: '50%', objectFit: 'cover',
+                                border: '2px solid rgba(215,255,0,0.4)',
+                                boxShadow: '0 0 16px rgba(215,255,0,0.12), 0 4px 14px rgba(0,0,0,0.5)',
+                              }}
+                            />
                           </div>
 
-                          {/* Divider */}
-                          <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', marginBottom: 11 }} />
-
-                          {/* Context block */}
-                          <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
-                            {isClient ? 'Scenario' : 'Ask about'}
-                          </p>
-                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, marginBottom: 11, fontFamily: "'Montserrat', sans-serif" }}>
-                            {s.context}
-                          </p>
-
-                          {/* Practice goal block */}
-                          <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
-                            {isClient ? 'What to practice' : 'How to use'}
-                          </p>
-                          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, marginBottom: 11, fontFamily: "'Montserrat', sans-serif" }}>
-                            {s.practiceGoal}
-                          </p>
-
-                          {/* Tag */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                          {/* Name + AI badge */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 3 }}>
+                            <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1.2, fontFamily: "'Montserrat', sans-serif" }}>
+                              {displayName}
+                            </span>
                             <span style={{
-                              display: 'inline-block',
+                              background: 'rgba(215,255,0,0.15)', color: '#D7FF00',
+                              border: '1px solid rgba(215,255,0,0.3)',
+                              borderRadius: 5, padding: '1px 6px', fontSize: 9, fontWeight: 700,
+                              fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.05em', flexShrink: 0,
+                            }}>
+                              AI
+                            </span>
+                          </div>
+
+                          {/* Job title */}
+                          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.38)', fontSize: 10.5, marginBottom: 11, fontFamily: "'Montserrat', sans-serif" }}>
+                            {displayJob}
+                          </p>
+
+                          {/* Tag chips */}
+                          <div style={{ display: 'flex', gap: 5, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+                            <span style={{
                               background: isClient ? 'rgba(215,255,0,0.09)' : 'rgba(255,255,255,0.05)',
                               color: isClient ? 'rgba(215,255,0,0.75)' : 'rgba(255,255,255,0.32)',
-                              borderRadius: 4, padding: '3px 7px', fontSize: 9, lineHeight: 1.5,
-                              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+                              border: isClient ? '1px solid rgba(215,255,0,0.2)' : '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: 20, padding: '3px 9px',
+                              fontSize: 9, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
                             }}>
-                              {s.tag}
+                              {isClient ? t('practiceClients') : t('practiceEducational')}
                             </span>
-                            {isFreePlan && (
+                            {displayTag && (
                               <span style={{
-                                display: 'inline-block',
+                                background: isClient ? 'rgba(215,255,0,0.09)' : 'rgba(255,255,255,0.05)',
+                                color: isClient ? 'rgba(215,255,0,0.75)' : 'rgba(255,255,255,0.32)',
+                                border: isClient ? '1px solid rgba(215,255,0,0.2)' : '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: 20, padding: '3px 9px',
+                                fontSize: 9, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+                              }}>
+                                {displayTag}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* CTA button */}
+                          <div style={{
+                            width: '100%', background: '#D7FF00', color: '#000',
+                            borderRadius: 24, padding: '9px 12px', fontWeight: 700,
+                            fontSize: 11.5, fontFamily: "'Montserrat', sans-serif",
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                          }}>
+                            <span style={{ fontSize: 13 }}>+</span>
+                            {t('practiceStartWith')} {displayName}
+                          </div>
+
+                          {isFreePlan && (
+                            <div style={{ textAlign: 'center', marginTop: 8 }}>
+                              <span style={{
                                 background: scenarioLimitReached ? 'rgba(255,60,60,0.12)' : 'rgba(255,255,255,0.05)',
                                 color: scenarioLimitReached ? 'rgba(255,100,100,0.9)' : 'rgba(255,255,255,0.38)',
                                 borderRadius: 4, padding: '3px 7px', fontSize: 9, lineHeight: 1.5,
                                 fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
                                 border: scenarioLimitReached ? '1px solid rgba(255,60,60,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                                display: 'inline-block',
                               }}>
                                 {scenarioLimitReached ? 'Limit reached' : `${DAILY_LIMIT - usedToday}/${DAILY_LIMIT} left today`}
                               </span>
-                            )}
+                            </div>
+                          )}
+
+                          {/* Description section */}
+                          <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
+                            <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>
+                              {isClient ? t('practiceScenarioLabel') : t('practiceAskAbout')}
+                            </p>
+                            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, marginBottom: 9, fontFamily: "'Montserrat', sans-serif" }}>
+                              {displayCtx}
+                            </p>
+                            <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>
+                              {isClient ? t('practiceWhatToPractice') : t('practiceHowToUse')}
+                            </p>
+                            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, fontFamily: "'Montserrat', sans-serif" }}>
+                              {displayGoal}
+                            </p>
                           </div>
                         </button>
                       )
@@ -1063,22 +1119,22 @@ export default function PracticeClient({ userId, companyId, userName, role, user
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/>
           </svg>
-          Scenarios
+          {t('practiceScenarios')}
         </button>
         {currentScenario && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
             <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10.5, fontFamily: "'Montserrat', sans-serif", fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {currentScenario.name || currentScenario.label}
+              {lang === 'ar' ? (currentScenario.nameAr ?? currentScenario.name ?? currentScenario.label) : (currentScenario.name || currentScenario.label)}
             </span>
             <span style={{ color: 'rgba(255,255,255,0.18)', fontSize: 10 }}>·</span>
             <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 10, fontFamily: "'Montserrat', sans-serif", whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {currentScenario.job}
+              {lang === 'ar' ? (currentScenario.jobAr ?? currentScenario.job) : currentScenario.job}
             </span>
           </div>
         )}
         {!currentScenario && (
           <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, fontFamily: "'Space Grotesk', sans-serif", fontStyle: 'italic' }}>
-            No scenario selected
+            {t('practiceNoScenario')}
           </span>
         )}
       </div>

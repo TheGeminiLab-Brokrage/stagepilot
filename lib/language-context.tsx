@@ -15,16 +15,13 @@ const LanguageContext = createContext<LanguageContextValue>({
   setLang: () => {},
 })
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => {
-    if (typeof window === 'undefined') return 'ar'
-    const stored = localStorage.getItem('sp_lang') as Lang | null
-    return (stored === 'en' || stored === 'ar') ? stored : 'ar'
-  })
+export function LanguageProvider({ children, initialLang }: { children: React.ReactNode; initialLang?: Lang }) {
+  const [lang, setLangState] = useState<Lang>(initialLang ?? 'ar')
 
   function setLang(l: Lang) {
     setLangState(l)
     localStorage.setItem('sp_lang', l)
+    document.cookie = `sp_lang=${l}; path=/; max-age=31536000; samesite=lax`
   }
 
   return (

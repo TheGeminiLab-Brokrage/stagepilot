@@ -202,6 +202,14 @@ const en = {
   practiceSaving: 'Saving…',
   practiceNew: '↺ New',
   practiceEndSession: 'End Session',
+
+  // ── PracticeClient card labels ─────────────────────────────────────────
+  practiceScenarioLabel: 'Scenario',
+  practiceAskAbout: 'Ask about',
+  practiceWhatToPractice: 'What to practice',
+  practiceHowToUse: 'How to use',
+  practiceNoScenario: 'No scenario selected',
+  practiceStartWith: 'Start with',
 }
 
 const ar: typeof en = {
@@ -408,6 +416,14 @@ const ar: typeof en = {
   practiceSaving: 'جاري الحفظ…',
   practiceNew: '↺ جديد',
   practiceEndSession: 'إنهاء الجلسة',
+
+  // ── PracticeClient card labels ─────────────────────────────────────────
+  practiceScenarioLabel: 'السيناريو',
+  practiceAskAbout: 'اسأل عن',
+  practiceWhatToPractice: 'ما تتدرب عليه',
+  practiceHowToUse: 'كيف تستخدمه',
+  practiceNoScenario: 'لم يُختر سيناريو',
+  practiceStartWith: 'ابدأ مع',
 }
 
 export const translations = { en, ar }

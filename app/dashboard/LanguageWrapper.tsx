@@ -15,9 +15,9 @@ function Inner({ children }: { children: React.ReactNode }) {
   )
 }
 
-export default function LanguageWrapper({ children }: { children: React.ReactNode }) {
+export default function LanguageWrapper({ children, initialLang }: { children: React.ReactNode; initialLang?: 'ar' | 'en' }) {
   return (
-    <LanguageProvider>
+    <LanguageProvider initialLang={initialLang}>
       <Inner>{children}</Inner>
     </LanguageProvider>
   )
