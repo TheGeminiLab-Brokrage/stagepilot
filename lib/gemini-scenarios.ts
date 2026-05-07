@@ -7,6 +7,7 @@ import { DR_MARIAM_PROMPT } from './scenario-prompts/prompt_dr_mariam'
 import { MOHAMMED_TGL_PROMPT } from './scenario-prompts/prompt_mohammed_tgl'
 import { MOHAMMED_MADINET_MASR_PROMPT } from './scenario-prompts/prompt_mohammed_madinet_masr'
 import { MONA_HASSAN_PROMPT } from './scenario-prompts/prompt_mona_hassan'
+import { ALI_PROMPT } from './scenario-prompts/prompt_ali'
 
 export interface Scenario {
   id: string;
@@ -126,6 +127,25 @@ export const SCENARIOS: Scenario[] = [
     tagAr: "مدينة مصر — سراي",
     contextAr: "سيدة أعمال مشغولة صادفت إعلان مدينة مصر عن سراي. مهتمة في الخفاء ولا تُظهر ذلك. تُجري اختباراً صامتاً ثنائي المرحلة منذ أول تبادل — الموظف لا يعلم أنه يُقيَّم.",
     practiceGoalAr: "أعلى سيناريو ضغطاً في المجموعة. المرحلة الأولى: أثبت معرفتك بمصداقية مدينة مصر وسجلها. أقل من ٧٠٪ وتنهي المكالمة — بأدب لكن بحزم. اجتز المرحلة الأولى وستنفتح معك على تفاصيل سراي.",
+  },
+  {
+    id: "ali",
+    label: "علي — Knowledge Quiz",
+    defaultVoice: "Charon",
+    prompt: ALI_PROMPT,
+    description: "علي — an internal AI quiz master that calls agents and tests their knowledge of commercial clinic units across New Cairo. Egyptian Arabic only.",
+    category: "Clinics",
+    subcategory: "Educational",
+    name: "علي",
+    job: "Internal Training System",
+    tag: "Clinic Knowledge Quiz",
+    iconType: "chart",
+    context: "An internal AI training system that calls agents and quizzes them on available commercial clinic units in New Cairo — location, developer, sizes, prices, payment plans, and delivery dates. It never answers questions; it only asks them.",
+    practiceGoal: "Test your full product knowledge under pressure. علي asks one question at a time and scores every answer. Cover all projects you claim to know — wrong or missing answers are corrected on the spot. No hints, no mercy, Egyptian Arabic only.",
+    jobAr: "نظام تدريب داخلي",
+    tagAr: "اختبار معرفة العيادات",
+    contextAr: "نظام تدريب داخلي يتصل بالموظفين ويختبر معرفتهم بوحدات العيادات التجارية المتاحة في القاهرة الجديدة — الموقع والمطور والمساحات والأسعار وخطط السداد ومواعيد التسليم. لا يجيب على أسئلة، فقط يسأل.",
+    practiceGoalAr: "اختبر معرفتك الكاملة بالمنتج تحت الضغط. علي يسأل سؤالاً واحداً في كل مرة ويصحح كل إجابة. غطِّ جميع المشاريع التي تدّعي معرفتها — الإجابات الخاطئة أو الناقصة تُصحَّح فوراً. لا تلميحات، بالعامية المصرية فقط.",
   },
 ]
 
