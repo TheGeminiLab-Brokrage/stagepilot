@@ -235,6 +235,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
   const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
   const [selectedScenario, setSelectedScenario] = useState<string>('')
   const [panelOpen, setPanelOpen] = useState(true)
+  const [activeTab, setActiveTab] = useState<'Clients' | 'Educational'>('Clients')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
   const [downloadUrl, setDownloadUrl] = useState<{ url: string; filename: string } | null>(null)
@@ -921,35 +922,50 @@ export default function PracticeClient({ userId, companyId, userName, role, user
             </button>
           </div>
 
-          {/* Card grid — Clients then Educational, each split by category */}
+          {/* Tabs */}
+          <div style={{ display: 'flex', borderBottom: '1px solid rgba(215,255,0,0.10)', padding: '0 20px' }}>
+            {(['Clients', 'Educational'] as const).map(tab => {
+              const label = tab === 'Clients' ? t('practiceClients') : t('practiceEducational')
+              const isActive = activeTab === tab
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    padding: '12px 18px 10px',
+                    fontSize: 11, fontWeight: 700, letterSpacing: '0.12em',
+                    textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif",
+                    color: isActive ? '#D7FF00' : 'rgba(255,255,255,0.35)',
+                    borderBottom: isActive ? '2px solid #D7FF00' : '2px solid transparent',
+                    marginBottom: -1,
+                    transition: 'color 0.15s, border-color 0.15s',
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Card grid — active tab only */}
           <div style={{ padding: '24px 20px 28px' }}>
-            {(['Clients', 'Educational'] as const).map((subcat, si) => {
+            {(() => {
+              const subcat = activeTab
               const subcatCats = Array.from(new Set(
                 scenarios.filter(s => s.subcategory === subcat).map(s => s.category)
               ))
-              if (subcatCats.length === 0) return null
-              const subcatLabel = subcat === 'Clients' ? t('practiceClients') : t('practiceEducational')
-              return (
-                <div key={subcat} style={{ marginBottom: si === 0 ? 32 : 0 }}>
-                  {/* Section header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-                    <span style={{ color: '#D7FF00', fontSize: 9, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif", whiteSpace: 'nowrap' }}>
-                      {subcatLabel}
-                    </span>
-                    <div style={{ flex: 1, height: 1, background: 'rgba(215,255,0,0.18)' }} />
-                  </div>
+              return subcatCats.map((cat, ci) => {
+                const catScenarios = scenarios.filter(s => s.subcategory === subcat && s.category === cat)
+                return (
+                  <div key={cat} style={{ marginBottom: ci < subcatCats.length - 1 ? 24 : 0 }}>
+                    {/* Category label */}
+                    <p style={{ fontSize: 8.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(215,255,0,0.45)', marginBottom: 14, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
+                      {cat}
+                    </p>
 
-                  {subcatCats.map((cat, ci) => {
-                    const catScenarios = scenarios.filter(s => s.subcategory === subcat && s.category === cat)
-                    return (
-                      <div key={cat} style={{ marginBottom: ci < subcatCats.length - 1 ? 24 : 0 }}>
-                        {/* Category label */}
-                        <p style={{ fontSize: 8.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(215,255,0,0.45)', marginBottom: 14, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
-                          {cat}
-                        </p>
-
-                        {/* 2-column card grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+                    {/* 2-column card grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
                           {catScenarios.map(s => {
                             const selected = selectedScenario === s.id
                             const scenarioLimitReached = isFreePlan && (dailyUsage[s.id] ?? 0) >= DAILY_LIMIT
@@ -1086,13 +1102,11 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                               </button>
                             )
                           })}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })}
+                    </div>
+                  </div>
+                )
+              })
+            })()}
           </div>
         </div>
       </div>
