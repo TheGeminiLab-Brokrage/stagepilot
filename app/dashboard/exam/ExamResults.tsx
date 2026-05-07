@@ -41,19 +41,32 @@ export default function ExamResults({ userName, onReset }: Props) {
         </div>
       </div>
 
-      <button
-        onClick={onReset}
-        style={{
-          background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)',
-          border: '1px solid rgba(255,255,255,0.12)', fontWeight: 700, borderRadius: 10,
-          padding: '12px 36px', fontSize: 14, cursor: 'pointer', transition: 'all 0.15s',
-          marginTop: 16,
-        }}
-        onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; (e.target as HTMLButtonElement).style.color = '#fff' }}
-        onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; (e.target as HTMLButtonElement).style.color = 'rgba(255,255,255,0.6)' }}
-      >
-        إعادة الامتحان من البداية ↺
-      </button>
+      <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+        <button
+          onClick={onReset}
+          style={{
+            background: '#D7FF00', color: '#000',
+            border: 'none', fontWeight: 700, borderRadius: 10,
+            padding: '12px 36px', fontSize: 14, cursor: 'pointer', transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { (e.target as HTMLButtonElement).style.opacity = '0.85' }}
+          onMouseLeave={e => { (e.target as HTMLButtonElement).style.opacity = '1' }}
+        >
+          إعادة الامتحان ↺
+        </button>
+        <button
+          onClick={onReset}
+          style={{
+            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)',
+            border: '1px solid rgba(255,255,255,0.12)', fontWeight: 700, borderRadius: 10,
+            padding: '12px 36px', fontSize: 14, cursor: 'pointer', transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)'; (e.target as HTMLButtonElement).style.color = '#fff' }}
+          onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; (e.target as HTMLButtonElement).style.color = 'rgba(255,255,255,0.6)' }}
+        >
+          العودة للرئيسية
+        </button>
+      </div>
     </div>
   )
 }

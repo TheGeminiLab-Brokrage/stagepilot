@@ -41,6 +41,8 @@ const typeBorder: Record<string, string> = {
   essay: 'rgba(245,158,11,0.4)',
 }
 
+const QUESTION_TIME = 60
+
 export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
   const [questions, setQuestions] = useState<Question[] | null>(null)
   const [current, setCurrent] = useState(0)
@@ -49,6 +51,9 @@ export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
   const [grading, setGrading] = useState(false)
   const [error, setError] = useState('')
   const [started, setStarted] = useState(false)
+
+  const [questionTimeLeft, setQuestionTimeLeft] = useState(QUESTION_TIME)
+  const timerFiredRef = useRef(false)
 
   const forceSubmitFiredRef = useRef(false)
   useEffect(() => {
@@ -71,6 +76,36 @@ export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
       .catch(() => onComplete(answersArr, [], 0, 0, questions))
       .finally(() => setGrading(false))
   }, [forceSubmitTrigger])
+
+  // Reset per-question timer when question changes
+  useEffect(() => {
+    if (!started) return
+    setQuestionTimeLeft(QUESTION_TIME)
+    timerFiredRef.current = false
+  }, [current, started])
+
+  // Countdown
+  useEffect(() => {
+    if (!started || !questions) return
+    if (questionTimeLeft <= 0) return
+    const id = setTimeout(() => setQuestionTimeLeft(t => Math.max(0, t - 1)), 1000)
+    return () => clearTimeout(id)
+  }, [questionTimeLeft, started, questions])
+
+  // Auto-advance when per-question timer hits 0
+  useEffect(() => {
+    if (questionTimeLeft > 0) return
+    if (!started || !questions) return
+    if (timerFiredRef.current) return
+    timerFiredRef.current = true
+    const isLast = current === questions.length - 1
+    if (isLast) {
+      submitExam()
+    } else {
+      setCurrent(c => c + 1)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionTimeLeft])
 
   async function startExam() {
     setLoading(true)
@@ -283,35 +318,42 @@ export default function ExamPhase1({ onComplete, forceSubmitTrigger }: Props) {
         )}
       </div>
 
-      {/* Navigation */}
+      {/* Per-question timer + navigation */}
       <div className="flex items-center justify-between mt-3">
-        <button
-          onClick={() => setCurrent(c => Math.max(0, c - 1))}
-          disabled={current === 0}
-          style={{
-            color: 'rgba(255,255,255,0.4)', background: 'transparent', border: 'none',
-            cursor: current === 0 ? 'default' : 'pointer', fontSize: 13,
-            opacity: current === 0 ? 0.3 : 1,
-          }}
-        >
-          ← السابق
-        </button>
+        {/* Question timer */}
+        <div style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontSize: 13,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          color: questionTimeLeft <= 10 ? '#ff4444' : 'rgba(215,255,0,0.8)',
+          background: questionTimeLeft <= 10 ? 'rgba(255,68,68,0.08)' : 'rgba(215,255,0,0.05)',
+          border: `1px solid ${questionTimeLeft <= 10 ? 'rgba(255,68,68,0.3)' : 'rgba(215,255,0,0.15)'}`,
+          padding: '3px 10px',
+          borderRadius: 6,
+          transition: 'color 0.3s, background 0.3s, border-color 0.3s',
+          animation: questionTimeLeft <= 10 ? 'timerPulse 0.8s ease-in-out infinite' : 'none',
+        }}>
+          {String(Math.floor(questionTimeLeft / 60)).padStart(2, '0')}:{String(questionTimeLeft % 60).padStart(2, '0')}
+        </div>
 
-        {error && <span style={{ color: '#f87171', fontSize: 12 }}>{error}</span>}
+        <div className="flex items-center gap-3">
+          {error && <span style={{ color: '#f87171', fontSize: 12 }}>{error}</span>}
 
-        <button
-          onClick={handleNext}
-          disabled={!currentAnswer || grading}
-          style={{
-            background: !currentAnswer || grading ? 'rgba(215,255,0,0.3)' : '#D7FF00',
-            color: '#000', fontWeight: 700, borderRadius: 10,
-            padding: '10px 28px', fontSize: 14, border: 'none',
-            cursor: !currentAnswer || grading ? 'not-allowed' : 'pointer',
-            transition: 'background 0.15s',
-          }}
-        >
-          {grading ? 'جاري التصحيح…' : isLast ? 'تسليم المرحلة الأولى ✓' : 'التالي →'}
-        </button>
+          <button
+            onClick={handleNext}
+            disabled={!currentAnswer || grading}
+            style={{
+              background: !currentAnswer || grading ? 'rgba(215,255,0,0.3)' : '#D7FF00',
+              color: '#000', fontWeight: 700, borderRadius: 10,
+              padding: '10px 28px', fontSize: 14, border: 'none',
+              cursor: !currentAnswer || grading ? 'not-allowed' : 'pointer',
+              transition: 'background 0.15s',
+            }}
+          >
+            {grading ? 'جاري التصحيح…' : isLast ? 'تسليم المرحلة الأولى ✓' : 'التالي →'}
+          </button>
+        </div>
       </div>
     </div>
   )

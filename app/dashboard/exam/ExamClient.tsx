@@ -245,6 +245,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
     skipPhase2Ref.current = false
     hasSubmittedRef.current = false
     setTimerKey(k => k + 1)
+    setGate('intro')
   }
 
   const phaseOrder: ExamPhase[] = ['phase1', 'phase2', 'phase3', 'results']
