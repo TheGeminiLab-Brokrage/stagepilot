@@ -84,13 +84,14 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
           <select
             value={role}
             onChange={e => { setRole(e.target.value); setTeamName('') }}
-            className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)] cursor-pointer"
+            className="w-full border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)] cursor-pointer"
+            style={{ background: '#0f0f0f' }}
           >
-            <option value="agent">{t('roleAgent')}</option>
-            <option value="team_leader">{t('roleTeamLeader')}</option>
-            <option value="trainee">{t('roleTrainee')}</option>
-            <option value="exam">{t('adminRoleExam')}</option>
-            <option value="super_admin">{t('roleSuperAdmin')}</option>
+            <option value="agent" style={{ background: '#0f0f0f', color: '#fff' }}>{t('roleAgent')}</option>
+            <option value="team_leader" style={{ background: '#0f0f0f', color: '#fff' }}>{t('roleTeamLeader')}</option>
+            <option value="trainee" style={{ background: '#0f0f0f', color: '#fff' }}>{t('roleTrainee')}</option>
+            <option value="exam" style={{ background: '#0f0f0f', color: '#fff' }}>{t('adminRoleExam')}</option>
+            <option value="super_admin" style={{ background: '#0f0f0f', color: '#fff' }}>{t('roleSuperAdmin')}</option>
           </select>
         </div>
         {role === 'agent' && (
@@ -99,11 +100,12 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
             <select
               value={teamName}
               onChange={e => setTeamName(e.target.value)}
-              className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)]"
+              className="w-full border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)]"
+              style={{ background: '#0f0f0f' }}
             >
-              <option value="">{t('adminNoTeam')}</option>
+              <option value="" style={{ background: '#0f0f0f', color: '#fff' }}>{t('adminNoTeam')}</option>
               {teamLeaders.map(name => (
-                <option key={name} value={name}>{name}</option>
+                <option key={name} value={name} style={{ background: '#0f0f0f', color: '#fff' }}>{name}</option>
               ))}
             </select>
           </div>

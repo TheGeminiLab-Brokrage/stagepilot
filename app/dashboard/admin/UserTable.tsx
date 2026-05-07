@@ -172,11 +172,12 @@ export default function UserTable({
                       defaultValue={p.team_name ?? ''}
                       onChange={e => saveTeam(p.id, e.target.value)}
                       onBlur={() => setEditingTeam(null)}
-                      className="bg-gray-800 border border-gray-600 text-white rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="border border-gray-600 text-white rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      style={{ background: '#0f0f0f' }}
                     >
-                      <option value="">{t('adminUnassigned')}</option>
+                      <option value="" style={{ background: '#0f0f0f', color: '#fff' }}>{t('adminUnassigned')}</option>
                       {teamLeaders.map(name => (
-                        <option key={name} value={name}>{name}</option>
+                        <option key={name} value={name} style={{ background: '#0f0f0f', color: '#fff' }}>{name}</option>
                       ))}
                     </select>
                   ) : (
