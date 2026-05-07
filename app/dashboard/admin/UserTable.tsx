@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useT } from '@/lib/language-context'
 
 type Profile = {
   id: string
@@ -33,6 +34,7 @@ export default function UserTable({
   emailMap: Record<string, string>
   currentUserId: string
 }) {
+  const t = useT()
   const [profiles, setProfiles] = useState<Profile[]>(initialProfiles)
   const [editingTeam, setEditingTeam] = useState<string | null>(null)
   const [saving, setSaving] = useState<string | null>(null)
@@ -100,7 +102,7 @@ export default function UserTable({
     if (!settingPassword) return
     setPasswordError(null)
     if (newPassword.length < 8) {
-      setPasswordError('Password must be at least 8 characters')
+      setPasswordError(t('adminPasswordMinErr'))
       return
     }
     setPasswordSaving(true)
@@ -128,29 +130,32 @@ export default function UserTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-            <th className="text-left px-4 py-3">Name</th>
-            <th className="text-left px-4 py-3">Email</th>
-            <th className="text-left px-4 py-3">
+            <th className="px-4 py-3">{t('adminColName')}</th>
+            <th className="px-4 py-3">{t('adminColEmail')}</th>
+            <th className="px-4 py-3">
               <button
                 onClick={cycleRoleSort}
                 className="flex items-center gap-1 hover:text-white transition-colors"
               >
-                Role
+                {t('adminColRole')}
                 {roleSort === 'asc' && <span>↑</span>}
                 {roleSort === 'desc' && <span>↓</span>}
               </button>
             </th>
-            <th className="text-left px-4 py-3">Team</th>
-            <th className="text-left px-4 py-3">Joined</th>
+            <th className="px-4 py-3">{t('adminColTeam')}</th>
+            <th className="px-4 py-3">{t('adminColJoined')}</th>
             <th className="px-4 py-3" />
           </tr>
         </thead>
         <tbody>
           {sortedProfiles.map(p => (
-            <tr key={p.id} className="border-b border-gray-800/50">
+            <tr key={p.id} className="border-b border-gray-800/50" style={{ transition: 'background 0.1s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(215,255,0,0.04)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
               <td className="px-4 py-3 text-white">
                 {p.full_name}
-                {p.id === currentUserId && <span className="ml-2 text-xs text-gray-600">(you)</span>}
+                {p.id === currentUserId && <span className="ms-2 text-xs text-gray-600">{t('adminYouLabel')}</span>}
               </td>
               <td className="px-4 py-3 text-gray-400 text-xs">{emailMap[p.id] ?? '—'}</td>
               <td className="px-4 py-3 text-center">
@@ -169,7 +174,7 @@ export default function UserTable({
                       onBlur={() => setEditingTeam(null)}
                       className="bg-gray-800 border border-gray-600 text-white rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="">— unassigned —</option>
+                      <option value="">{t('adminUnassigned')}</option>
                       {teamLeaders.map(name => (
                         <option key={name} value={name}>{name}</option>
                       ))}
@@ -190,20 +195,20 @@ export default function UserTable({
               <td className="px-4 py-3 text-gray-500 text-xs">
                 {new Date(p.created_at).toLocaleDateString('en-GB')}
               </td>
-              <td className="px-4 py-3 text-right">
+              <td className="px-4 py-3">
                 <div className="flex items-center justify-end gap-3">
                   <button
                     onClick={() => { setNewPassword(''); setPasswordError(null); setPasswordDone(false); setSettingPassword({ id: p.id, name: p.full_name }) }}
                     className="text-xs text-gray-600 hover:text-blue-400 transition-colors cursor-pointer"
                   >
-                    Set password
+                    {t('adminSetPasswordBtn')}
                   </button>
                   {p.id !== currentUserId && (
                     <button
                       onClick={() => { setRemoveError(null); setRemovingUser({ id: p.id, name: p.full_name }) }}
                       className="text-xs text-gray-600 hover:text-red-400 transition-colors cursor-pointer"
                     >
-                      Remove
+                      {t('adminRemoveBtn')}
                     </button>
                   )}
                 </div>
@@ -216,10 +221,10 @@ export default function UserTable({
       {settingPassword && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-80 shadow-xl">
-            <h3 className="text-white font-semibold text-base mb-1">Set new password</h3>
+            <h3 className="text-white font-semibold text-base mb-1">{t('adminSetNewPasswordTitle')}</h3>
             <p className="text-gray-400 text-sm mb-4">{settingPassword.name}</p>
             {passwordDone ? (
-              <p className="text-green-400 text-sm text-center py-2">Password updated.</p>
+              <p className="text-green-400 text-sm text-center py-2">{t('adminPasswordUpdated')}</p>
             ) : (
               <>
                 <input
@@ -228,7 +233,7 @@ export default function UserTable({
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') savePassword() }}
-                  placeholder="Min. 8 characters"
+                  placeholder={t('adminPlaceholderPassword')}
                   className="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {passwordError && (
@@ -239,14 +244,14 @@ export default function UserTable({
                     onClick={() => setSettingPassword(null)}
                     className="px-4 py-1.5 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-colors"
                   >
-                    Cancel
+                    {t('adminCancel')}
                   </button>
                   <button
                     onClick={savePassword}
                     disabled={passwordSaving}
                     className="px-4 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg transition-colors"
                   >
-                    {passwordSaving ? 'Saving…' : 'Save'}
+                    {passwordSaving ? t('adminSaving') : t('adminSave')}
                   </button>
                 </div>
               </>
@@ -258,9 +263,9 @@ export default function UserTable({
       {removingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-80 shadow-xl">
-            <h3 className="text-white font-semibold text-base mb-1">Remove user?</h3>
+            <h3 className="text-white font-semibold text-base mb-1">{t('adminRemoveUserTitle')}</h3>
             <p className="text-gray-400 text-sm mb-4">{removingUser.name}</p>
-            <p className="text-gray-500 text-xs mb-5">This cannot be undone.</p>
+            <p className="text-gray-500 text-xs mb-5">{t('adminCannotUndo')}</p>
             {removeError && (
               <p className="text-red-400 text-xs mb-4">{removeError}</p>
             )}
@@ -269,13 +274,13 @@ export default function UserTable({
                 onClick={() => setRemovingUser(null)}
                 className="px-4 py-1.5 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-colors"
               >
-                Cancel
+                {t('adminCancel')}
               </button>
               <button
                 onClick={confirmRemoveUser}
                 className="px-4 py-1.5 text-sm text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors"
               >
-                Remove
+                {t('adminRemoveBtn')}
               </button>
             </div>
           </div>

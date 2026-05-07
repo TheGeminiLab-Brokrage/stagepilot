@@ -6,6 +6,7 @@ import UserTable from './UserTable'
 import PracticeSessionsTable from './PracticeSessionsTable'
 import ExamResultsTable from './ExamResultsTable'
 import ExamRecordingsTable from './ExamRecordingsTable'
+import AdminSectionTitle from './AdminSectionTitle'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -76,10 +77,11 @@ export default async function AdminPage() {
   return (
     <div className="max-w-4xl pb-8">
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-white">User Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{profiles?.length ?? 0} users in your company</p>
-        </div>
+        <AdminSectionTitle
+          titleKey="adminHeading"
+          count={profiles?.length ?? 0}
+          subtitleKey="adminUsersInCompany"
+        />
       </div>
 
       {/* User list */}
@@ -95,7 +97,11 @@ export default async function AdminPage() {
 
       {/* Create user form */}
       <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', padding: '20px 24px', marginBottom: '2rem' }}>
-        <h2 className="text-white font-medium mb-4">Add New User</h2>
+        <AdminSectionTitle
+          titleKey="adminAddNewUser"
+          headingLevel="h2"
+          headingClass="text-white font-medium mb-4"
+        />
         <CreateUserForm
           teamLeaders={(profiles ?? [])
             .filter(p => p.role === 'team_leader')
@@ -106,10 +112,11 @@ export default async function AdminPage() {
       {/* Exam Results */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-semibold text-white">Exam Results</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{examResults.length} exams completed</p>
-          </div>
+          <AdminSectionTitle
+            titleKey="adminExamResultsTitle"
+            count={examResults.length}
+            subtitleKey="adminExamsCompleted"
+          />
         </div>
         <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', overflow: 'hidden' }}>
           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
@@ -121,10 +128,12 @@ export default async function AdminPage() {
       {/* AI Test Exam Recordings */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-semibold text-white">AI Test Exam Recordings</h1>
-            <p className="text-sm mt-0.5" style={{ color: 'rgba(215,255,0,0.5)' }}>{examRecordings.length} recordings</p>
-          </div>
+          <AdminSectionTitle
+            titleKey="adminExamRecordingsTitle"
+            count={examRecordings.length}
+            subtitleKey="adminRecordingsCount"
+            subtitleColor="rgba(215,255,0,0.5)"
+          />
         </div>
         <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', overflow: 'hidden' }}>
           <div style={{ maxHeight: 360, overflowY: 'auto' }}>
@@ -136,10 +145,11 @@ export default async function AdminPage() {
       {/* Practice Sessions */}
       <div>
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-semibold text-white">Practice Sessions</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{practiceSessions?.length ?? 0} sessions recorded</p>
-          </div>
+          <AdminSectionTitle
+            titleKey="adminPracticeSessionsTitle"
+            count={practiceSessions?.length ?? 0}
+            subtitleKey="adminSessionsRecorded"
+          />
         </div>
 
         <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', overflow: 'hidden' }}>

@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useT } from '@/lib/language-context'
 
 export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] }) {
+  const t = useT()
   const router = useRouter()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -44,7 +46,7 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Full name</label>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">{t('adminLabelFullName')}</label>
           <input
             type="text"
             required
@@ -55,7 +57,7 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Email</label>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">{t('adminColEmail')}</label>
           <input
             type="email"
             required
@@ -66,40 +68,40 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Password</label>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">{t('adminLabelPassword')}</label>
           <input
             type="password"
             required
             minLength={8}
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="Min. 8 characters"
+            placeholder={t('adminPlaceholderPassword')}
             className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)]"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Role</label>
+          <label className="block text-xs font-medium text-gray-400 mb-1.5">{t('adminLabelRole')}</label>
           <select
             value={role}
             onChange={e => { setRole(e.target.value); setTeamName('') }}
             className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)] cursor-pointer"
           >
-            <option value="agent">Agent</option>
-            <option value="team_leader">Team Leader</option>
-            <option value="trainee">Trainee</option>
-            <option value="exam">Exam</option>
-            <option value="super_admin">Super Admin</option>
+            <option value="agent">{t('roleAgent')}</option>
+            <option value="team_leader">{t('roleTeamLeader')}</option>
+            <option value="trainee">{t('roleTrainee')}</option>
+            <option value="exam">{t('adminRoleExam')}</option>
+            <option value="super_admin">{t('roleSuperAdmin')}</option>
           </select>
         </div>
         {role === 'agent' && (
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">Team</label>
+            <label className="block text-xs font-medium text-gray-400 mb-1.5">{t('adminColTeam')}</label>
             <select
               value={teamName}
               onChange={e => setTeamName(e.target.value)}
               className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)]"
             >
-              <option value="">No team</option>
+              <option value="">{t('adminNoTeam')}</option>
               {teamLeaders.map(name => (
                 <option key={name} value={name}>{name}</option>
               ))}
@@ -115,7 +117,7 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
       )}
       {status === 'done' && (
         <div className="bg-green-500/10 border border-green-500/20 text-green-400 text-sm rounded-lg px-4 py-3">
-          User created successfully. They can log in now.
+          {t('adminUserCreatedMsg')}
         </div>
       )}
 
@@ -137,7 +139,7 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
         onMouseEnter={e => { if (status !== 'loading') (e.currentTarget as HTMLButtonElement).style.background = '#c8f000' }}
         onMouseLeave={e => { if (status !== 'loading') (e.currentTarget as HTMLButtonElement).style.background = '#D7FF00' }}
       >
-        {status === 'loading' ? 'Creating…' : 'Create User'}
+        {status === 'loading' ? t('adminCreatingBtn') : t('adminCreateUserBtn')}
       </button>
     </form>
   )

@@ -224,9 +224,48 @@ const en = {
   adminColTrainee: 'Trainee',
   adminColScenario: 'Scenario',
   adminColAdmin: 'Admin',
+  adminColEmail: 'Email',
+  adminColTeam: 'Team',
+  adminColRole: 'Role',
+  adminColJoined: 'Joined',
   adminViewDetails: 'Details',
   adminReport: 'Report',
   adminDownloaded: 'Downloaded',
+
+  // ── Admin page sections ────────────────────────────────────────────────
+  adminUsersInCompany: 'users in your company',
+  adminAddNewUser: 'Add New User',
+  adminExamResultsTitle: 'Exam Results',
+  adminExamsCompleted: 'exams completed',
+  adminExamRecordingsTitle: 'AI Test Exam Recordings',
+  adminRecordingsCount: 'recordings',
+  adminPracticeSessionsTitle: 'Practice Sessions',
+  adminSessionsRecorded: 'sessions recorded',
+
+  // ── UserTable actions & modals ─────────────────────────────────────────
+  adminSetPasswordBtn: 'Set password',
+  adminRemoveBtn: 'Remove',
+  adminSetNewPasswordTitle: 'Set new password',
+  adminRemoveUserTitle: 'Remove user?',
+  adminCannotUndo: 'This cannot be undone.',
+  adminCancel: 'Cancel',
+  adminSave: 'Save',
+  adminSaving: 'Saving…',
+  adminPasswordUpdated: 'Password updated.',
+  adminPasswordMinErr: 'Password must be at least 8 characters',
+  adminUnassigned: '— unassigned —',
+  adminYouLabel: '(you)',
+
+  // ── CreateUserForm ─────────────────────────────────────────────────────
+  adminLabelFullName: 'Full name',
+  adminLabelPassword: 'Password',
+  adminLabelRole: 'Role',
+  adminPlaceholderPassword: 'Min. 8 characters',
+  adminNoTeam: 'No team',
+  adminCreateUserBtn: 'Create User',
+  adminCreatingBtn: 'Creating…',
+  adminUserCreatedMsg: 'User created successfully. They can log in now.',
+  adminRoleExam: 'Exam',
 }
 
 const ar: typeof en = {
@@ -455,9 +494,48 @@ const ar: typeof en = {
   adminColTrainee: 'المتدرب',
   adminColScenario: 'السيناريو',
   adminColAdmin: 'المسؤول',
+  adminColEmail: 'البريد الإلكتروني',
+  adminColTeam: 'الفريق',
+  adminColRole: 'الدور',
+  adminColJoined: 'تاريخ الانضمام',
   adminViewDetails: 'عرض التفاصيل',
   adminReport: 'تقرير',
   adminDownloaded: 'تم التحميل',
+
+  // ── Admin page sections ────────────────────────────────────────────────
+  adminUsersInCompany: 'مستخدم في شركتك',
+  adminAddNewUser: 'إضافة مستخدم جديد',
+  adminExamResultsTitle: 'نتائج الاختبار',
+  adminExamsCompleted: 'اختبار مكتمل',
+  adminExamRecordingsTitle: 'تسجيلات اختبار الذكاء الاصطناعي',
+  adminRecordingsCount: 'تسجيل',
+  adminPracticeSessionsTitle: 'جلسات التدريب',
+  adminSessionsRecorded: 'جلسة مسجلة',
+
+  // ── UserTable actions & modals ─────────────────────────────────────────
+  adminSetPasswordBtn: 'تعيين كلمة المرور',
+  adminRemoveBtn: 'إزالة',
+  adminSetNewPasswordTitle: 'تعيين كلمة مرور جديدة',
+  adminRemoveUserTitle: 'إزالة المستخدم؟',
+  adminCannotUndo: 'لا يمكن التراجع عن هذا.',
+  adminCancel: 'إلغاء',
+  adminSave: 'حفظ',
+  adminSaving: 'جاري الحفظ…',
+  adminPasswordUpdated: 'تم تحديث كلمة المرور.',
+  adminPasswordMinErr: 'يجب أن تكون كلمة المرور 8 أحرف على الأقل',
+  adminUnassigned: '— غير مخصص —',
+  adminYouLabel: '(أنت)',
+
+  // ── CreateUserForm ─────────────────────────────────────────────────────
+  adminLabelFullName: 'الاسم الكامل',
+  adminLabelPassword: 'كلمة المرور',
+  adminLabelRole: 'الدور',
+  adminPlaceholderPassword: '8 أحرف على الأقل',
+  adminNoTeam: 'بدون فريق',
+  adminCreateUserBtn: 'إنشاء مستخدم',
+  adminCreatingBtn: 'جاري الإنشاء…',
+  adminUserCreatedMsg: 'تم إنشاء المستخدم بنجاح. يمكنه تسجيل الدخول الآن.',
+  adminRoleExam: 'اختبار',
 }
 
 export const translations = { en, ar }

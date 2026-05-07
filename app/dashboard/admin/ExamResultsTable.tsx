@@ -332,7 +332,7 @@ export default function ExamResultsTable({ results }: { results: ExamResult[] })
                         border: `1px solid ${passed ? 'rgba(16,185,129,0.3)' : 'rgba(248,113,113,0.3)'}`,
                       }}
                     >
-                      {passed ? 'Pass' : 'Fail'}
+                      {passed ? t('userExamPassed') : t('userExamFailed')}
                     </span>
                   </td>
                   <td className="px-5 py-3" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
