@@ -113,6 +113,24 @@ const en = {
   examPhase3: '3 — Simulation',
   examResults: 'Results',
 
+  // ── Exam gate / intro screens ──────────────────────────────────────────────
+  examTagline: 'Certification Exam',
+  examReadyQuestion: 'are you ready?',
+  examIntroBody: 'The exam consists of 3 phases: multiple choice questions, scenarios, and a live call simulation.',
+  examIntroPhase1Label: 'Phase 1',
+  examIntroPhase2Label: 'Phase 2',
+  examIntroPhase3Label: 'Phase 3',
+  examIntroPhase1Desc: 'Questions',
+  examIntroPhase2Desc: 'Scenarios',
+  examIntroPhase3Desc: 'Simulation',
+  examIntroWarning: 'Warning: You have only one attempt per day',
+  examStartBtn: 'Start Exam',
+  examLoading: 'Loading…',
+  examBlockedTitle: 'You have used your daily exam attempt',
+  examBlockedBody: 'Only one attempt is allowed per day. Come back tomorrow to try again.',
+  examBlockedLogout: 'Sign Out',
+  examStartError: 'An error occurred. Please try again.',
+
   // ── Stage names ───────────────────────────────────────────────────────────
   stageDoneDeal: 'done deal',
   stagePotentialToClose: 'potential to close',
@@ -237,6 +255,24 @@ const ar: typeof en = {
   examPhase2: '٢ — السيناريوهات',
   examPhase3: '٣ — المحاكاة',
   examResults: 'النتيجة',
+
+  // ── Exam gate / intro screens ──────────────────────────────────────────────
+  examTagline: 'الاختبار التقييمي',
+  examReadyQuestion: 'أنت جاهز؟',
+  examIntroBody: 'الاختبار يتكوّن من ٣ مراحل: أسئلة متعددة الخيارات، سيناريوهات، ومحاكاة مكالمة حيّة.',
+  examIntroPhase1Label: 'المرحلة ١',
+  examIntroPhase2Label: 'المرحلة ٢',
+  examIntroPhase3Label: 'المرحلة ٣',
+  examIntroPhase1Desc: 'أسئلة',
+  examIntroPhase2Desc: 'سيناريوهات',
+  examIntroPhase3Desc: 'محاكاة',
+  examIntroWarning: 'تنبيه: لديك محاولة واحدة فقط في اليوم',
+  examStartBtn: 'ابدأ الاختبار',
+  examLoading: 'جاري التحميل…',
+  examBlockedTitle: 'لقد استخدمت محاولة الاختبار اليومية',
+  examBlockedBody: 'يُسمح بمحاولة واحدة فقط في اليوم. عد غداً للمحاولة مجدداً.',
+  examBlockedLogout: 'تسجيل الخروج',
+  examStartError: 'حدث خطأ. حاول مرة أخرى.',
 
   // ── Stage names ───────────────────────────────────────────────────────────
   stageDoneDeal: 'صفقة منجزة',

@@ -138,7 +138,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
         setGate('blocked')
       }
     } catch {
-      setStartError('حدث خطأ. حاول مرة أخرى.')
+      setStartError(t('examStartError'))
     }
   }
 
@@ -258,7 +258,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         height: '100%', fontFamily: "'Montserrat', sans-serif",
       }}>
-        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>جاري التحميل…</div>
+        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>{t('examLoading')}</div>
       </div>
     )
   }
@@ -281,10 +281,10 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
         </div>
         <div>
           <p style={{ color: '#fff', fontSize: 16, fontWeight: 700, marginBottom: 10 }}>
-            لقد استخدمت محاولة الاختبار اليومية
+            {t('examBlockedTitle')}
           </p>
           <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 1.7, maxWidth: 340 }}>
-            يُسمح بمحاولة واحدة فقط في اليوم. عد غداً للمحاولة مجدداً.
+            {t('examBlockedBody')}
           </p>
         </div>
         <a
@@ -294,13 +294,18 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
             cursor: 'pointer', marginTop: 8,
           }}
         >
-          تسجيل الخروج
+          {t('examBlockedLogout')}
         </a>
       </div>
     )
   }
 
   if (gate === 'intro') {
+    const phases = [
+      { label: t('examIntroPhase3Label'), desc: t('examIntroPhase3Desc') },
+      { label: t('examIntroPhase2Label'), desc: t('examIntroPhase2Desc') },
+      { label: t('examIntroPhase1Label'), desc: t('examIntroPhase1Desc') },
+    ]
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -312,13 +317,13 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
             fontSize: 16, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase',
             color: '#D7FF00', marginBottom: 18, fontFamily: "'Space Grotesk', sans-serif",
           }}>
-            الاختبار التقييمي
+            {t('examTagline')}
           </p>
-          <h1 style={{ color: '#fff', fontSize: 40, fontWeight: 800, marginBottom: 16, lineHeight: 1.2 }}>
-            {userName}، أنت جاهز؟
+          <h1 dir="ltr" style={{ color: '#fff', fontSize: 40, fontWeight: 800, marginBottom: 16, lineHeight: 1.2 }}>
+            {userName}، {t('examReadyQuestion')}
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 17, lineHeight: 1.75, maxWidth: 480 }}>
-            الاختبار يتكوّن من ٣ مراحل: أسئلة متعددة الخيارات، سيناريوهات، ومحاكاة مكالمة حيّة.
+            {t('examIntroBody')}
           </p>
         </div>
 
@@ -328,11 +333,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
           borderRadius: 14, padding: '20px 40px',
           display: 'flex', gap: 48,
         }}>
-          {[
-            { label: 'المرحلة ٣', desc: 'محاكاة' },
-            { label: 'المرحلة ٢', desc: 'سيناريوهات' },
-            { label: 'المرحلة ١', desc: 'أسئلة' },
-          ].map((item) => (
+          {phases.map((item) => (
             <div key={item.label} style={{ textAlign: 'center' }}>
               <p style={{ color: '#D7FF00', fontSize: 14, fontWeight: 700, marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
                 {item.label}
@@ -344,7 +345,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
 
         {userEmail !== 'exam@test.com' && (
           <p style={{ color: 'rgba(255,100,100,0.7)', fontSize: 13, letterSpacing: '0.03em' }}>
-            تنبيه: لديك محاولة واحدة فقط في اليوم
+            {t('examIntroWarning')}
           </p>
         )}
 
@@ -361,7 +362,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
             fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.06em',
           }}
         >
-          ابدأ الاختبار
+          {t('examStartBtn')}
         </button>
       </div>
     )
@@ -413,7 +414,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
         })}
         {phase === 'results' && (
           <div style={{ marginRight: 8, padding: '5px 14px', borderRadius: 20, background: 'rgba(215,255,0,0.12)', border: '1px solid rgba(215,255,0,0.4)' }}>
-            <span style={{ fontSize: 12, color: '#D7FF00', fontWeight: 600 }}>النتيجة</span>
+            <span style={{ fontSize: 12, color: '#D7FF00', fontWeight: 600 }}>{t('examResults')}</span>
           </div>
         )}
       </div>
