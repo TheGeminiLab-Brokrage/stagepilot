@@ -218,6 +218,14 @@ const AVATAR: Record<string, string> = {
   mona_hassan: '/avatars/mona.jpg',
 }
 
+const AVATAR_POSITION: Record<string, string> = {
+  dr_yasmine: '48% center',
+  dr_mariam: '18% center',
+  mohammed_tgl: '44% center',
+  mohammed_madinet_masr: '50% center',
+  mona_hassan: '47% center',
+}
+
 export default function PracticeClient({ userId, companyId, userName, role, userEmail }: PracticeClientProps) {
   const t = useT()
   const { lang } = useLanguage()
@@ -993,15 +1001,22 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                         >
                           {/* Circular photo */}
                           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-                            <img
-                              src={AVATAR[s.id] ?? ''}
-                              alt={displayName}
-                              style={{
-                                width: 64, height: 64, borderRadius: '50%', objectFit: 'cover',
-                                border: '2px solid rgba(215,255,0,0.4)',
-                                boxShadow: '0 0 16px rgba(215,255,0,0.12), 0 4px 14px rgba(0,0,0,0.5)',
-                              }}
-                            />
+                            <div style={{
+                              width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                              border: '2px solid rgba(215,255,0,0.4)',
+                              boxShadow: '0 0 16px rgba(215,255,0,0.12), 0 4px 14px rgba(0,0,0,0.5)',
+                            }}>
+                              <img
+                                src={AVATAR[s.id] ?? ''}
+                                alt={displayName}
+                                style={{
+                                  width: '100%', height: '100%',
+                                  objectFit: 'cover',
+                                  objectPosition: AVATAR_POSITION[s.id] ?? 'center',
+                                  display: 'block',
+                                }}
+                              />
+                            </div>
                           </div>
 
                           {/* Name + AI badge */}
