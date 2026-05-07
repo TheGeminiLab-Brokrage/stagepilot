@@ -41,15 +41,8 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
   const [startError, setStartError] = useState('')
 
   const [phase, setPhase] = useState<ExamPhase>('phase1')
+  const [questionTimeDisplay, setQuestionTimeDisplay] = useState(60)
 
-  const TIMER_DURATION = 1800 // 30 minutes
-  const [timeLeft, setTimeLeft] = useState(TIMER_DURATION)
-  const [timerExpired, setTimerExpired] = useState(false)
-  const [forceSubmitP1, setForceSubmitP1] = useState(false)
-  const [forceSubmitP2, setForceSubmitP2] = useState(false)
-  const [timerKey, setTimerKey] = useState(0)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const skipPhase2Ref = useRef(false)
   const hasSubmittedRef = useRef(false)
 
   const [phase1Answers, setPhase1Answers] = useState<{ id: string; response: string }[]>([])
@@ -82,46 +75,8 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
           setGate('blocked')
         }
       })
-      .catch(() => setGate('intro')) // fail open so auth issues don't lock users out
+      .catch(() => setGate('intro'))
   }, [userEmail])
-
-  // Start countdown when exam goes active; restart when timerKey changes (reset)
-  useEffect(() => {
-    if (gate !== 'active') return
-    intervalRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(intervalRef.current!)
-          intervalRef.current = null
-          setTimerExpired(true)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => {
-      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
-    }
-  }, [gate, timerKey])
-
-  // Stop timer once user reaches phase3 or results
-  useEffect(() => {
-    if (phase === 'phase3' || phase === 'results') {
-      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
-    }
-  }, [phase])
-
-  // On expiry: trigger force-submit for whichever phase is active
-  useEffect(() => {
-    if (!timerExpired) return
-    if (phase === 'phase1') {
-      skipPhase2Ref.current = true
-      setForceSubmitP1(true)
-    } else if (phase === 'phase2') {
-      setForceSubmitP2(true)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timerExpired]) // intentionally omits `phase` — reads phase value at expiry moment
 
   async function handleStartExam() {
     setStartError('')
@@ -154,16 +109,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
     setPhase1Score(totalScore)
     setPhase1Max(maxScore)
     setPhase1Questions(questions)
-    if (skipPhase2Ref.current) {
-      // Timer expired during Phase 1 — skip Phase 2 with zeros and jump to Phase 3
-      setPhase2Score(0)
-      setPhase2Max(0)
-      setPhase2Results([])
-      setPhase2Questions([])
-      setPhase('phase3')
-    } else {
-      setPhase('phase2')
-    }
+    setPhase('phase2')
   }
 
   function handlePhase2Complete(
@@ -190,7 +136,6 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
     hasSubmittedRef.current = true
     setPhase3Completed(true)
 
-    // Save to DB
     try {
       await fetch('/api/exam/save-result', {
         method: 'POST',
@@ -209,7 +154,6 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
       // Non-blocking — results screen still shows
     }
 
-    // Fire grading after result is saved (fire and forget)
     if (phase3AudioPathRef.current) {
       fetch('/api/exam/trigger-grading', {
         method: 'POST',
@@ -238,13 +182,8 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
     setPhase2Max(0)
     setPhase2Questions([])
     setPhase3Completed(false)
-    setForceSubmitP1(false)
-    setForceSubmitP2(false)
-    setTimerExpired(false)
-    setTimeLeft(TIMER_DURATION)
-    skipPhase2Ref.current = false
     hasSubmittedRef.current = false
-    setTimerKey(k => k + 1)
+    setQuestionTimeDisplay(60)
     setGate('intro')
   }
 
@@ -420,7 +359,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
         )}
       </div>
 
-      {/* Countdown timer — visible only during phase1 and phase2 */}
+      {/* Per-question countdown — visible only during phase1 and phase2 */}
       {(phase === 'phase1' || phase === 'phase2') && (
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <div style={{
@@ -428,15 +367,15 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
             fontSize: 18,
             fontWeight: 800,
             letterSpacing: '0.12em',
-            color: timeLeft <= 10 ? '#ff4444' : '#D7FF00',
-            background: timeLeft <= 10 ? 'rgba(255,68,68,0.08)' : 'rgba(215,255,0,0.06)',
-            border: `1px solid ${timeLeft <= 10 ? 'rgba(255,68,68,0.3)' : 'rgba(215,255,0,0.2)'}`,
+            color: questionTimeDisplay <= 10 ? '#ff4444' : '#D7FF00',
+            background: questionTimeDisplay <= 10 ? 'rgba(255,68,68,0.08)' : 'rgba(215,255,0,0.06)',
+            border: `1px solid ${questionTimeDisplay <= 10 ? 'rgba(255,68,68,0.3)' : 'rgba(215,255,0,0.2)'}`,
             padding: '4px 16px',
             borderRadius: 8,
             transition: 'color 0.3s, background 0.3s, border-color 0.3s',
-            animation: timeLeft <= 10 ? 'timerPulse 0.8s ease-in-out infinite' : 'none',
+            animation: questionTimeDisplay <= 10 ? 'timerPulse 0.8s ease-in-out infinite' : 'none',
           }}>
-            {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
+            {String(Math.floor(questionTimeDisplay / 60)).padStart(2, '0')}:{String(questionTimeDisplay % 60).padStart(2, '0')}
           </div>
         </div>
       )}
@@ -444,10 +383,10 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
       {/* Phase content */}
       <div>
         {phase === 'phase1' && (
-          <ExamPhase1 onComplete={handlePhase1Complete} forceSubmitTrigger={forceSubmitP1} />
+          <ExamPhase1 onComplete={handlePhase1Complete} onTimerTick={setQuestionTimeDisplay} />
         )}
         {phase === 'phase2' && (
-          <ExamPhase2 onComplete={handlePhase2Complete} forceSubmitTrigger={forceSubmitP2} />
+          <ExamPhase2 onComplete={handlePhase2Complete} onTimerTick={setQuestionTimeDisplay} />
         )}
         {phase === 'phase3' && (
           <ExamPhase3 onComplete={handlePhase3Complete} onRecordingSaved={handlePhase3RecordingSaved} />

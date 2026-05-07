@@ -107,6 +107,10 @@ const en = {
   // ── Admin page ────────────────────────────────────────────────────────────
   adminHeading: 'User Management',
 
+  // ── Exam tab labels ───────────────────────────────────────────────────────
+  examTabExam: 'Exam',
+  examTabResults: 'Exam Results',
+
   // ── Exam phase labels ─────────────────────────────────────────────────────
   examPhase1: '1 — Questions',
   examPhase2: '2 — Scenarios',
@@ -249,6 +253,10 @@ const ar: typeof en = {
 
   // ── Admin page ────────────────────────────────────────────────────────────
   adminHeading: 'إدارة المستخدمين',
+
+  // ── Exam tab labels ───────────────────────────────────────────────────────
+  examTabExam: 'الاختبار',
+  examTabResults: 'نتائج الاختبار',
 
   // ── Exam phase labels ─────────────────────────────────────────────────────
   examPhase1: '١ — الأسئلة',

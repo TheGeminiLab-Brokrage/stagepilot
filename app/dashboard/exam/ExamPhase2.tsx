@@ -25,12 +25,12 @@ interface GradeResult {
 
 interface Props {
   onComplete: (answers: { id: string; response: string }[], results: GradeResult[], totalScore: number, maxScore: number, questions: Question[]) => void
-  forceSubmitTrigger: boolean
+  onTimerTick: (seconds: number) => void
 }
 
 const QUESTION_TIME = 60
 
-export default function ExamPhase2({ onComplete, forceSubmitTrigger }: Props) {
+export default function ExamPhase2({ onComplete, onTimerTick }: Props) {
   const [questions, setQuestions] = useState<Question[] | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [current, setCurrent] = useState(0)
@@ -41,28 +41,13 @@ export default function ExamPhase2({ onComplete, forceSubmitTrigger }: Props) {
 
   const [questionTimeLeft, setQuestionTimeLeft] = useState(QUESTION_TIME)
   const timerFiredRef = useRef(false)
+  const onTimerTickRef = useRef(onTimerTick)
+  onTimerTickRef.current = onTimerTick
 
-  const forceSubmitFiredRef = useRef(false)
+  // Report timer value up to ExamClient for top display
   useEffect(() => {
-    if (!forceSubmitTrigger) return
-    if (forceSubmitFiredRef.current) return
-    forceSubmitFiredRef.current = true
-    if (!questions || questions.length === 0) {
-      onComplete([], [], 0, 0, [])
-      return
-    }
-    const answersArr = questions.map(q => ({ id: q.id, response: answers[q.id] ?? '' }))
-    setSubmitting(true)
-    fetch('/api/exam/grade-phase2', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers: answersArr }),
-    })
-      .then(r => r.json())
-      .then(data => onComplete(answersArr, data.results, data.totalScore, data.maxScore, questions))
-      .catch(() => onComplete(answersArr, [], 0, 0, questions))
-      .finally(() => setSubmitting(false))
-  }, [forceSubmitTrigger])
+    onTimerTickRef.current(questionTimeLeft)
+  }, [questionTimeLeft])
 
   // Reset per-question timer when question changes
   useEffect(() => {
@@ -264,59 +249,40 @@ export default function ExamPhase2({ onComplete, forceSubmitTrigger }: Props) {
           </div>
         </div>
 
-      {/* Per-question timer + navigation */}
-      <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        {/* Question timer */}
-        <div style={{
-          fontFamily: "'Space Grotesk', sans-serif",
-          fontSize: 13,
-          fontWeight: 700,
-          letterSpacing: '0.08em',
-          color: questionTimeLeft <= 10 ? '#ff4444' : 'rgba(215,255,0,0.8)',
-          background: questionTimeLeft <= 10 ? 'rgba(255,68,68,0.08)' : 'rgba(215,255,0,0.05)',
-          border: `1px solid ${questionTimeLeft <= 10 ? 'rgba(255,68,68,0.3)' : 'rgba(215,255,0,0.15)'}`,
-          padding: '3px 10px',
-          borderRadius: 6,
-          transition: 'color 0.3s, background 0.3s, border-color 0.3s',
-          animation: questionTimeLeft <= 10 ? 'timerPulse 0.8s ease-in-out infinite' : 'none',
-        }}>
-          {String(Math.floor(questionTimeLeft / 60)).padStart(2, '0')}:{String(questionTimeLeft % 60).padStart(2, '0')}
-        </div>
+      {/* Navigation */}
+      <div className="flex items-center justify-end mt-4 pt-4 gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        {error && <span style={{ color: '#f87171', fontSize: 12 }}>{error}</span>}
 
-        <div className="flex items-center gap-3">
-          {error && <span style={{ color: '#f87171', fontSize: 12 }}>{error}</span>}
-
-          {/* Next or Submit */}
-          {isLast ? (
-            <button
-              onClick={submitPhase}
-              disabled={!currentAnswered || submitting}
-              style={{
-                background: !currentAnswered || submitting ? 'rgba(215,255,0,0.25)' : '#D7FF00',
-                color: '#000', fontWeight: 700, borderRadius: 10,
-                padding: '11px 32px', fontSize: 14, border: 'none',
-                cursor: !currentAnswered || submitting ? 'not-allowed' : 'pointer',
-                transition: 'background 0.15s',
-              }}
-            >
-              {submitting ? 'جاري التصحيح…' : 'تسليم المرحلة الثانية ✓'}
-            </button>
-          ) : (
-            <button
-              onClick={() => setCurrent(c => c + 1)}
-              disabled={!currentAnswered}
-              style={{
-                background: currentAnswered ? '#D7FF00' : 'rgba(215,255,0,0.25)',
-                color: '#000', fontWeight: 700, borderRadius: 10,
-                padding: '11px 28px', fontSize: 14, border: 'none',
-                cursor: currentAnswered ? 'pointer' : 'not-allowed',
-                transition: 'background 0.15s',
-              }}
-            >
-              التالي ←
-            </button>
-          )}
-        </div>
+        {/* Next or Submit */}
+        {isLast ? (
+          <button
+            onClick={submitPhase}
+            disabled={!currentAnswered || submitting}
+            style={{
+              background: !currentAnswered || submitting ? 'rgba(215,255,0,0.25)' : '#D7FF00',
+              color: '#000', fontWeight: 700, borderRadius: 10,
+              padding: '11px 32px', fontSize: 14, border: 'none',
+              cursor: !currentAnswered || submitting ? 'not-allowed' : 'pointer',
+              transition: 'background 0.15s',
+            }}
+          >
+            {submitting ? 'جاري التصحيح…' : 'تسليم المرحلة الثانية ✓'}
+          </button>
+        ) : (
+          <button
+            onClick={() => setCurrent(c => c + 1)}
+            disabled={!currentAnswered}
+            style={{
+              background: currentAnswered ? '#D7FF00' : 'rgba(215,255,0,0.25)',
+              color: '#000', fontWeight: 700, borderRadius: 10,
+              padding: '11px 28px', fontSize: 14, border: 'none',
+              cursor: currentAnswered ? 'pointer' : 'not-allowed',
+              transition: 'background 0.15s',
+            }}
+          >
+            التالي ←
+          </button>
+        )}
       </div>
     </div>
   )

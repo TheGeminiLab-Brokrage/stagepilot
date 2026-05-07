@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import ExamClient from './ExamClient'
 import UserExamResultsTab, { type ExamResult } from './UserExamResultsTab'
+import { useT } from '@/lib/language-context'
 
 interface Props {
   userId: string
@@ -16,10 +17,11 @@ type Tab = 'exam' | 'results'
 
 export default function ExamPageWrapper({ userId, companyId, userName, userEmail, initialResults }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('exam')
+  const t = useT()
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'exam', label: 'الاختبار' },
-    { key: 'results', label: 'نتائج الاختبار' },
+    { key: 'exam', label: t('examTabExam') },
+    { key: 'results', label: t('examTabResults') },
   ]
 
   return (
