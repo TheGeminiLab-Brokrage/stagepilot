@@ -159,7 +159,7 @@ export default function UserTable({
               </td>
               <td className="px-4 py-3 text-gray-400 text-xs">{emailMap[p.id] ?? '—'}</td>
               <td className="px-4 py-3 text-center">
-                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[p.role] ?? 'bg-gray-700 text-white'}`}>
+                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${ROLE_COLORS[p.role] ?? 'bg-gray-700 text-white'}`}>
                   {p.role.replace('_', ' ')}
                 </span>
               </td>
