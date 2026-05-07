@@ -872,245 +872,228 @@ export default function PracticeClient({ userId, companyId, userName, role, user
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
 
-  // icon helper
-  const ScenarioIcon = ({ iconType, isClient }: { iconType?: string; isClient: boolean }) => {
-    const stroke = isClient ? '#D7FF00' : 'rgba(255,255,255,0.45)'
-    if (iconType === 'tooth') return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2C9.5 2 8 3.5 7 5c-1-.8-2.5-.8-3.5 0C2 6 1.5 8.5 2.5 11c.5 1.5 1.5 5 2 7 .3 1.2 1 3 2.5 3s2-2.5 5-2.5 3.5 2.5 5 2.5 2.2-1.8 2.5-3c.5-2 1.5-5.5 2-7 1-2.5.5-5-1-6.5-1-.8-2.5-.8-3.5 0-1-1.5-2.5-3-5-3z"/>
-      </svg>
-    )
-    if (iconType === 'sparkle') return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
-      </svg>
-    )
-    if (iconType === 'chart') return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-6"/>
-      </svg>
-    )
-    return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/>
-      </svg>
-    )
-  }
-
-  const categories = Array.from(new Set(scenarios.map(s => s.category).filter(Boolean)))
-
   return (
     <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden" style={{ background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
 
-      {/* ── RETRACTABLE SCENARIO PANEL ─────────────────────────────────────── */}
-
-      {/* Backdrop */}
-      {panelOpen && (
+      {/* ── SCENARIO PANEL (centered overlay) ────────────────────────────────── */}
+      <div
+        onClick={() => setPanelOpen(false)}
+        style={{
+          position: 'absolute', inset: 0, zIndex: 20,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+          padding: '20px 16px',
+          background: panelOpen ? 'rgba(0,0,0,0.80)' : 'rgba(0,0,0,0)',
+          backdropFilter: panelOpen ? 'blur(4px)' : 'none',
+          transition: 'background 0.22s ease',
+          pointerEvents: panelOpen ? 'auto' : 'none',
+          overflowY: 'auto',
+        }}
+      >
         <div
-          onClick={() => setPanelOpen(false)}
-          style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(2px)' }}
-        />
-      )}
+          onClick={e => e.stopPropagation()}
+          style={{
+            width: '100%', maxWidth: 880, flexShrink: 0,
+            background: '#060606',
+            border: '1px solid rgba(215,255,0,0.12)',
+            borderRadius: 20,
+            overflow: 'hidden',
+            opacity: panelOpen ? 1 : 0,
+            transform: panelOpen ? 'translateY(0) scale(1)' : 'translateY(-12px) scale(0.97)',
+            transition: 'opacity 0.22s ease, transform 0.22s ease',
+            boxShadow: '0 32px 80px rgba(0,0,0,0.85), 0 0 0 1px rgba(215,255,0,0.04)',
+          }}
+        >
+          {/* Panel header */}
+          <div style={{
+            padding: '14px 20px 12px',
+            borderBottom: '1px solid rgba(215,255,0,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            flexShrink: 0,
+          }}>
+            <span style={{ color: '#D7FF00', fontSize: 10, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif" }}>
+              {t('practiceScenarios')}
+            </span>
+            <button
+              onClick={() => setPanelOpen(false)}
+              style={{ color: 'rgba(255,255,255,0.35)', fontSize: 22, lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', fontWeight: 300 }}
+            >
+              ×
+            </button>
+          </div>
 
-      {/* Drawer */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, bottom: 0, zIndex: 20,
-        width: 300,
-        transform: panelOpen ? 'translateX(0)' : 'translateX(-300px)',
-        transition: 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
-        background: '#060606',
-        borderRight: '1px solid rgba(215,255,0,0.1)',
-        display: 'flex', flexDirection: 'column',
-      }}>
-        {/* Panel header */}
-        <div style={{
-          padding: '14px 16px 12px',
-          borderBottom: '1px solid rgba(215,255,0,0.08)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexShrink: 0,
-        }}>
-          <span style={{ color: '#D7FF00', fontSize: 10, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif" }}>
-            {t('practiceScenarios')}
-          </span>
-          <button
-            onClick={() => setPanelOpen(false)}
-            style={{ color: 'rgba(255,255,255,0.35)', fontSize: 20, lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', fontWeight: 300 }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Scrollable scenario list */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px' }}>
-          {categories.map((cat, ci) => (
-            <div key={cat} style={{ marginBottom: ci < categories.length - 1 ? 24 : 0 }}>
-
-              {/* Category header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ color: '#D7FF00', fontSize: 8.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif", whiteSpace: 'nowrap' }}>
-                  {cat}
-                </span>
-                <div style={{ flex: 1, height: 1, background: 'rgba(215,255,0,0.12)' }} />
-              </div>
-
-              {/* Subcategories */}
-              {(['Clients', 'Educational'] as const)
-                .filter(sub => scenarios.some(s => s.category === cat && s.subcategory === sub))
-                .map(sub => (
-                  <div key={sub} style={{ marginBottom: 14 }}>
-                    {sub === 'Educational' ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                        <span style={{ color: '#D7FF00', fontSize: 8.5, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif", whiteSpace: 'nowrap' }}>
-                          {t('practiceEducational')}
-                        </span>
-                        <div style={{ flex: 1, height: 1, background: 'rgba(215,255,0,0.12)' }} />
-                      </div>
-                    ) : (
-                      <p style={{ fontSize: 8, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#D7FF00', marginBottom: 8, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
-                        {t('practiceClients')}
-                      </p>
-                    )}
-
-                    {scenarios.filter(s => s.category === cat && s.subcategory === sub).map(s => {
-                      const selected = selectedScenario === s.id
-                      const scenarioLimitReached = isFreePlan && (dailyUsage[s.id] ?? 0) >= DAILY_LIMIT
-                      const disabled = isActive || status === 'connecting' || scenarioLimitReached
-                      const isClient = sub === 'Clients'
-                      const usedToday = isFreePlan ? (dailyUsage[s.id] ?? 0) : 0
-                      const displayName = lang === 'ar' ? (s.nameAr ?? s.name ?? s.label) : (s.name || s.label)
-                      const displayJob  = lang === 'ar' ? (s.jobAr  ?? s.job  ?? '') : (s.job  ?? '')
-                      const displayTag  = lang === 'ar' ? (s.tagAr  ?? s.tag  ?? '') : (s.tag  ?? '')
-                      const displayCtx  = lang === 'ar' ? (s.contextAr     ?? s.context     ?? '') : (s.context     ?? '')
-                      const displayGoal = lang === 'ar' ? (s.practiceGoalAr ?? s.practiceGoal ?? '') : (s.practiceGoal ?? '')
-
-                      return (
-                        <button
-                          key={s.id}
-                          onClick={() => { if (!disabled) { setSelectedScenario(s.id); setPanelOpen(false) } }}
-                          disabled={disabled}
-                          style={{
-                            display: 'block', width: '100%', textAlign: 'unset',
-                            background: selected ? 'rgba(215,255,0,0.06)' : 'rgba(255,255,255,0.02)',
-                            border: selected ? '1px solid rgba(215,255,0,0.45)' : '1px solid rgba(255,255,255,0.06)',
-                            boxShadow: selected ? '0 0 18px rgba(215,255,0,0.08)' : 'none',
-                            borderRadius: 14, padding: '16px 13px 13px',
-                            marginBottom: 10, cursor: disabled ? 'not-allowed' : 'pointer',
-                            opacity: disabled ? 0.35 : 1,
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          {/* Circular photo */}
-                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-                            <div style={{
-                              width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
-                              border: '2px solid rgba(215,255,0,0.4)',
-                              boxShadow: '0 0 16px rgba(215,255,0,0.12), 0 4px 14px rgba(0,0,0,0.5)',
-                            }}>
-                              <img
-                                src={AVATAR[s.id] ?? ''}
-                                alt={displayName}
-                                style={{
-                                  width: '100%', height: '100%',
-                                  objectFit: 'cover',
-                                  objectPosition: AVATAR_POSITION[s.id] ?? 'center',
-                                  display: 'block',
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Name + AI badge */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 3 }}>
-                            <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1.2, fontFamily: "'Montserrat', sans-serif" }}>
-                              {displayName}
-                            </span>
-                            <span style={{
-                              background: 'rgba(215,255,0,0.15)', color: '#D7FF00',
-                              border: '1px solid rgba(215,255,0,0.3)',
-                              borderRadius: 5, padding: '1px 6px', fontSize: 9, fontWeight: 700,
-                              fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.05em', flexShrink: 0,
-                            }}>
-                              AI
-                            </span>
-                          </div>
-
-                          {/* Job title */}
-                          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.38)', fontSize: 10.5, marginBottom: 11, fontFamily: "'Montserrat', sans-serif" }}>
-                            {displayJob}
-                          </p>
-
-                          {/* Tag chips */}
-                          <div style={{ display: 'flex', gap: 5, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-                            <span style={{
-                              background: isClient ? 'rgba(215,255,0,0.09)' : 'rgba(255,255,255,0.05)',
-                              color: isClient ? 'rgba(215,255,0,0.75)' : 'rgba(255,255,255,0.32)',
-                              border: isClient ? '1px solid rgba(215,255,0,0.2)' : '1px solid rgba(255,255,255,0.08)',
-                              borderRadius: 20, padding: '3px 9px',
-                              fontSize: 9, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
-                            }}>
-                              {isClient ? t('practiceClients') : t('practiceEducational')}
-                            </span>
-                            {displayTag && (
-                              <span style={{
-                                background: isClient ? 'rgba(215,255,0,0.09)' : 'rgba(255,255,255,0.05)',
-                                color: isClient ? 'rgba(215,255,0,0.75)' : 'rgba(255,255,255,0.32)',
-                                border: isClient ? '1px solid rgba(215,255,0,0.2)' : '1px solid rgba(255,255,255,0.08)',
-                                borderRadius: 20, padding: '3px 9px',
-                                fontSize: 9, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
-                              }}>
-                                {displayTag}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* CTA button */}
-                          <div style={{
-                            width: '100%', background: '#D7FF00', color: '#000',
-                            borderRadius: 24, padding: '9px 12px', fontWeight: 700,
-                            fontSize: 11.5, fontFamily: "'Montserrat', sans-serif",
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                          }}>
-                            <span style={{ fontSize: 13 }}>+</span>
-                            {t('practiceStartWith')} {displayName}
-                          </div>
-
-                          {isFreePlan && (
-                            <div style={{ textAlign: 'center', marginTop: 8 }}>
-                              <span style={{
-                                background: scenarioLimitReached ? 'rgba(255,60,60,0.12)' : 'rgba(255,255,255,0.05)',
-                                color: scenarioLimitReached ? 'rgba(255,100,100,0.9)' : 'rgba(255,255,255,0.38)',
-                                borderRadius: 4, padding: '3px 7px', fontSize: 9, lineHeight: 1.5,
-                                fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
-                                border: scenarioLimitReached ? '1px solid rgba(255,60,60,0.25)' : '1px solid rgba(255,255,255,0.08)',
-                                display: 'inline-block',
-                              }}>
-                                {scenarioLimitReached ? 'Limit reached' : `${DAILY_LIMIT - usedToday}/${DAILY_LIMIT} left today`}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Description section */}
-                          <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
-                            <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>
-                              {isClient ? t('practiceScenarioLabel') : t('practiceAskAbout')}
-                            </p>
-                            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, marginBottom: 9, fontFamily: "'Montserrat', sans-serif" }}>
-                              {displayCtx}
-                            </p>
-                            <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>
-                              {isClient ? t('practiceWhatToPractice') : t('practiceHowToUse')}
-                            </p>
-                            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, fontFamily: "'Montserrat', sans-serif" }}>
-                              {displayGoal}
-                            </p>
-                          </div>
-                        </button>
-                      )
-                    })}
+          {/* Card grid — Clients then Educational, each split by category */}
+          <div style={{ padding: '24px 20px 28px' }}>
+            {(['Clients', 'Educational'] as const).map((subcat, si) => {
+              const subcatCats = Array.from(new Set(
+                scenarios.filter(s => s.subcategory === subcat).map(s => s.category)
+              ))
+              if (subcatCats.length === 0) return null
+              const subcatLabel = subcat === 'Clients' ? t('practiceClients') : t('practiceEducational')
+              return (
+                <div key={subcat} style={{ marginBottom: si === 0 ? 32 : 0 }}>
+                  {/* Section header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                    <span style={{ color: '#D7FF00', fontSize: 9, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif", whiteSpace: 'nowrap' }}>
+                      {subcatLabel}
+                    </span>
+                    <div style={{ flex: 1, height: 1, background: 'rgba(215,255,0,0.18)' }} />
                   </div>
-                ))}
-            </div>
-          ))}
+
+                  {subcatCats.map((cat, ci) => {
+                    const catScenarios = scenarios.filter(s => s.subcategory === subcat && s.category === cat)
+                    return (
+                      <div key={cat} style={{ marginBottom: ci < subcatCats.length - 1 ? 24 : 0 }}>
+                        {/* Category label */}
+                        <p style={{ fontSize: 8.5, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(215,255,0,0.45)', marginBottom: 14, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
+                          {cat}
+                        </p>
+
+                        {/* 2-column card grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+                          {catScenarios.map(s => {
+                            const selected = selectedScenario === s.id
+                            const scenarioLimitReached = isFreePlan && (dailyUsage[s.id] ?? 0) >= DAILY_LIMIT
+                            const disabled = isActive || status === 'connecting' || scenarioLimitReached
+                            const isClient = subcat === 'Clients'
+                            const usedToday = isFreePlan ? (dailyUsage[s.id] ?? 0) : 0
+                            const displayName = lang === 'ar' ? (s.nameAr ?? s.name ?? s.label) : (s.name || s.label)
+                            const displayJob  = lang === 'ar' ? (s.jobAr  ?? s.job  ?? '') : (s.job  ?? '')
+                            const displayTag  = lang === 'ar' ? (s.tagAr  ?? s.tag  ?? '') : (s.tag  ?? '')
+                            const displayCtx  = lang === 'ar' ? (s.contextAr ?? s.context ?? '') : (s.context ?? '')
+                            const displayGoal = lang === 'ar' ? (s.practiceGoalAr ?? s.practiceGoal ?? '') : (s.practiceGoal ?? '')
+
+                            return (
+                              <button
+                                key={s.id}
+                                onClick={() => { if (!disabled) { setSelectedScenario(s.id); setPanelOpen(false) } }}
+                                disabled={disabled}
+                                style={{
+                                  display: 'block', width: '100%', textAlign: 'unset',
+                                  background: selected ? 'rgba(215,255,0,0.06)' : 'rgba(255,255,255,0.02)',
+                                  border: selected ? '1px solid rgba(215,255,0,0.45)' : '1px solid rgba(255,255,255,0.06)',
+                                  boxShadow: selected ? '0 0 28px rgba(215,255,0,0.10)' : 'none',
+                                  borderRadius: 16, padding: '22px 18px 18px',
+                                  cursor: disabled ? 'not-allowed' : 'pointer',
+                                  opacity: disabled ? 0.35 : 1,
+                                  transition: 'all 0.15s ease',
+                                }}
+                              >
+                                {/* Circular photo — 88px */}
+                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+                                  <div style={{
+                                    width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                                    border: '2px solid rgba(215,255,0,0.45)',
+                                    boxShadow: '0 0 22px rgba(215,255,0,0.18), 0 6px 20px rgba(0,0,0,0.6)',
+                                  }}>
+                                    <img
+                                      src={AVATAR[s.id] ?? ''}
+                                      alt={displayName}
+                                      style={{
+                                        width: '100%', height: '100%',
+                                        objectFit: 'cover',
+                                        objectPosition: AVATAR_POSITION[s.id] ?? 'center',
+                                        display: 'block',
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Name + AI badge */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 }}>
+                                  <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, lineHeight: 1.2, fontFamily: "'Montserrat', sans-serif" }}>
+                                    {displayName}
+                                  </span>
+                                  <span style={{
+                                    background: 'rgba(215,255,0,0.15)', color: '#D7FF00',
+                                    border: '1px solid rgba(215,255,0,0.3)',
+                                    borderRadius: 5, padding: '1px 6px', fontSize: 9, fontWeight: 700,
+                                    fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.05em', flexShrink: 0,
+                                  }}>
+                                    AI
+                                  </span>
+                                </div>
+
+                                {/* Job title */}
+                                <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.38)', fontSize: 11, marginBottom: 12, fontFamily: "'Montserrat', sans-serif" }}>
+                                  {displayJob}
+                                </p>
+
+                                {/* Tag chips */}
+                                <div style={{ display: 'flex', gap: 5, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+                                  <span style={{
+                                    background: isClient ? 'rgba(215,255,0,0.09)' : 'rgba(255,255,255,0.05)',
+                                    color: isClient ? 'rgba(215,255,0,0.75)' : 'rgba(255,255,255,0.32)',
+                                    border: isClient ? '1px solid rgba(215,255,0,0.2)' : '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: 20, padding: '3px 10px',
+                                    fontSize: 10, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+                                  }}>
+                                    {isClient ? t('practiceClients') : t('practiceEducational')}
+                                  </span>
+                                  {displayTag && (
+                                    <span style={{
+                                      background: isClient ? 'rgba(215,255,0,0.09)' : 'rgba(255,255,255,0.05)',
+                                      color: isClient ? 'rgba(215,255,0,0.75)' : 'rgba(255,255,255,0.32)',
+                                      border: isClient ? '1px solid rgba(215,255,0,0.2)' : '1px solid rgba(255,255,255,0.08)',
+                                      borderRadius: 20, padding: '3px 10px',
+                                      fontSize: 10, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+                                    }}>
+                                      {displayTag}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* CTA button */}
+                                <div style={{
+                                  width: '100%', background: '#D7FF00', color: '#000',
+                                  borderRadius: 24, padding: '10px 14px', fontWeight: 700,
+                                  fontSize: 12, fontFamily: "'Montserrat', sans-serif",
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                                }}>
+                                  <span style={{ fontSize: 14 }}>+</span>
+                                  {t('practiceStartWith')} {displayName}
+                                </div>
+
+                                {isFreePlan && (
+                                  <div style={{ textAlign: 'center', marginTop: 8 }}>
+                                    <span style={{
+                                      background: scenarioLimitReached ? 'rgba(255,60,60,0.12)' : 'rgba(255,255,255,0.05)',
+                                      color: scenarioLimitReached ? 'rgba(255,100,100,0.9)' : 'rgba(255,255,255,0.38)',
+                                      borderRadius: 4, padding: '3px 7px', fontSize: 9, lineHeight: 1.5,
+                                      fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+                                      border: scenarioLimitReached ? '1px solid rgba(255,60,60,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                                      display: 'inline-block',
+                                    }}>
+                                      {scenarioLimitReached ? 'Limit reached' : `${DAILY_LIMIT - usedToday}/${DAILY_LIMIT} left today`}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Description */}
+                                <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                                  <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
+                                    {isClient ? t('practiceScenarioLabel') : t('practiceAskAbout')}
+                                  </p>
+                                  <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, marginBottom: 10, fontFamily: "'Montserrat', sans-serif" }}>
+                                    {displayCtx}
+                                  </p>
+                                  <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
+                                    {isClient ? t('practiceWhatToPractice') : t('practiceHowToUse')}
+                                  </p>
+                                  <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, fontFamily: "'Montserrat', sans-serif" }}>
+                                    {displayGoal}
+                                  </p>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
 
