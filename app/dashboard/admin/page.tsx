@@ -122,11 +122,11 @@ export default async function AdminPage() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-xl font-semibold text-amber-400">AI Test Exam Recordings</h1>
-            <p className="text-sm text-amber-600/70 mt-0.5">{examRecordings.length} recordings</p>
+            <h1 className="text-xl font-semibold text-white">AI Test Exam Recordings</h1>
+            <p className="text-sm mt-0.5" style={{ color: 'rgba(215,255,0,0.5)' }}>{examRecordings.length} recordings</p>
           </div>
         </div>
-        <div style={{ borderRadius: 12, background: 'rgba(251,191,36,0.03)', border: '1px solid rgba(251,191,36,0.15)', overflow: 'hidden' }}>
+        <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', overflow: 'hidden' }}>
           <div style={{ maxHeight: 360, overflowY: 'auto' }}>
             <ExamRecordingsTable recordings={examRecordings} />
           </div>

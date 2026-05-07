@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { ExamReportData, ReportSummary } from '@/lib/report-generator'
+import { useT } from '@/lib/language-context'
 
 interface QuestionDetail {
   id: string
@@ -183,6 +184,7 @@ function DetailsModal({ result, onClose }: { result: ExamResult; onClose: () => 
 function DownloadButton({ result }: { result: ExamResult }) {
   const [generating, setGenerating] = useState(false)
   const [downloaded, setDownloaded] = useState(!!result.report_downloaded_at)
+  const t = useT()
 
   if (downloaded) {
     return (
@@ -194,7 +196,7 @@ function DownloadButton({ result }: { result: ExamResult }) {
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <polyline points="20 6 9 17 4 12"/>
         </svg>
-        تم التحميل
+        {t('adminDownloaded')}
       </span>
     )
   }
@@ -255,7 +257,7 @@ function DownloadButton({ result }: { result: ExamResult }) {
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M12 3v13M6 16l6 6 6-6"/>
           </svg>
-          تقرير
+          {t('adminReport')}
         </>
       )}
     </button>
@@ -264,6 +266,7 @@ function DownloadButton({ result }: { result: ExamResult }) {
 
 export default function ExamResultsTable({ results }: { results: ExamResult[] }) {
   const [selected, setSelected] = useState<ExamResult | null>(null)
+  const t = useT()
 
   if (results.length === 0) {
     return (
@@ -280,8 +283,17 @@ export default function ExamResultsTable({ results }: { results: ExamResult[] })
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              {['Name', 'Phase 1', 'Phase 2', 'Phase 3', 'Total', 'Result', 'Date', '', ''].map((h, i) => (
-                <th key={i} className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              {[
+                t('adminColName'),
+                t('adminColPhase1'),
+                t('adminColPhase2'),
+                t('adminColPhase3'),
+                t('adminColTotal'),
+                t('adminColResult'),
+                t('adminColDate'),
+                '', '',
+              ].map((h, i) => (
+                <th key={i} className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
                   {h}
                 </th>
               ))}
@@ -338,7 +350,7 @@ export default function ExamResultsTable({ results }: { results: ExamResult[] })
                       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(215,255,0,0.15)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'rgba(215,255,0,0.08)')}
                     >
-                      عرض التفاصيل
+                      {t('adminViewDetails')}
                     </button>
                   </td>
                   <td className="px-5 py-3">

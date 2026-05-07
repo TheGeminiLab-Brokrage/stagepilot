@@ -51,7 +51,7 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
             value={fullName}
             onChange={e => setFullName(e.target.value)}
             placeholder="Mohammed Shaaban"
-            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)]"
           />
         </div>
         <div>
@@ -62,7 +62,7 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="user@company.com"
-            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)]"
           />
         </div>
         <div>
@@ -74,7 +74,7 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="Min. 8 characters"
-            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)]"
           />
         </div>
         <div>
@@ -82,7 +82,7 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
           <select
             value={role}
             onChange={e => { setRole(e.target.value); setTeamName('') }}
-            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)] cursor-pointer"
           >
             <option value="agent">Agent</option>
             <option value="team_leader">Team Leader</option>
@@ -97,7 +97,7 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
             <select
               value={teamName}
               onChange={e => setTeamName(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(215,255,0,0.15)] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#D7FF00] focus:border-[rgba(215,255,0,0.4)]"
             >
               <option value="">No team</option>
               {teamLeaders.map(name => (

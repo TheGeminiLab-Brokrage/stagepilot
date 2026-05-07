@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useT } from '@/lib/language-context'
 
 interface ExamRecording {
   id: string
@@ -33,6 +34,7 @@ export default function ExamRecordingsTable({ recordings }: { recordings: ExamRe
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState<string>('')
+  const t = useT()
 
   async function playRecording(recordingId: string) {
     if (playingId === recordingId) {
@@ -74,17 +76,17 @@ export default function ExamRecordingsTable({ recordings }: { recordings: ExamRe
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-amber-900/40 text-amber-600/70 text-xs uppercase tracking-wide">
-            <th className="text-left px-4 py-3">Admin</th>
-            <th className="text-left px-4 py-3">Date</th>
-            <th className="text-left px-4 py-3">Time</th>
-            <th className="text-left px-4 py-3">Duration</th>
+          <tr className="border-b border-[rgba(215,255,0,0.12)] text-xs uppercase tracking-wide" style={{ color: 'rgba(215,255,0,0.4)' }}>
+            <th className="text-left px-4 py-3">{t('adminColAdmin')}</th>
+            <th className="text-left px-4 py-3">{t('adminColDate')}</th>
+            <th className="text-left px-4 py-3">{t('adminColTime')}</th>
+            <th className="text-left px-4 py-3">{t('adminColDuration')}</th>
             <th className="px-4 py-3" />
           </tr>
         </thead>
         <tbody>
           {recordings.map((rec) => (
-            <tr key={rec.id} className="border-b border-amber-900/20 hover:bg-amber-900/10 transition-colors">
+            <tr key={rec.id} className="border-b border-[rgba(215,255,0,0.06)] hover:bg-[rgba(215,255,0,0.04)] transition-colors">
               <td className="px-4 py-3 text-white font-medium">
                 {rec.profiles?.full_name || '—'}
               </td>
@@ -101,7 +103,7 @@ export default function ExamRecordingsTable({ recordings }: { recordings: ExamRe
                 <button
                   onClick={() => playRecording(rec.id)}
                   disabled={loadingId === rec.id}
-                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-800 hover:bg-amber-600 text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[rgba(215,255,0,0.08)] hover:bg-[#D7FF00] text-[#D7FF00] hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title={playingId === rec.id ? 'Stop playback' : 'Play recording'}
                 >
                   {loadingId === rec.id ? (
@@ -126,7 +128,7 @@ export default function ExamRecordingsTable({ recordings }: { recordings: ExamRe
       </table>
 
       {audioUrl && (
-        <div className="px-4 py-4 border-t border-amber-900/30 bg-amber-900/10">
+        <div className="px-4 py-4 border-t border-[rgba(215,255,0,0.12)] bg-[rgba(215,255,0,0.03)]">
           <audio
             key={audioUrl}
             autoPlay

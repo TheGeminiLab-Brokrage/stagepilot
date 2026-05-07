@@ -210,6 +210,23 @@ const en = {
   practiceHowToUse: 'How to use',
   practiceNoScenario: 'No scenario selected',
   practiceStartWith: 'Start with',
+
+  // ── Admin table columns & actions ─────────────────────────────────────
+  adminColName: 'Name',
+  adminColPhase1: 'Phase 1',
+  adminColPhase2: 'Phase 2',
+  adminColPhase3: 'Phase 3',
+  adminColTotal: 'Total',
+  adminColResult: 'Result',
+  adminColDate: 'Date',
+  adminColTime: 'Time',
+  adminColDuration: 'Duration',
+  adminColTrainee: 'Trainee',
+  adminColScenario: 'Scenario',
+  adminColAdmin: 'Admin',
+  adminViewDetails: 'Details',
+  adminReport: 'Report',
+  adminDownloaded: 'Downloaded',
 }
 
 const ar: typeof en = {
@@ -424,6 +441,23 @@ const ar: typeof en = {
   practiceHowToUse: 'كيف تستخدمه',
   practiceNoScenario: 'لم يُختر سيناريو',
   practiceStartWith: 'ابدأ مع',
+
+  // ── Admin table columns & actions ─────────────────────────────────────
+  adminColName: 'الاسم',
+  adminColPhase1: 'المرحلة ١',
+  adminColPhase2: 'المرحلة ٢',
+  adminColPhase3: 'المرحلة ٣',
+  adminColTotal: 'الإجمالي',
+  adminColResult: 'النتيجة',
+  adminColDate: 'التاريخ',
+  adminColTime: 'الوقت',
+  adminColDuration: 'المدة',
+  adminColTrainee: 'المتدرب',
+  adminColScenario: 'السيناريو',
+  adminColAdmin: 'المسؤول',
+  adminViewDetails: 'عرض التفاصيل',
+  adminReport: 'تقرير',
+  adminDownloaded: 'تم التحميل',
 }
 
 export const translations = { en, ar }

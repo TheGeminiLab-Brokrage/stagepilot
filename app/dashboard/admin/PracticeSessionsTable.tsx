@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useT } from '@/lib/language-context'
 
 interface PracticeSession {
   id: string
@@ -40,6 +41,7 @@ export default function PracticeSessionsTable({ sessions }: { sessions: Practice
   const [playingSession, setPlayingSession] = useState<string | null>(null)
   const [loadingSession, setLoadingSession] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState<string>('')
+  const t = useT()
 
   async function playSession(sessionId: string) {
     if (playingSession === sessionId) {
@@ -81,18 +83,18 @@ export default function PracticeSessionsTable({ sessions }: { sessions: Practice
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-            <th className="text-left px-4 py-3">Trainee</th>
-            <th className="text-left px-4 py-3">Scenario</th>
-            <th className="text-left px-4 py-3">Date</th>
-            <th className="text-left px-4 py-3">Time</th>
-            <th className="text-left px-4 py-3">Duration</th>
+          <tr className="border-b border-[rgba(215,255,0,0.12)] text-xs uppercase tracking-wide" style={{ color: 'rgba(215,255,0,0.4)' }}>
+            <th className="text-left px-4 py-3">{t('adminColTrainee')}</th>
+            <th className="text-left px-4 py-3">{t('adminColScenario')}</th>
+            <th className="text-left px-4 py-3">{t('adminColDate')}</th>
+            <th className="text-left px-4 py-3">{t('adminColTime')}</th>
+            <th className="text-left px-4 py-3">{t('adminColDuration')}</th>
             <th className="px-4 py-3" />
           </tr>
         </thead>
         <tbody>
           {sessions.map((session) => (
-            <tr key={session.id} className="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors">
+            <tr key={session.id} className="border-b border-[rgba(215,255,0,0.06)] hover:bg-[rgba(215,255,0,0.04)] transition-colors">
               <td className="px-4 py-3 text-white font-medium">
                 {session.profiles?.full_name || '—'}
               </td>
@@ -112,7 +114,7 @@ export default function PracticeSessionsTable({ sessions }: { sessions: Practice
                 <button
                   onClick={() => playSession(session.id)}
                   disabled={loadingSession === session.id}
-                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-800 hover:bg-violet-600 text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[rgba(215,255,0,0.08)] hover:bg-[#D7FF00] text-[#D7FF00] hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title={playingSession === session.id ? 'Stop playback' : 'Play recording'}
                 >
                   {loadingSession === session.id ? (
