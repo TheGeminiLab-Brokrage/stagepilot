@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import StatsCards from './StatsCards'
 import DashboardClient from './DashboardClient'
+import DashboardPageHeader from './DashboardPageHeader'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -50,27 +51,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-white">
-            {isLeader ? 'Team Calls' : 'My Calls'}
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {isLeader
-              ? `Reviewing calls for ${profile?.team_name ?? 'your team'}`
-              : 'Your processed call recordings'}
-          </p>
-        </div>
-        {role === 'agent' && (
-          <a
-            href="/dashboard/upload"
-            className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            + Upload Call
-          </a>
-        )}
-      </div>
-
+      <DashboardPageHeader isLeader={isLeader} role={role} teamName={profile?.team_name} />
       <StatsCards calls={calls} />
       <DashboardClient calls={calls} isLeader={isLeader} currentUserId={user.id} />
     </div>

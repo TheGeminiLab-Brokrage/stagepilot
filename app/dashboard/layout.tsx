@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import LogoutButton from './LogoutButton'
 import GeminiVoiceButton from './components/GeminiVoiceButton'
 import Navbar from './Navbar'
+import LanguageWrapper from './LanguageWrapper'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -30,7 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex flex-col" style={{ height: '100vh', background: '#000', fontFamily: "'Montserrat', sans-serif" }}>
+    <LanguageWrapper>
       <Navbar role={role} fullName={profile?.full_name} rightSlot={<LogoutButton />} />
 
       <div className="flex-1 overflow-y-auto flex flex-col">
@@ -40,6 +41,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </div>
 
       {role !== 'trainee' && role !== 'exam' && <GeminiVoiceButton />}
-    </div>
+    </LanguageWrapper>
   )
 }

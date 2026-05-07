@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useT } from '@/lib/language-context'
 
 const STAGE_COLORS: Record<string, string> = {
   'interested / follow up': 'bg-blue-500/20 text-blue-300',
@@ -44,6 +45,7 @@ export default function CallDetailModal({
   isLeader: boolean
   onClose: () => void
 }) {
+  const t = useT()
   const stage = call.stage_corrected ?? call.stage
   const stageBadge = stage
     ? (call.stage_corrected
@@ -79,9 +81,9 @@ export default function CallDetailModal({
 
   const tripleC = call.triple_c
   const tripleCItems = tripleC ? [
-    { key: 'clear_need', label: 'Clear Need', description: 'Did the prospect articulate a specific pain point?', data: tripleC.clear_need },
-    { key: 'clear_budget', label: 'Clear Budget', description: 'Was budget or willingness to invest confirmed?', data: tripleC.clear_budget },
-    { key: 'clear_path', label: 'Clear Path', description: 'Did the agent lock in a clear next step — a follow-up call, meeting, or any confirmed action with the client?', data: tripleC.clear_path },
+    { key: 'clear_need', label: t('tripleCNeedLabel'), description: t('tripleCNeedDesc'), data: tripleC.clear_need },
+    { key: 'clear_budget', label: t('tripleCBudgetLabel'), description: t('tripleCBudgetDesc'), data: tripleC.clear_budget },
+    { key: 'clear_path', label: t('tripleCPathLabel'), description: t('tripleCPathDesc'), data: tripleC.clear_path },
   ] : []
 
   return (
@@ -103,20 +105,20 @@ export default function CallDetailModal({
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${stageBadge}`}>
                   {stage}
                   {call.stage_corrected && call.stage && call.stage_corrected !== call.stage && (
-                    <span className="ml-1 text-gray-500">(was: {call.stage})</span>
+                    <span className="ml-1 text-gray-500">({t('modalWas')} {call.stage})</span>
                   )}
                 </span>
               )}
               {call.agent_stage && (
                 <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                  <span>Agent:</span>
+                  <span>{t('modalAgent')}</span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STAGE_COLORS[call.agent_stage] ?? 'bg-gray-700 text-gray-300'}`}>
                     {call.agent_stage}
                   </span>
                 </span>
               )}
             </div>
-            {call.campaign && <p className="text-gray-500 text-sm mt-0.5">Campaign: {call.campaign}</p>}
+            {call.campaign && <p className="text-gray-500 text-sm mt-0.5">{t('modalCampaign')} {call.campaign}</p>}
             <p className="text-gray-600 text-xs mt-0.5 truncate max-w-xs">{call.file_name}</p>
           </div>
           <button
@@ -128,7 +130,7 @@ export default function CallDetailModal({
         <div className="px-6 py-5 space-y-6">
           {/* Audio Player — team leaders and admins only */}
           {isLeader && call.audio_url && (
-            <Section title="Call Recording">
+            <Section title={t('sectionCallRecording')}>
               {(() => {
                 const ext = call.audio_url?.split('.').pop()?.toLowerCase()
                 const browserPlayable = ['mp3', 'm4a', 'mp4', 'wav', 'ogg', 'webm', 'flac', 'aac'].includes(ext ?? '')
@@ -139,7 +141,7 @@ export default function CallDetailModal({
                       download
                       className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
                     >
-                      ⬇ Download Recording ({ext?.toUpperCase()})
+                      {t('modalDownload')} ({ext?.toUpperCase()})
                     </a>
                   ) : (
                     <div className="flex items-center gap-3">
@@ -148,9 +150,9 @@ export default function CallDetailModal({
                         disabled={audioLoading}
                         className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
                       >
-                        {audioLoading ? 'Loading…' : '⬇ Get Download Link'}
+                        {audioLoading ? t('modalLoading') : t('modalGetDownloadLink')}
                       </button>
-                      <span className="text-xs text-gray-600">({ext?.toUpperCase()} — not playable in browser)</span>
+                      <span className="text-xs text-gray-600">({ext?.toUpperCase()} — {t('modalNotPlayable')})</span>
                     </div>
                   )
                 }
@@ -162,7 +164,7 @@ export default function CallDetailModal({
                     disabled={audioLoading}
                     className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
                   >
-                    {audioLoading ? 'Loading…' : '▶ Load Recording'}
+                    {audioLoading ? t('modalLoading') : t('modalLoadRecording')}
                   </button>
                 )
               })()}
@@ -171,14 +173,14 @@ export default function CallDetailModal({
           )}
 
           {/* Summary */}
-          <Section title="Summary">
+          <Section title={t('sectionSummary')}>
             {call.transcript_summary
               ? <p className="text-gray-300 text-sm leading-relaxed">{call.transcript_summary}</p>
-              : <p className="text-gray-600 text-sm italic">Analysis not available</p>}
+              : <p className="text-gray-600 text-sm italic">{t('modalAnalysisNA')}</p>}
           </Section>
 
           {/* Triple C */}
-          <Section title="Triple C Analysis">
+          <Section title={t('sectionTripleC')}>
             {tripleCItems.length > 0 ? (
               <div className="space-y-3">
                 {tripleCItems.map(({ key, label, description, data }) => (
@@ -193,20 +195,20 @@ export default function CallDetailModal({
                       <p className="text-xs text-gray-600 mb-1">{description}</p>
                       {data?.detail
                         ? <p className="text-sm text-gray-400 leading-relaxed">{data.detail}</p>
-                        : <p className="text-gray-600 text-sm italic">No detail available</p>}
+                        : <p className="text-gray-600 text-sm italic">{t('modalNoDetail')}</p>}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-600 text-sm italic">Analysis not available</p>
+              <p className="text-gray-600 text-sm italic">{t('modalAnalysisNA')}</p>
             )}
           </Section>
 
           {/* Pain Points */}
-          <Section title="Client Pain Points">
+          <Section title={t('sectionPainPoints')}>
             {(() => {
-              if (!call.pain_points) return <p className="text-gray-600 text-sm italic">Analysis not available</p>
+              if (!call.pain_points) return <p className="text-gray-600 text-sm italic">{t('modalAnalysisNA')}</p>
 
               // Try JSON array format (supports both "point" and "client_pain" key)
               try {
@@ -267,15 +269,15 @@ export default function CallDetailModal({
           </Section>
 
           {/* Agent Feedback */}
-          <Section title="Agent Feedback">
+          <Section title={t('sectionAgentFeedback')}>
             {call.agent_feedback
               ? <p className="text-gray-300 text-sm leading-relaxed">{call.agent_feedback}</p>
-              : <p className="text-gray-600 text-sm italic">Analysis not available</p>}
+              : <p className="text-gray-600 text-sm italic">{t('modalAnalysisNA')}</p>}
           </Section>
 
           {/* AI Reasoning */}
           {call.reasoning && (
-            <Section title="AI Stage Reasoning">
+            <Section title={t('sectionAiReasoning')}>
               <p className="text-gray-400 text-sm leading-relaxed">{call.reasoning}</p>
             </Section>
           )}

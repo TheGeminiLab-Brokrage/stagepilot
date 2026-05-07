@@ -1,25 +1,40 @@
 'use client'
 
+import { useLanguage, useT } from '@/lib/language-context'
+
 interface NavbarProps {
   role: string
   fullName: string | null | undefined
   rightSlot?: React.ReactNode
 }
 
+const ROLE_KEY_MAP: Record<string, 'roleAgent' | 'roleTeamLeader' | 'roleSuperAdmin' | 'roleTrainee' | 'roleExam'> = {
+  agent: 'roleAgent',
+  team_leader: 'roleTeamLeader',
+  super_admin: 'roleSuperAdmin',
+  trainee: 'roleTrainee',
+  exam: 'roleExam',
+}
+
 export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
+  const { lang, setLang } = useLanguage()
+  const t = useT()
+
   const navLinks =
     role === 'trainee'
-      ? [{ href: '/dashboard/practice', label: 'AI Practice' }]
+      ? [{ href: '/dashboard/practice', label: t('navAiPractice') }]
       : role === 'exam'
-      ? [{ href: '/dashboard/exam', label: 'الامتحان' }]
+      ? [{ href: '/dashboard/exam', label: t('navExam') }]
       : [
-          { href: '/dashboard', label: role === 'agent' ? 'My Calls' : 'Team Calls' },
-          ...(role === 'agent' ? [{ href: '/dashboard/upload', label: 'Upload Call' }] : []),
+          { href: '/dashboard', label: role === 'agent' ? t('navMyCalls') : t('navTeamCalls') },
+          ...(role === 'agent' ? [{ href: '/dashboard/upload', label: t('navUploadCall') }] : []),
           ...(role === 'super_admin' ? [
-            { href: '/dashboard/admin', label: 'Admin' },
-            { href: '/dashboard/admin/knowledge-base', label: 'Knowledge Base' },
+            { href: '/dashboard/admin', label: t('navAdmin') },
+            { href: '/dashboard/admin/knowledge-base', label: t('navKnowledgeBase') },
           ] : []),
         ]
+
+  const roleLabel = ROLE_KEY_MAP[role] ? t(ROLE_KEY_MAP[role]) : role.replace('_', ' ')
 
   return (
     <header
@@ -75,17 +90,42 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Language toggle */}
+          <div className="flex items-center rounded-md overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+            {(['ar', 'en'] as const).map(l => (
+              <button
+                key={l}
+                onClick={() => setLang(l)}
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '3px 9px',
+                  letterSpacing: '0.04em',
+                  transition: 'all 0.15s',
+                  background: lang === l ? 'rgba(215,255,0,0.12)' : 'transparent',
+                  color: lang === l ? '#D7FF00' : 'rgba(255,255,255,0.3)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  outline: lang === l ? '1px solid rgba(215,255,0,0.25)' : 'none',
+                }}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
           <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: "'Montserrat', sans-serif" }}>
             {fullName}
             <span
-              className="ml-1.5 px-1.5 py-0.5 rounded text-xs font-semibold capitalize"
+              className="ml-1.5 px-1.5 py-0.5 rounded text-xs font-semibold"
               style={{
                 background: 'rgba(215,255,0,0.1)',
                 color: 'rgba(215,255,0,0.7)',
                 fontFamily: "'Space Grotesk', sans-serif",
               }}
             >
-              {role.replace('_', ' ')}
+              {roleLabel}
             </span>
           </span>
           {rightSlot}

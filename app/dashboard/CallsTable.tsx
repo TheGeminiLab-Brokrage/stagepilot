@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import CallDetailModal from './CallDetailModal'
+import { useT } from '@/lib/language-context'
+import { STAGE_KEY_MAP } from '@/lib/translations'
 
 const STAGE_COLORS: Record<string, string> = {
   'interested / follow up': 'bg-blue-500/20 text-blue-300',
@@ -57,6 +59,7 @@ export default function CallsTable({
   isLeader: boolean
   currentUserId: string
 }) {
+  const t = useT()
   const router = useRouter()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -105,10 +108,10 @@ export default function CallsTable({
   if (localCalls.length === 0) {
     return (
       <div className="text-center py-20 text-gray-600">
-        No calls yet.{' '}
+        {t('noCallsYet')}{' '}
         {!isLeader && (
           <a href="/dashboard/upload" className="text-blue-500 hover:underline">
-            Upload your first call
+            {t('uploadFirstCall')}
           </a>
         )}
       </div>
@@ -121,15 +124,15 @@ export default function CallsTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-              <th className="text-left px-4 py-3">File</th>
-              <th className="text-left px-4 py-3">Client</th>
-              {isLeader && <th className="text-left px-4 py-3">Agent</th>}
-              <th className="text-left px-4 py-3">Campaign</th>
-              <th className="text-left px-4 py-3">AI Stage</th>
-              {isLeader && <th className="text-left px-4 py-3">Agent Stage</th>}
-              {isLeader && <th className="text-left px-4 py-3">Correction</th>}
-              <th className="text-left px-4 py-3">Status</th>
-              <th className="text-left px-4 py-3">Date</th>
+              <th className="text-left px-4 py-3">{t('colFile')}</th>
+              <th className="text-left px-4 py-3">{t('colClient')}</th>
+              {isLeader && <th className="text-left px-4 py-3">{t('colAgent')}</th>}
+              <th className="text-left px-4 py-3">{t('colCampaign')}</th>
+              <th className="text-left px-4 py-3">{t('colAiStage')}</th>
+              {isLeader && <th className="text-left px-4 py-3">{t('colAgentStage')}</th>}
+              {isLeader && <th className="text-left px-4 py-3">{t('colCorrection')}</th>}
+              <th className="text-left px-4 py-3">{t('colStatus')}</th>
+              <th className="text-left px-4 py-3">{t('colDate')}</th>
               <th className="px-2 py-3" />
             </tr>
           </thead>
@@ -163,7 +166,7 @@ export default function CallsTable({
                   <td className="px-4 py-3">
                     {displayStage ? (
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${stageBadge}`}>
-                        {displayStage}
+                        {STAGE_KEY_MAP[displayStage] ? t(STAGE_KEY_MAP[displayStage]) : displayStage}
                       </span>
                     ) : '—'}
                   </td>
@@ -172,7 +175,7 @@ export default function CallsTable({
                     <td className="px-4 py-3">
                       {call.agent_stage ? (
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STAGE_COLORS[call.agent_stage] ?? 'bg-gray-700 text-gray-300'}`}>
-                          {call.agent_stage}
+                          {STAGE_KEY_MAP[call.agent_stage] ? t(STAGE_KEY_MAP[call.agent_stage]) : call.agent_stage}
                         </span>
                       ) : '—'}
                     </td>
@@ -189,9 +192,9 @@ export default function CallsTable({
                           onBlur={() => setEditingId(null)}
                           className="bg-gray-800 border border-gray-600 text-white text-xs rounded px-2 py-1"
                         >
-                          <option value="">— remove correction —</option>
+                          <option value="">{t('removeCorrection')}</option>
                           {CORRECTION_STAGES.map(s => (
-                            <option key={s} value={s}>{s}</option>
+                            <option key={s} value={s}>{STAGE_KEY_MAP[s] ? t(STAGE_KEY_MAP[s]) : s}</option>
                           ))}
                         </select>
                       ) : (
@@ -205,7 +208,9 @@ export default function CallsTable({
                               : 'text-gray-500 hover:text-blue-400'
                           }`}
                         >
-                          {call.stage_corrected ? `✓ ${call.stage_corrected}` : 'Correct →'}
+                          {call.stage_corrected
+                            ? `✓ ${STAGE_KEY_MAP[call.stage_corrected] ? t(STAGE_KEY_MAP[call.stage_corrected]) : call.stage_corrected}`
+                            : t('correctBtn')}
                         </button>
                       )}
                     </td>
@@ -213,14 +218,14 @@ export default function CallsTable({
 
                   <td className="px-4 py-3">
                     {call.status === 'processing' && (
-                      <span className="text-xs text-yellow-400">Processing…</span>
+                      <span className="text-xs text-yellow-400">{t('statusProcessing')}</span>
                     )}
                     {call.status === 'done' && (
-                      <span className="text-xs text-green-400">Done</span>
+                      <span className="text-xs text-green-400">{t('statusDone')}</span>
                     )}
                     {call.status === 'error' && (
                       <span className="flex items-center gap-1">
-                        <span className="text-xs text-red-400">Error</span>
+                        <span className="text-xs text-red-400">{t('statusError')}</span>
                         {call.error_message && (
                           <span
                             title={call.error_message.slice(0, 200)}
@@ -255,24 +260,24 @@ export default function CallsTable({
       {deletingCall && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-80 shadow-xl">
-            <h3 className="text-white font-semibold text-base mb-1">Remove client?</h3>
-            <p className="text-gray-400 text-sm mb-1">{deletingCall.name ?? 'Unknown client'}</p>
+            <h3 className="text-white font-semibold text-base mb-1">{t('deleteModalTitle')}</h3>
+            <p className="text-gray-400 text-sm mb-1">{deletingCall.name ?? t('deleteModalUnknown')}</p>
             {deletingCall.phone && (
               <p className="text-gray-600 text-xs mb-4">{deletingCall.phone}</p>
             )}
-            <p className="text-gray-500 text-xs mb-5">This call record will be permanently deleted.</p>
+            <p className="text-gray-500 text-xs mb-5">{t('deleteModalBody')}</p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setDeletingCall(null)}
                 className="px-4 py-1.5 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-colors"
               >
-                Cancel
+                {t('deleteModalCancel')}
               </button>
               <button
                 onClick={() => removeCall(deletingCall.id)}
                 className="px-4 py-1.5 text-sm text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors"
               >
-                Remove
+                {t('deleteModalConfirm')}
               </button>
             </div>
           </div>

@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { type Call } from './CallsTable'
+import { useT } from '@/lib/language-context'
+import { STAGE_KEY_MAP } from '@/lib/translations'
 
 const ALL_STAGES = [
   'interested / follow up',
@@ -20,6 +22,7 @@ type Props = {
 }
 
 export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
+  const t = useT()
   const [selectedStages, setSelectedStages] = useState<string[]>([])
   const [clientSearch, setClientSearch] = useState('')
   const [teamFilter, setTeamFilter] = useState('')
@@ -110,22 +113,26 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
               : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
           }`}
         >
-          Stage {selectedStages.length > 0 && <span className="bg-blue-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">{selectedStages.length}</span>}
+          {t('filterStage')} {selectedStages.length > 0 && <span className="bg-blue-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">{selectedStages.length}</span>}
           <span className="text-gray-600">▾</span>
         </button>
         {stageOpen && (
           <div className="absolute top-full left-0 mt-1 z-20 bg-gray-900 border border-gray-700 rounded-xl shadow-xl py-1 min-w-[200px]">
-            {ALL_STAGES.map(s => (
-              <label key={s} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-800 cursor-pointer text-xs text-gray-300 capitalize">
-                <input
-                  type="checkbox"
-                  checked={selectedStages.includes(s)}
-                  onChange={() => toggleStage(s)}
-                  className="accent-blue-500"
-                />
-                {s}
-              </label>
-            ))}
+            {ALL_STAGES.map(s => {
+              const stageKey = STAGE_KEY_MAP[s]
+              const stageLabel = stageKey ? t(stageKey) : s
+              return (
+                <label key={s} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-800 cursor-pointer text-xs text-gray-300 capitalize">
+                  <input
+                    type="checkbox"
+                    checked={selectedStages.includes(s)}
+                    onChange={() => toggleStage(s)}
+                    className="accent-blue-500"
+                  />
+                  {stageLabel}
+                </label>
+              )
+            })}
           </div>
         )}
       </div>
@@ -133,7 +140,7 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
       {/* Client search */}
       <input
         type="text"
-        placeholder="Search client…"
+        placeholder={t('filterSearchClient')}
         value={clientSearch}
         onChange={e => setClientSearch(e.target.value)}
         className="text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-600 w-36"
@@ -150,8 +157,8 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
               : 'bg-gray-800 border-gray-700 text-gray-400'
           }`}
         >
-          <option value="">All teams</option>
-          {teams.map(t => <option key={t} value={t}>{t}</option>)}
+          <option value="">{t('filterAllTeams')}</option>
+          {teams.map(team => <option key={team} value={team}>{team}</option>)}
         </select>
       )}
 
@@ -159,7 +166,7 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
       {isLeader && (
         <input
           type="text"
-          placeholder="Search agent…"
+          placeholder={t('filterSearchAgent')}
           value={agentSearch}
           onChange={e => setAgentSearch(e.target.value)}
           className="text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-600 w-32"
@@ -187,7 +194,7 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
           onClick={clearAll}
           className="text-xs text-gray-600 hover:text-red-400 transition-colors px-1"
         >
-          Clear all
+          {t('filterClearAll')}
         </button>
       )}
     </div>

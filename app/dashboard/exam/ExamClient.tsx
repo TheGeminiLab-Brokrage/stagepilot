@@ -5,6 +5,7 @@ import ExamPhase1 from './ExamPhase1'
 import ExamPhase2 from './ExamPhase2'
 import ExamPhase3 from './ExamPhase3'
 import ExamResults from './ExamResults'
+import { useT } from '@/lib/language-context'
 
 type ExamPhase = 'phase1' | 'phase2' | 'phase3' | 'results'
 type ExamGate = 'loading' | 'intro' | 'active' | 'blocked'
@@ -27,14 +28,15 @@ interface Props {
   userEmail: string
 }
 
-const PHASE_LABELS: Record<ExamPhase, string> = {
-  phase1: '١ — الأسئلة',
-  phase2: '٢ — السيناريوهات',
-  phase3: '٣ — المحاكاة',
-  results: 'النتيجة',
-}
-
 export default function ExamClient({ userId, companyId, userName, userEmail }: Props) {
+  const t = useT()
+  const PHASE_LABELS: Record<ExamPhase, string> = {
+    phase1: t('examPhase1'),
+    phase2: t('examPhase2'),
+    phase3: t('examPhase3'),
+    results: t('examResults'),
+  }
+
   const [gate, setGate] = useState<ExamGate>('loading')
   const [startError, setStartError] = useState('')
 

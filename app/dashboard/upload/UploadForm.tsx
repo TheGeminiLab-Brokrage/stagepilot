@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useT } from '@/lib/language-context'
 
 const ACCEPTED = '.m4a,.mp3,.mp4,.wav,.ogg,.amr,.aac,.flac,.webm,.mpeg,.mpga'
 const SUPPORTED_EXTENSIONS = ['mp3', 'm4a', 'mp4', 'wav', 'ogg', 'amr', 'aac', 'flac', 'webm', 'mpeg', 'mpga']
@@ -24,6 +25,7 @@ function validateFile(f: File): string | null {
 }
 
 export default function UploadForm() {
+  const t = useT()
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
   const xhrRef = useRef<XMLHttpRequest | null>(null)
@@ -176,15 +178,15 @@ export default function UploadForm() {
                 onClick={e => { e.stopPropagation(); removeFile() }}
                 className="text-xs text-gray-600 hover:text-red-400 mt-2 transition-colors"
               >
-                Remove
+                {t('uploadRemoveFile')}
               </button>
             )}
           </div>
         ) : (
           <div>
-            <p className="text-gray-400">Drag & drop audio file here</p>
-            <p className="text-gray-600 text-sm mt-1">or click to browse</p>
-            <p className="text-gray-700 text-xs mt-3">M4A, MP3, WAV, AMR, AAC, FLAC supported</p>
+            <p className="text-gray-400">{t('uploadDropZone')}</p>
+            <p className="text-gray-600 text-sm mt-1">{t('uploadClickBrowse')}</p>
+            <p className="text-gray-700 text-xs mt-3">{t('uploadSupportedFormats')}</p>
           </div>
         )}
       </div>
@@ -192,7 +194,7 @@ export default function UploadForm() {
       {/* Stage selector */}
       <div>
         <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wide">
-          Your Stage Assessment <span className="text-red-400">*</span>
+          {t('uploadStageLabel')} <span className="text-red-400">*</span>
         </label>
         <select
           value={agentStage}
@@ -200,7 +202,7 @@ export default function UploadForm() {
           required
           className="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
-          <option value="" disabled>Select the call stage…</option>
+          <option value="" disabled>{t('uploadStagePlaceholder')}</option>
           {STAGES.map(s => (
             <option key={s} value={s}>{s}</option>
           ))}
@@ -215,14 +217,14 @@ export default function UploadForm() {
 
       {status === 'done' && (
         <div className="bg-green-500/10 border border-green-500/20 text-green-400 text-sm rounded-lg px-4 py-3">
-          Uploaded! Processing in the background — redirecting…
+          {t('uploadSuccess')}
         </div>
       )}
 
       {status === 'uploading' && uploadPct > 0 && (
         <div className="space-y-1">
           <div className="flex justify-between text-xs text-gray-500">
-            <span>Uploading…</span>
+            <span>{t('uploadUploading')}</span>
             <span>{uploadPct}%</span>
           </div>
           <div className="bg-gray-800 rounded-full h-1.5">
@@ -239,7 +241,7 @@ export default function UploadForm() {
         disabled={!file || !agentStage || status === 'uploading' || status === 'done'}
         className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg py-2.5 text-sm transition-colors"
       >
-        {status === 'uploading' ? 'Uploading…' : 'Process Call'}
+        {status === 'uploading' ? t('uploadSubmittingBtn') : t('uploadSubmitBtn')}
       </button>
     </form>
   )
