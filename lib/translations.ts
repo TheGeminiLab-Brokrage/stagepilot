@@ -121,7 +121,7 @@ const en = {
   stageInterestedFollowUp: 'interested / follow up',
   stageNotInterested: 'not interested',
   stageLowBudget: 'low budget',
-} as const
+}
 
 const ar: typeof en = {
   // ── Navbar links ──────────────────────────────────────────────────────────
