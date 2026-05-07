@@ -83,16 +83,18 @@ export default async function AdminPage() {
       </div>
 
       {/* User list */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-8">
-        <UserTable
-          initialProfiles={profiles ?? []}
-          emailMap={emailMap}
-          currentUserId={user.id}
-        />
+      <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', overflow: 'hidden', marginBottom: '2rem' }}>
+        <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+          <UserTable
+            initialProfiles={profiles ?? []}
+            emailMap={emailMap}
+            currentUserId={user.id}
+          />
+        </div>
       </div>
 
       {/* Create user form */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl px-6 py-5 mb-8">
+      <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', padding: '20px 24px', marginBottom: '2rem' }}>
         <h2 className="text-white font-medium mb-4">Add New User</h2>
         <CreateUserForm
           teamLeaders={(profiles ?? [])
@@ -109,21 +111,25 @@ export default async function AdminPage() {
             <p className="text-sm text-gray-500 mt-0.5">{examResults.length} exams completed</p>
           </div>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <ExamResultsTable results={examResults} />
+        <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', overflow: 'hidden' }}>
+          <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+            <ExamResultsTable results={examResults} />
+          </div>
         </div>
       </div>
 
-      {/* Admin AI Test Recordings */}
+      {/* AI Test Exam Recordings */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-xl font-semibold text-amber-400">Admin AI Test Recordings</h1>
+            <h1 className="text-xl font-semibold text-amber-400">AI Test Exam Recordings</h1>
             <p className="text-sm text-amber-600/70 mt-0.5">{examRecordings.length} recordings</p>
           </div>
         </div>
-        <div className="bg-gray-900 border border-amber-900/40 rounded-xl overflow-hidden">
-          <ExamRecordingsTable recordings={examRecordings} />
+        <div style={{ borderRadius: 12, background: 'rgba(251,191,36,0.03)', border: '1px solid rgba(251,191,36,0.15)', overflow: 'hidden' }}>
+          <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+            <ExamRecordingsTable recordings={examRecordings} />
+          </div>
         </div>
       </div>
 
@@ -136,8 +142,10 @@ export default async function AdminPage() {
           </div>
         </div>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <PracticeSessionsTable sessions={practiceSessions ?? []} />
+        <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', overflow: 'hidden' }}>
+          <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+            <PracticeSessionsTable sessions={practiceSessions ?? []} />
+          </div>
         </div>
       </div>
     </div>
