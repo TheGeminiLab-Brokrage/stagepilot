@@ -182,6 +182,7 @@ export default function ExamPhase2({ onComplete, onTimerTick }: Props) {
           borderRadius: 14,
           padding: '22px 24px',
           transition: 'border-color 0.2s',
+          userSelect: 'none',
         }}
       >
           {/* Q number + subtype */}

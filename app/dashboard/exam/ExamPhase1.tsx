@@ -203,6 +203,7 @@ export default function ExamPhase1({ onComplete, onTimerTick }: Props) {
           border: `1px solid ${typeBorder[q.type]}`,
           borderRadius: 16,
           padding: '14px 20px',
+          userSelect: 'none',
         }}
       >
         {/* Type badge + points */}
@@ -298,6 +299,7 @@ export default function ExamPhase1({ onComplete, onTimerTick }: Props) {
               background: 'rgba(255,255,255,0.04)',
               color: '#fff', fontSize: 14, padding: '12px 16px',
               resize: 'vertical', outline: 'none', lineHeight: 1.7,
+              userSelect: 'text',
             }}
           />
         )}
