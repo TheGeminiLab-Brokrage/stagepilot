@@ -11,10 +11,10 @@ type Profile = {
 }
 
 const ROLE_COLORS: Record<string, string> = {
-  super_admin: 'bg-purple-500/20 text-purple-300',
-  team_leader: 'bg-blue-500/20 text-blue-300',
-  agent: 'bg-gray-500/20 text-gray-400',
-  trainee: 'bg-green-500/20 text-green-300',
+  super_admin: 'bg-purple-500/20 text-white',
+  team_leader: 'bg-blue-500/20 text-white',
+  agent: 'bg-gray-500/20 text-white',
+  trainee: 'bg-green-500/20 text-white',
 }
 
 const ROLE_ORDER: Record<string, number> = {
@@ -153,8 +153,8 @@ export default function UserTable({
                 {p.id === currentUserId && <span className="ml-2 text-xs text-gray-600">(you)</span>}
               </td>
               <td className="px-4 py-3 text-gray-400 text-xs">{emailMap[p.id] ?? '—'}</td>
-              <td className="px-4 py-3">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[p.role] ?? 'bg-gray-700 text-gray-300'}`}>
+              <td className="px-4 py-3 text-center">
+                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[p.role] ?? 'bg-gray-700 text-white'}`}>
                   {p.role.replace('_', ' ')}
                 </span>
               </td>
@@ -194,14 +194,14 @@ export default function UserTable({
                 <div className="flex items-center justify-end gap-3">
                   <button
                     onClick={() => { setNewPassword(''); setPasswordError(null); setPasswordDone(false); setSettingPassword({ id: p.id, name: p.full_name }) }}
-                    className="text-xs text-gray-600 hover:text-blue-400 transition-colors"
+                    className="text-xs text-gray-600 hover:text-blue-400 transition-colors cursor-pointer"
                   >
                     Set password
                   </button>
                   {p.id !== currentUserId && (
                     <button
                       onClick={() => { setRemoveError(null); setRemovingUser({ id: p.id, name: p.full_name }) }}
-                      className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                      className="text-xs text-gray-600 hover:text-red-400 transition-colors cursor-pointer"
                     >
                       Remove
                     </button>

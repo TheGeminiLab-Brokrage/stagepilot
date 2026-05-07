@@ -760,6 +760,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
               borderBottom: activeTab === cat ? '2px solid #D7FF00' : '2px solid transparent',
               background: 'transparent',
               marginBottom: '-1px',
+              cursor: 'pointer',
             }}
           >
             {CATEGORY_LABELS[cat]}
@@ -782,6 +783,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
             borderBottom: activeTab === 'sheet_connections' ? '2px solid #D7FF00' : '2px solid transparent',
             background: 'transparent',
             marginBottom: '-1px',
+            cursor: 'pointer',
           }}
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -832,6 +834,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
             background: '#D7FF00',
             color: '#000',
             fontFamily: "'Space Grotesk', sans-serif",
+            cursor: 'pointer',
           }}
         >
           + Add Entry
@@ -909,6 +912,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                       className="w-8 h-4 rounded-full transition-all relative"
                       style={{
                         background: entry.is_active ? 'rgba(215,255,0,0.3)' : 'rgba(255,255,255,0.1)',
+                        cursor: 'pointer',
                       }}
                     >
                       <span
@@ -924,7 +928,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                     <button
                       onClick={() => openEdit(entry)}
                       className="text-xs px-2 py-1 rounded mr-1 transition-all"
-                      style={{ color: 'rgba(215,255,0,0.6)', background: 'rgba(215,255,0,0.05)' }}
+                      style={{ color: 'rgba(215,255,0,0.6)', background: 'rgba(215,255,0,0.05)', cursor: 'pointer' }}
                       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(215,255,0,0.12)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'rgba(215,255,0,0.05)')}
                     >
@@ -934,7 +938,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                       onClick={() => handleDelete(entry.id)}
                       disabled={deleting === entry.id}
                       className="text-xs px-2 py-1 rounded transition-all disabled:opacity-40"
-                      style={{ color: 'rgba(239,68,68,0.7)', background: 'rgba(239,68,68,0.05)' }}
+                      style={{ color: 'rgba(239,68,68,0.7)', background: 'rgba(239,68,68,0.05)', cursor: 'pointer' }}
                       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.12)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.05)')}
                     >

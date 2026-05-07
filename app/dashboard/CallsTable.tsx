@@ -120,7 +120,7 @@ export default function CallsTable({
 
   return (
     <>
-      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', overflow: 'hidden' }}>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">

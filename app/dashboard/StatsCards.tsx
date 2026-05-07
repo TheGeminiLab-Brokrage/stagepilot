@@ -60,11 +60,11 @@ export default function StatsCards({ calls }: { calls: Call[] }) {
     <div className="mb-6 space-y-3">
       {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+        <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', padding: '12px 16px' }}>
           <p className="text-xs text-gray-500 mb-1">{t('statTotalProcessed')}</p>
           <p className="text-2xl font-bold text-white">{total}</p>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+        <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', padding: '12px 16px' }}>
           <p className="text-xs text-gray-500 mb-1">{t('statAiAccuracy')}</p>
           {accuracy !== null ? (
             <>
@@ -75,12 +75,12 @@ export default function StatsCards({ calls }: { calls: Call[] }) {
             <p className="text-2xl font-bold text-gray-600">—</p>
           )}
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+        <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', padding: '12px 16px' }}>
           <p className="text-xs text-gray-500 mb-1">{t('statThisWeek')}</p>
           <p className="text-2xl font-bold text-purple-400">{thisWeek}</p>
           <p className="text-xs text-gray-600 mt-0.5">{t('statLast7Days')}</p>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+        <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', padding: '12px 16px' }}>
           <p className="text-xs text-gray-500 mb-1">{t('statErrors')}</p>
           <p className="text-2xl font-bold text-red-400">{errors}</p>
         </div>
@@ -88,7 +88,7 @@ export default function StatsCards({ calls }: { calls: Call[] }) {
 
       {/* Stage breakdown */}
       {stageBreakdown.length > 0 && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+        <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', padding: '12px 16px' }}>
           <p className="text-xs text-gray-500 mb-3">{t('statStageBreakdown')}</p>
           <div className="space-y-2">
             {stageBreakdown.map(({ stage, count, pct }) => {

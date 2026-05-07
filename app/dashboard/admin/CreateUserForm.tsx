@@ -82,7 +82,7 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
           <select
             value={role}
             onChange={e => { setRole(e.target.value); setTeamName('') }}
-            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
             <option value="agent">Agent</option>
             <option value="team_leader">Team Leader</option>
@@ -122,7 +122,20 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
       <button
         type="submit"
         disabled={status === 'loading'}
-        className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg px-5 py-2 text-sm transition-colors"
+        style={{
+          background: status === 'loading' ? 'rgba(215,255,0,0.4)' : '#D7FF00',
+          color: '#000',
+          fontWeight: 700,
+          borderRadius: 8,
+          padding: '8px 20px',
+          fontSize: 13,
+          border: 'none',
+          cursor: status === 'loading' ? 'default' : 'pointer',
+          transition: 'all 0.15s',
+          letterSpacing: '0.01em',
+        }}
+        onMouseEnter={e => { if (status !== 'loading') (e.currentTarget as HTMLButtonElement).style.background = '#c8f000' }}
+        onMouseLeave={e => { if (status !== 'loading') (e.currentTarget as HTMLButtonElement).style.background = '#D7FF00' }}
       >
         {status === 'loading' ? 'Creating…' : 'Create User'}
       </button>

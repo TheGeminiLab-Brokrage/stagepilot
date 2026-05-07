@@ -187,10 +187,13 @@ function DownloadButton({ result }: { result: ExamResult }) {
   if (downloaded) {
     return (
       <span style={{
-        fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
-        background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.2)',
-        border: '1px solid rgba(255,255,255,0.07)', display: 'inline-block',
+        fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 6,
+        background: 'rgba(16,185,129,0.06)', color: 'rgba(16,185,129,0.5)',
+        border: '1px solid rgba(16,185,129,0.15)', display: 'inline-flex', alignItems: 'center', gap: 5,
       }}>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
         تم التحميل
       </span>
     )
@@ -234,14 +237,27 @@ function DownloadButton({ result }: { result: ExamResult }) {
       onClick={download}
       disabled={generating}
       style={{
-        fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
-        background: generating ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
-        color: generating ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.5)',
-        border: '1px solid rgba(255,255,255,0.1)', cursor: generating ? 'default' : 'pointer',
+        fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 6,
+        background: generating ? 'rgba(215,255,0,0.04)' : 'rgba(215,255,0,0.08)',
+        color: generating ? 'rgba(215,255,0,0.3)' : '#D7FF00',
+        border: generating ? '1px solid rgba(215,255,0,0.08)' : '1px solid rgba(215,255,0,0.25)',
+        cursor: generating ? 'default' : 'pointer',
         transition: 'all 0.15s',
+        display: 'inline-flex', alignItems: 'center', gap: 5,
       }}
+      onMouseEnter={e => { if (!generating) e.currentTarget.style.background = 'rgba(215,255,0,0.15)' }}
+      onMouseLeave={e => { if (!generating) e.currentTarget.style.background = 'rgba(215,255,0,0.08)' }}
     >
-      {generating ? '...' : '↓ تقرير'}
+      {generating ? (
+        '...'
+      ) : (
+        <>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 3v13M6 16l6 6 6-6"/>
+          </svg>
+          تقرير
+        </>
+      )}
     </button>
   )
 }
