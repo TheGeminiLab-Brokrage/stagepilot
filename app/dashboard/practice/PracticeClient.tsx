@@ -936,7 +936,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer',
                     padding: '12px 18px 10px',
-                    fontSize: 11, fontWeight: 700, letterSpacing: '0.12em',
+                    fontSize: lang === 'ar' ? 13 : 11, fontWeight: 700, letterSpacing: '0.12em',
                     textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif",
                     color: isActive ? '#D7FF00' : 'rgba(255,255,255,0.35)',
                     borderBottom: isActive ? '2px solid #D7FF00' : '2px solid transparent',
@@ -1091,13 +1091,13 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                                   <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
                                     {isClient ? t('practiceScenarioLabel') : t('practiceAskAbout')}
                                   </p>
-                                  <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, marginBottom: 10, fontFamily: "'Montserrat', sans-serif" }}>
+                                  <p style={{ fontSize: lang === 'ar' ? 13.5 : 11.5, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, marginBottom: 10, fontFamily: "'Montserrat', sans-serif" }}>
                                     {displayCtx}
                                   </p>
                                   <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
                                     {isClient ? t('practiceWhatToPractice') : t('practiceHowToUse')}
                                   </p>
-                                  <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, fontFamily: "'Montserrat', sans-serif" }}>
+                                  <p style={{ fontSize: lang === 'ar' ? 13.5 : 11.5, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, fontFamily: "'Montserrat', sans-serif" }}>
                                     {displayGoal}
                                   </p>
                                 </div>
