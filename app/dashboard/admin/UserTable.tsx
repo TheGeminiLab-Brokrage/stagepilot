@@ -26,16 +26,21 @@ const ROLE_ORDER: Record<string, number> = {
 }
 
 export default function UserTable({
-  initialProfiles,
+  profiles,
   emailMap,
   currentUserId,
+  teamLeaders,
+  onRemoveProfile,
+  onUpdateTeamProfile,
 }: {
-  initialProfiles: Profile[]
+  profiles: Profile[]
   emailMap: Record<string, string>
   currentUserId: string
+  teamLeaders: string[]
+  onRemoveProfile: (id: string) => void
+  onUpdateTeamProfile: (id: string, team: string | null) => void
 }) {
   const t = useT()
-  const [profiles, setProfiles] = useState<Profile[]>(initialProfiles)
   const [editingTeam, setEditingTeam] = useState<string | null>(null)
   const [saving, setSaving] = useState<string | null>(null)
   const [roleSort, setRoleSort] = useState<'asc' | 'desc' | null>(null)
@@ -46,11 +51,6 @@ export default function UserTable({
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [passwordSaving, setPasswordSaving] = useState(false)
   const [passwordDone, setPasswordDone] = useState(false)
-
-  const teamLeaders = useMemo(
-    () => profiles.filter(p => p.role === 'team_leader').map(p => p.full_name),
-    [profiles]
-  )
 
   const sortedProfiles = useMemo(() => {
     if (!roleSort) return profiles
@@ -69,7 +69,7 @@ export default function UserTable({
       body: JSON.stringify({ userId: removingUser.id }),
     })
     if (res.ok) {
-      setProfiles(prev => prev.filter(p => p.id !== removingUser.id))
+      onRemoveProfile(removingUser.id)
       setRemovingUser(null)
     } else {
       const d = await res.json().catch(() => ({}))
@@ -86,9 +86,7 @@ export default function UserTable({
       body: JSON.stringify({ userId, teamName: teamValue }),
     })
     if (res.ok) {
-      setProfiles(prev =>
-        prev.map(p => p.id === userId ? { ...p, team_name: teamValue } : p)
-      )
+      onUpdateTeamProfile(userId, teamValue)
     }
     setSaving(null)
     setEditingTeam(null)
@@ -200,7 +198,10 @@ export default function UserTable({
                 <div className="flex items-center justify-end gap-3">
                   <button
                     onClick={() => { setNewPassword(''); setPasswordError(null); setPasswordDone(false); setSettingPassword({ id: p.id, name: p.full_name }) }}
-                    className="text-xs text-gray-600 hover:text-blue-400 transition-colors cursor-pointer"
+                    className="text-xs text-gray-600 transition-colors cursor-pointer"
+                    style={{ transition: 'color 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#d7ff00')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '')}
                   >
                     {t('adminSetPasswordBtn')}
                   </button>
@@ -220,12 +221,20 @@ export default function UserTable({
       </table>
 
       {settingPassword && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-80 shadow-xl">
-            <h3 className="text-white font-semibold text-base mb-1">{t('adminSetNewPasswordTitle')}</h3>
-            <p className="text-gray-400 text-sm mb-4">{settingPassword.name}</p>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}>
+          <div style={{
+            background: '#0a0a0a',
+            border: '1px solid rgba(215,255,0,0.15)',
+            borderRadius: 16,
+            padding: '28px 28px 24px',
+            width: 340,
+            boxShadow: '0 0 0 1px rgba(215,255,0,0.05), 0 24px 60px rgba(0,0,0,0.8)',
+            fontFamily: "'Montserrat', sans-serif",
+          }}>
+            <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 15, margin: '0 0 4px' }}>{t('adminSetNewPasswordTitle')}</h3>
+            <p style={{ color: 'rgba(215,255,0,0.6)', fontSize: 13, margin: '0 0 20px', fontFamily: "'Space Grotesk', sans-serif" }}>{settingPassword.name}</p>
             {passwordDone ? (
-              <p className="text-green-400 text-sm text-center py-2">{t('adminPasswordUpdated')}</p>
+              <p style={{ color: '#d7ff00', fontSize: 13, textAlign: 'center', padding: '8px 0' }}>{t('adminPasswordUpdated')}</p>
             ) : (
               <>
                 <input
@@ -235,22 +244,44 @@ export default function UserTable({
                   onChange={e => setNewPassword(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') savePassword() }}
                   placeholder={t('adminPlaceholderPassword')}
-                  className="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{
+                    width: '100%', background: 'rgba(215,255,0,0.04)', border: '1px solid rgba(215,255,0,0.2)',
+                    color: '#fff', borderRadius: 8, padding: '10px 12px', fontSize: 13,
+                    outline: 'none', boxSizing: 'border-box', marginBottom: 8,
+                    fontFamily: "'Space Grotesk', sans-serif", transition: 'border-color 0.15s',
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(215,255,0,0.5)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'rgba(215,255,0,0.2)')}
                 />
                 {passwordError && (
-                  <p className="text-red-400 text-xs mb-3">{passwordError}</p>
+                  <p style={{ color: '#f87171', fontSize: 12, marginBottom: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '6px 10px' }}>{passwordError}</p>
                 )}
-                <div className="flex gap-3 justify-end mt-4">
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
                   <button
                     onClick={() => setSettingPassword(null)}
-                    className="px-4 py-1.5 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-colors"
+                    style={{
+                      padding: '8px 18px', fontSize: 13, fontWeight: 600, borderRadius: 8, cursor: 'pointer',
+                      background: 'transparent', color: 'rgba(255,255,255,0.45)',
+                      border: '1px solid rgba(255,255,255,0.12)', transition: 'all 0.15s',
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)' }}
                   >
                     {t('adminCancel')}
                   </button>
                   <button
                     onClick={savePassword}
                     disabled={passwordSaving}
-                    className="px-4 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg transition-colors"
+                    style={{
+                      padding: '8px 18px', fontSize: 13, fontWeight: 700, borderRadius: 8, cursor: passwordSaving ? 'not-allowed' : 'pointer',
+                      background: passwordSaving ? 'rgba(215,255,0,0.1)' : 'rgba(215,255,0,0.15)',
+                      color: passwordSaving ? 'rgba(215,255,0,0.4)' : '#d7ff00',
+                      border: '1px solid rgba(215,255,0,0.3)', transition: 'all 0.15s',
+                      fontFamily: "'Space Grotesk', sans-serif", opacity: passwordSaving ? 0.6 : 1,
+                    }}
+                    onMouseEnter={e => { if (!passwordSaving) { e.currentTarget.style.background = 'rgba(215,255,0,0.25)'; e.currentTarget.style.borderColor = 'rgba(215,255,0,0.5)' } }}
+                    onMouseLeave={e => { e.currentTarget.style.background = passwordSaving ? 'rgba(215,255,0,0.1)' : 'rgba(215,255,0,0.15)'; e.currentTarget.style.borderColor = 'rgba(215,255,0,0.3)' }}
                   >
                     {passwordSaving ? t('adminSaving') : t('adminSave')}
                   </button>

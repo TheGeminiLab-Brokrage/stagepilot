@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import UserTable from './UserTable'
 import CreateUserForm from './CreateUserForm'
 import AdminSectionTitle from './AdminSectionTitle'
@@ -23,9 +23,22 @@ export default function AdminUsersClient({ initialProfiles, initialEmailMap, cur
   const [profiles, setProfiles] = useState<Profile[]>(initialProfiles)
   const [emailMap, setEmailMap] = useState<Record<string, string>>(initialEmailMap)
 
+  const teamLeaders = useMemo(
+    () => profiles.filter(p => p.role === 'team_leader').map(p => p.full_name),
+    [profiles]
+  )
+
   function handleUserCreated(profile: Profile, email: string) {
     setProfiles(prev => [...prev, profile])
     setEmailMap(prev => ({ ...prev, [profile.id]: email }))
+  }
+
+  function handleRemoveProfile(id: string) {
+    setProfiles(prev => prev.filter(p => p.id !== id))
+  }
+
+  function handleUpdateTeamProfile(id: string, team: string | null) {
+    setProfiles(prev => prev.map(p => p.id === id ? { ...p, team_name: team } : p))
   }
 
   return (
@@ -34,9 +47,12 @@ export default function AdminUsersClient({ initialProfiles, initialEmailMap, cur
       <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', overflow: 'hidden', marginBottom: '2rem' }}>
         <div style={{ maxHeight: 360, overflowY: 'auto' }}>
           <UserTable
-            initialProfiles={profiles}
+            profiles={profiles}
             emailMap={emailMap}
             currentUserId={currentUserId}
+            teamLeaders={teamLeaders}
+            onRemoveProfile={handleRemoveProfile}
+            onUpdateTeamProfile={handleUpdateTeamProfile}
           />
         </div>
       </div>
@@ -49,7 +65,7 @@ export default function AdminUsersClient({ initialProfiles, initialEmailMap, cur
           headingClass="text-white font-medium mb-4"
         />
         <CreateUserForm
-          teamLeaders={profiles.filter(p => p.role === 'team_leader').map(p => p.full_name)}
+          teamLeaders={teamLeaders}
           onCreated={handleUserCreated}
         />
       </div>
