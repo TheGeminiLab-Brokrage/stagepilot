@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import PracticeClient from './PracticeClient'
 import TraineePracticeSessionsTab, { type PracticeSessionRow } from './TraineePracticeSessionsTab'
+import { useLanguage } from '@/lib/language-context'
 
 interface Props {
   userId: string
@@ -26,10 +27,12 @@ export default function PracticePageWrapper({
   scenarioLabels,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('practice')
+  const { lang } = useLanguage()
+  const isAr = lang === 'ar'
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'practice', label: 'التدريب' },
-    { key: 'sessions', label: 'سجل جلساتي' },
+    { key: 'practice', label: isAr ? 'التدريب' : 'Practice' },
+    { key: 'sessions', label: isAr ? 'سجل جلساتي' : 'My Sessions' },
   ]
 
   return (

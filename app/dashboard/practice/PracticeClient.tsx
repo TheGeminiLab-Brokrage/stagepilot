@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Mp3Encoder } from '@breezystack/lamejs'
 import AiOrb from './AiOrb'
 import { useT, useLanguage } from '@/lib/language-context'
+import { translations } from '@/lib/translations'
 
 // ─── Gemini Live API constants ─────────────────────────────────────────────────
 const MODEL = 'models/gemini-3.1-flash-live-preview'
@@ -672,7 +673,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
   const startSession = useCallback(async () => {
     if (isFreePlan && (dailyUsage[selectedScenarioRef.current] ?? 0) >= DAILY_LIMIT) {
       setStatusSync('error')
-      setErrorMsg('لقد وصلت إلى الحد اليومي لهذا السيناريو. حاول مرة أخرى غداً.')
+      setErrorMsg(lang === 'ar' ? 'لقد وصلت إلى الحد اليومي لهذا السيناريو. حاول مرة أخرى غداً.' : 'You have reached the daily limit for this scenario. Try again tomorrow.')
       return
     }
 
@@ -703,7 +704,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
       })
       if (res.status === 429) {
         setStatusSync('error')
-        setErrorMsg('لقد وصلت إلى الحد اليومي لهذا السيناريو. حاول مرة أخرى غداً.')
+        setErrorMsg(lang === 'ar' ? 'لقد وصلت إلى الحد اليومي لهذا السيناريو. حاول مرة أخرى غداً.' : 'You have reached the daily limit for this scenario. Try again tomorrow.')
         stopRingSound()
         return
       }
@@ -862,13 +863,14 @@ export default function PracticeClient({ userId, companyId, userName, role, user
   const isActive = status === 'listening' || status === 'speaking'
   const currentScenario = scenarios.find(s => s.id === selectedScenario)
 
+  const tr = translations[lang]
   const statusLabel: Record<Status, string> = {
-    idle:       t('practiceStatusIdle'),
-    connecting: t('practiceStatusConnecting'),
-    listening:  t('practiceStatusListening'),
-    speaking:   t('practiceStatusSpeaking'),
-    ending:     t('practiceStatusEnding'),
-    error:      t('practiceStatusError'),
+    idle:       tr.practiceStatusIdle,
+    connecting: tr.practiceStatusConnecting,
+    listening:  tr.practiceStatusListening,
+    speaking:   tr.practiceStatusSpeaking,
+    ending:     tr.practiceStatusEnding,
+    error:      tr.practiceStatusError,
   }
 
   // ─── RENDER ────────────────────────────────────────────────────────────────
