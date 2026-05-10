@@ -1,5 +1,6 @@
 'use client'
 
+import { usePathname } from 'next/navigation'
 import { useLanguage, useT } from '@/lib/language-context'
 
 interface NavbarProps {
@@ -19,6 +20,7 @@ const ROLE_KEY_MAP: Record<string, 'roleAgent' | 'roleTeamLeader' | 'roleSuperAd
 export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
   const { lang, setLang } = useLanguage()
   const t = useT()
+  const pathname = usePathname()
 
   const navLinks =
     role === 'trainee'
@@ -66,30 +68,38 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
           </a>
 
           <nav className="flex gap-1">
-            {navLinks.map(({ href, label }) => (
-              <a
-                key={href}
-                href={href}
-                className="text-xs font-semibold uppercase px-3 py-1.5 rounded-md transition-all"
-                style={{
-                  color: role === 'trainee' ? 'rgba(215,255,0,0.7)' : 'rgba(255,255,255,0.45)',
-                  letterSpacing: '0.08em',
-                  fontFamily: "'Space Grotesk', sans-serif",
-                }}
-                onMouseEnter={e => {
-                  const el = e.currentTarget
-                  el.style.color = '#D7FF00'
-                  el.style.background = 'rgba(215,255,0,0.08)'
-                }}
-                onMouseLeave={e => {
-                  const el = e.currentTarget
-                  el.style.color = (role === 'trainee' || role === 'exam') ? 'rgba(215,255,0,0.7)' : 'rgba(255,255,255,0.45)'
-                  el.style.background = 'transparent'
-                }}
-              >
-                {label}
-              </a>
-            ))}
+            {navLinks.map(({ href, label }) => {
+              const isActive = href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
+              return (
+                <a
+                  key={href}
+                  href={href}
+                  className="text-xs font-semibold uppercase px-3 py-1.5 rounded-md transition-all"
+                  style={{
+                    color: isActive ? '#D7FF00' : 'rgba(255,255,255,0.45)',
+                    background: isActive ? 'rgba(215,255,0,0.08)' : 'transparent',
+                    letterSpacing: '0.08em',
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    borderBottom: isActive ? '2px solid rgba(215,255,0,0.6)' : '2px solid transparent',
+                    borderRadius: '6px 6px 0 0',
+                  }}
+                  onMouseEnter={e => {
+                    if (isActive) return
+                    const el = e.currentTarget
+                    el.style.color = '#D7FF00'
+                    el.style.background = 'rgba(215,255,0,0.08)'
+                  }}
+                  onMouseLeave={e => {
+                    if (isActive) return
+                    const el = e.currentTarget
+                    el.style.color = 'rgba(255,255,255,0.45)'
+                    el.style.background = 'transparent'
+                  }}
+                >
+                  {label}
+                </a>
+              )
+            })}
           </nav>
         </div>
 

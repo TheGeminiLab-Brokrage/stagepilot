@@ -229,7 +229,8 @@ export default function UploadForm() {
           </div>
           <div className="bg-gray-800 rounded-full h-1.5">
             <div
-              className="bg-blue-500 h-1.5 rounded-full transition-all"
+              className="h-1.5 rounded-full transition-all"
+              style={{ background: '#D7FF00' }}
               style={{ width: `${uploadPct}%` }}
             />
           </div>
@@ -239,7 +240,8 @@ export default function UploadForm() {
       <button
         type="submit"
         disabled={!file || !agentStage || status === 'uploading' || status === 'done'}
-        className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg py-2.5 text-sm transition-colors"
+        className="w-full disabled:opacity-40 disabled:cursor-not-allowed font-bold rounded-lg py-2.5 text-sm transition-all tgl-btn-glow"
+        style={{ background: '#D7FF00', color: '#000', letterSpacing: '0.04em' }}
       >
         {status === 'uploading' ? t('uploadSubmittingBtn') : t('uploadSubmitBtn')}
       </button>
