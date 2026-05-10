@@ -20,7 +20,7 @@ export async function GET() {
   const admin = createAdminClient()
   const { data: results, error } = await admin
     .from('exam_results')
-    .select('id, phase1_score, phase1_max, phase2_score, phase2_max, phase3_completed, phase1_details, phase2_details, created_at, report_downloaded_at')
+    .select('id, phase1_score, phase1_max, phase2_score, phase2_max, phase3_completed, phase1_details, phase2_details, created_at, report_downloaded_at, call_grade')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(50)

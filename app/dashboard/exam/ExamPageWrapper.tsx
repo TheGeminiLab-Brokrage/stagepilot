@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import ExamClient from './ExamClient'
 import UserExamResultsTab, { type ExamResult } from './UserExamResultsTab'
 import { useT } from '@/lib/language-context'
@@ -17,12 +17,29 @@ type Tab = 'exam' | 'results'
 
 export default function ExamPageWrapper({ userId, companyId, userName, userEmail, initialResults }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('exam')
+  const [results, setResults] = useState<ExamResult[]>(initialResults)
   const t = useT()
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'exam', label: t('examTabExam') },
     { key: 'results', label: t('examTabResults') },
   ]
+
+  const refreshResults = useCallback(async () => {
+    try {
+      const res = await fetch('/api/exam/user-results')
+      if (!res.ok) return
+      const data = await res.json()
+      setResults(data.results ?? [])
+    } catch {
+      // Non-blocking — stale results stay visible
+    }
+  }, [])
+
+  const handleExamComplete = useCallback(async () => {
+    await refreshResults()
+    setActiveTab('results')
+  }, [refreshResults])
 
   return (
     <div className="flex flex-col h-full" style={{ fontFamily: "'Montserrat', sans-serif" }}>
@@ -57,7 +74,7 @@ export default function ExamPageWrapper({ userId, companyId, userName, userEmail
             }}
           >
             {label}
-            {key === 'results' && initialResults.length > 0 && (
+            {key === 'results' && results.length > 0 && (
               <span
                 style={{
                   marginRight: 8,
@@ -69,7 +86,7 @@ export default function ExamPageWrapper({ userId, companyId, userName, userEmail
                   fontWeight: 800,
                 }}
               >
-                {initialResults.length}
+                {results.length}
               </span>
             )}
           </button>
@@ -84,11 +101,12 @@ export default function ExamPageWrapper({ userId, companyId, userName, userEmail
             companyId={companyId}
             userName={userName}
             userEmail={userEmail}
+            onExamComplete={handleExamComplete}
           />
         )}
         {activeTab === 'results' && (
           <div className="flex-1 overflow-y-auto">
-            <UserExamResultsTab results={initialResults} userName={userName} />
+            <UserExamResultsTab results={results} userName={userName} />
           </div>
         )}
       </div>

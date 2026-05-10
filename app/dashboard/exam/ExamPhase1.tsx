@@ -129,16 +129,25 @@ export default function ExamPhase1({ onComplete, onTimerTick }: Props) {
 
   if (!started) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-6" dir="rtl">
+      <div className="flex flex-col items-center justify-center h-full gap-6">
         <div className="text-center space-y-3">
           <div style={{ color: '#D7FF00', fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 700 }}>
             المرحلة الأولى
           </div>
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, maxWidth: 480 }}>
+          <div style={{ color: 'rgba(215,255,0,0.45)', fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600, marginTop: -4 }}>
+            Phase 1
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 17, maxWidth: 480, margin: '0 auto', lineHeight: 1.7 }}>
             10 أسئلة متنوعة — اختيار من متعدد، صح أو غلط، وأسئلة مقالية. الأسئلة تظهر واحدة واحدة.
           </div>
-          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>
+          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontStyle: 'italic' }}>
+            10 varied questions — MCQ, true/false, and essay. One question at a time.
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>
             على الأقل سؤالين من كل نوع
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.28)', fontSize: 13, fontStyle: 'italic' }}>
+            At least 2 questions per type
           </div>
         </div>
         {error && <div style={{ color: '#f87171', fontSize: 13 }}>{error}</div>}

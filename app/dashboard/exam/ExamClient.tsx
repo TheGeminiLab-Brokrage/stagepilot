@@ -26,9 +26,10 @@ interface Props {
   companyId: string
   userName: string
   userEmail: string
+  onExamComplete?: () => void
 }
 
-export default function ExamClient({ userId, companyId, userName, userEmail }: Props) {
+export default function ExamClient({ userId, companyId, userName, userEmail, onExamComplete }: Props) {
   const t = useT()
   const PHASE_LABELS: Record<ExamPhase, string> = {
     phase1: t('examPhase1'),
@@ -163,6 +164,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
     }
 
     setPhase('results')
+    onExamComplete?.()
   }
 
   function handleReset() {
@@ -262,7 +264,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail }: P
           <h1 dir="ltr" style={{ color: '#fff', fontSize: 40, fontWeight: 800, marginBottom: 16, lineHeight: 1.2 }}>
             {userName}، {t('examReadyQuestion')}
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 17, lineHeight: 1.75, maxWidth: 480 }}>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 17, lineHeight: 1.75, maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
             {t('examIntroBody')}
           </p>
         </div>

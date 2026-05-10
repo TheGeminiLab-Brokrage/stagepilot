@@ -112,9 +112,9 @@ const en = {
   examTabResults: 'Exam Results',
 
   // ── Exam phase labels ─────────────────────────────────────────────────────
-  examPhase1: '1 — Questions',
-  examPhase2: '2 — Scenarios',
-  examPhase3: '3 — Simulation',
+  examPhase1: 'Questions',
+  examPhase2: 'Scenarios',
+  examPhase3: 'Simulation',
   examResults: 'Results',
 
   // ── Exam gate / intro screens ──────────────────────────────────────────────
@@ -382,9 +382,9 @@ const ar: typeof en = {
   examTabResults: 'نتائج الاختبار',
 
   // ── Exam phase labels ─────────────────────────────────────────────────────
-  examPhase1: '١ — الأسئلة',
-  examPhase2: '٢ — السيناريوهات',
-  examPhase3: '٣ — المحاكاة',
+  examPhase1: 'الأسئلة',
+  examPhase2: 'السيناريوهات',
+  examPhase3: 'المحاكاة',
   examResults: 'النتيجة',
 
   // ── Exam gate / intro screens ──────────────────────────────────────────────
