@@ -61,5 +61,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: profileError.message }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true, userId: newUser.user.id })
+  return NextResponse.json({
+    success: true,
+    userId: newUser.user.id,
+    profile: {
+      id: newUser.user.id,
+      full_name: fullName,
+      role,
+      team_name: resolvedTeamName,
+      created_at: new Date().toISOString(),
+    },
+    email,
+  })
 }

@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import CreateUserForm from './CreateUserForm'
-import UserTable from './UserTable'
+import AdminUsersClient from './AdminUsersClient'
 import PracticeSessionsTable from './PracticeSessionsTable'
 import ExamResultsTable from './ExamResultsTable'
 import ExamRecordingsTable from './ExamRecordingsTable'
@@ -84,30 +83,11 @@ export default async function AdminPage() {
         />
       </div>
 
-      {/* User list */}
-      <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', overflow: 'hidden', marginBottom: '2rem' }}>
-        <div style={{ maxHeight: 360, overflowY: 'auto' }}>
-          <UserTable
-            initialProfiles={profiles ?? []}
-            emailMap={emailMap}
-            currentUserId={user.id}
-          />
-        </div>
-      </div>
-
-      {/* Create user form */}
-      <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', padding: '20px 24px', marginBottom: '2rem' }}>
-        <AdminSectionTitle
-          titleKey="adminAddNewUser"
-          headingLevel="h2"
-          headingClass="text-white font-medium mb-4"
-        />
-        <CreateUserForm
-          teamLeaders={(profiles ?? [])
-            .filter(p => p.role === 'team_leader')
-            .map(p => p.full_name)}
-        />
-      </div>
+      <AdminUsersClient
+        initialProfiles={profiles ?? []}
+        initialEmailMap={emailMap}
+        currentUserId={user.id}
+      />
 
       {/* Exam Results */}
       <div className="mb-8">

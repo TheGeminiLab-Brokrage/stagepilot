@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useT } from '@/lib/language-context'
 
-export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] }) {
+type Profile = { id: string; full_name: string; role: string; team_name: string | null; created_at: string }
+
+export default function CreateUserForm({ teamLeaders, onCreated }: { teamLeaders: string[]; onCreated?: (profile: Profile, email: string) => void }) {
   const t = useT()
-  const router = useRouter()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -33,13 +33,16 @@ export default function CreateUserForm({ teamLeaders }: { teamLeaders: string[] 
       return
     }
 
+    const data = await res.json().catch(() => ({}))
     setStatus('done')
     setFullName('')
     setEmail('')
     setPassword('')
     setRole('agent')
     setTeamName('')
-    router.refresh()
+    if (onCreated && data.profile) {
+      onCreated(data.profile, data.email ?? '')
+    }
   }
 
   return (
