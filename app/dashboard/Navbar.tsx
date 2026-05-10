@@ -69,7 +69,7 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
 
           <nav className="flex gap-1">
             {navLinks.map(({ href, label }) => {
-              const isActive = href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
+              const isActive = pathname === href
               return (
                 <a
                   key={href}
