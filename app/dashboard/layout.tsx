@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { headers, cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import LogoutButton from './LogoutButton'
-import GeminiVoiceButton from './components/GeminiVoiceButton'
 import Navbar from './Navbar'
 import LanguageWrapper from './LanguageWrapper'
 
@@ -44,7 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </main>
       </div>
 
-      {role !== 'trainee' && role !== 'exam' && <GeminiVoiceButton />}
+
     </LanguageWrapper>
   )
 }
