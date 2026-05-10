@@ -91,13 +91,12 @@ interface ClinicFields {
 }
 
 const SCENARIOS = [
-  { id: 'dr_yasmine', label: 'Dr. Yasmine' },
-  { id: 'eng_khaled', label: 'Eng. Khaled' },
-  { id: 'mrs_nadia', label: 'Mrs. Nadia' },
-  { id: 'dr_mariam', label: 'Dr. Mariam' },
-  { id: 'mr_tarek', label: 'Mr. Tarek' },
-  { id: 'general_knowledge_clinics', label: 'General Knowledge' },
-  { id: 'sales_knowledge_assistant_demo', label: 'Sales Knowledge Demo' },
+  { id: 'dr_yasmine',            label: 'Dr. Yasmine' },
+  { id: 'dr_mariam',             label: 'Dr. Mariam' },
+  { id: 'mohammed_tgl',          label: 'محمد — TGL Strategist' },
+  { id: 'mohammed_madinet_masr', label: 'محمد — Madinet Masr' },
+  { id: 'mona_hassan',           label: 'منى حسن' },
+  { id: 'ali',                   label: 'علي' },
 ]
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -106,8 +105,10 @@ const CATEGORY_LABELS: Record<Category, string> = {
   common_question: 'Common Questions',
 }
 
+const VISIBLE_TABS: Category[] = ['product_fact', 'common_question']
+
 const CATEGORY_TIPS: Record<Category, string> = {
-  clinic_project: 'Real project data the AI searches in real time during a session — not baked into the prompt. Add, edit, or deactivate projects here.',
+  clinic_project: 'Real project data the AI searches in real time during a session — not baked into the prompt. Managed via Google Sheets.',
   product_fact: 'Injected into the AI\'s memory at session start. Use for pricing rules, policies, or facts that apply across conversations.',
   common_question: 'Injected into buyer-persona prompts so the AI-as-client asks realistic questions during practice sessions.',
 }
@@ -317,6 +318,7 @@ function SheetConnectionsPanel() {
   }
 
   const handleToggle = async (conn: SheetConnection) => {
+    setConnections((prev) => prev.map((c) => c.id === conn.id ? { ...c, is_active: !conn.is_active } : c))
     const res = await fetch(`/api/admin/sheet-connections/${conn.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -327,7 +329,7 @@ function SheetConnectionsPanel() {
   }
 
   const inputStyle = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }
-  const accentStyle = { background: '#D7FF00', color: '#000', fontFamily: "'Space Grotesk', sans-serif" }
+  const accentStyle = { background: '#D7FF00', color: '#000', fontFamily: "'Space Grotesk', sans-serif", cursor: 'pointer' as const }
 
   return (
     <>
@@ -340,7 +342,7 @@ function SheetConnectionsPanel() {
       </div>
 
       {/* List */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)' }}>
         {loading ? (
           <div className="py-10 text-center text-sm text-gray-600">Loading…</div>
         ) : connections.length === 0 ? (
@@ -350,12 +352,12 @@ function SheetConnectionsPanel() {
         ) : (
           <table className="w-full text-xs">
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <th className="text-left px-4 py-3 text-gray-500 uppercase tracking-wide font-semibold">Name</th>
-                <th className="text-left px-4 py-3 text-gray-500 uppercase tracking-wide font-semibold">Tab</th>
-                <th className="text-left px-4 py-3 text-gray-500 uppercase tracking-wide font-semibold">Category</th>
-                <th className="text-left px-4 py-3 text-gray-500 uppercase tracking-wide font-semibold">Last Sync</th>
-                <th className="text-center px-4 py-3 text-gray-500 uppercase tracking-wide font-semibold">Active</th>
+              <tr className="border-b border-[rgba(215,255,0,0.12)] text-xs uppercase tracking-wide" style={{ color: 'rgba(215,255,0,0.4)' }}>
+                <th className="text-left px-4 py-3 font-semibold">Name</th>
+                <th className="text-left px-4 py-3 font-semibold">Tab</th>
+                <th className="text-left px-4 py-3 font-semibold">Category</th>
+                <th className="text-left px-4 py-3 font-semibold">Last Sync</th>
+                <th className="text-center px-4 py-3 font-semibold">Active</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -363,7 +365,7 @@ function SheetConnectionsPanel() {
               {connections.map((conn, i) => {
                 const syncRes = conn.last_sync_result
                 return (
-                  <tr key={conn.id} style={{ borderBottom: i < connections.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                  <tr key={conn.id} className="hover:bg-[rgba(215,255,0,0.04)] transition-colors" style={{ borderBottom: i < connections.length - 1 ? '1px solid rgba(215,255,0,0.06)' : 'none' }}>
                     <td className="px-4 py-3 font-medium text-white">{conn.name}</td>
                     <td className="px-4 py-3 text-gray-400 font-mono">{conn.tab_name}</td>
                     <td className="px-4 py-3">
@@ -389,7 +391,7 @@ function SheetConnectionsPanel() {
                       <button
                         onClick={() => handleToggle(conn)}
                         className="w-8 h-4 rounded-full transition-all relative"
-                        style={{ background: conn.is_active ? 'rgba(215,255,0,0.3)' : 'rgba(255,255,255,0.1)' }}
+                        style={{ background: conn.is_active ? 'rgba(215,255,0,0.3)' : 'rgba(255,255,255,0.1)', cursor: 'pointer' }}
                       >
                         <span
                           className="absolute top-0.5 w-3 h-3 rounded-full transition-all"
@@ -402,7 +404,7 @@ function SheetConnectionsPanel() {
                         onClick={() => handleSync(conn.id)}
                         disabled={syncing === conn.id}
                         className="text-xs px-2 py-1 rounded mr-1 transition-all disabled:opacity-40"
-                        style={{ color: 'rgba(215,255,0,0.6)', background: 'rgba(215,255,0,0.05)' }}
+                        style={{ color: 'rgba(215,255,0,0.6)', background: 'rgba(215,255,0,0.05)', cursor: 'pointer' }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'rgba(215,255,0,0.12)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'rgba(215,255,0,0.05)')}
                       >
@@ -412,7 +414,7 @@ function SheetConnectionsPanel() {
                         onClick={() => handleDelete(conn.id)}
                         disabled={deleting === conn.id}
                         className="text-xs px-2 py-1 rounded transition-all disabled:opacity-40"
-                        style={{ color: 'rgba(239,68,68,0.7)', background: 'rgba(239,68,68,0.05)' }}
+                        style={{ color: 'rgba(239,68,68,0.7)', background: 'rgba(239,68,68,0.05)', cursor: 'pointer' }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.12)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.05)')}
                       >
@@ -644,7 +646,7 @@ function SheetConnectionsPanel() {
 
 export default function KnowledgeBaseManager({ initialEntries }: { initialEntries: Entry[] }) {
   const [entries, setEntries] = useState<Entry[]>(initialEntries)
-  const [activeTab, setActiveTab] = useState<MainTab>('clinic_project')
+  const [activeTab, setActiveTab] = useState<MainTab>('product_fact')
   const [showModal, setShowModal] = useState(false)
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null)
   const [saving, setSaving] = useState(false)
@@ -729,6 +731,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
   }, [])
 
   const handleToggleActive = useCallback(async (entry: Entry) => {
+    setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, is_active: !e.is_active } : e))
     const res = await fetch(`/api/admin/knowledge-entries/${entry.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -748,7 +751,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
     <>
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-800">
-        {(Object.keys(CATEGORY_LABELS) as Category[]).map((cat) => (
+        {VISIBLE_TABS.map((cat) => (
           <button
             key={cat}
             onClick={() => setActiveTab(cat)}
@@ -804,26 +807,9 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
       {/* Knowledge entries UI — hidden when Google Sheets tab is active */}
       {activeTab !== 'sheet_connections' && <>
 
-      {/* Cross-tab info banner for clinic_project */}
-      {activeTab === 'clinic_project' && (
-        <div
-          className="mb-4 px-4 py-3 rounded-lg text-xs leading-relaxed flex gap-2"
-          style={{ background: 'rgba(215,255,0,0.04)', border: '1px solid rgba(215,255,0,0.12)', color: 'rgba(215,255,0,0.6)' }}
-        >
-          <span style={{ flexShrink: 0 }}>ⓘ</span>
-          <span>
-            Clinic projects are available in <strong style={{ color: 'rgba(215,255,0,0.85)' }}>all sessions</strong> — the AI searches them in real time.
-            To add facts or questions that are <strong style={{ color: 'rgba(215,255,0,0.85)' }}>specific to a persona</strong>, use the{' '}
-            <strong style={{ color: 'rgba(215,255,0,0.85)' }}>Product Facts</strong> or{' '}
-            <strong style={{ color: 'rgba(215,255,0,0.85)' }}>Common Questions</strong> tabs where you can restrict entries to specific scenarios.
-          </span>
-        </div>
-      )}
-
       {/* Table header + Add button */}
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs text-gray-500">
-          {activeTab === 'clinic_project' && 'Searched in real-time by the AI during sessions.'}
           {activeTab === 'product_fact' && 'Injected into the system prompt at session start.'}
           {activeTab === 'common_question' && 'Injected into buyer persona prompts — the AI uses these as realistic client questions.'}
         </p>
@@ -842,7 +828,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
       </div>
 
       {/* Table */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)' }}>
         {filtered.length === 0 ? (
           <div className="py-12 text-center text-sm text-gray-600">
             No {CATEGORY_LABELS[activeTab].toLowerCase()} yet. Click &ldquo;+ Add Entry&rdquo; to add the first one.
@@ -850,16 +836,16 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
         ) : (
           <table className="w-full text-xs">
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">Title</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">Content</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">
+              <tr className="border-b border-[rgba(215,255,0,0.12)] text-xs uppercase tracking-wide" style={{ color: 'rgba(215,255,0,0.4)' }}>
+                <th className="text-left px-4 py-3 font-semibold">Title</th>
+                <th className="text-left px-4 py-3 font-semibold">Content</th>
+                <th className="text-left px-4 py-3 font-semibold">
                   <span className="flex items-center gap-0.5">
                     Scenarios
                     <InfoIcon tip="Which practice sessions include this entry. 'All' = no restriction, every session gets it. Restricted entries only appear in the selected personas." />
                   </span>
                 </th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide">
+                <th className="text-center px-4 py-3 font-semibold">
                   <span className="flex items-center justify-center gap-0.5">
                     Active
                     <InfoIcon tip="On = AI uses this entry in sessions. Off = stored but never shown to the AI. Toggle to pause without deleting." />
@@ -872,7 +858,8 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
               {filtered.map((entry, i) => (
                 <tr
                   key={entry.id}
-                  style={{ borderBottom: i < filtered.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
+                  className="hover:bg-[rgba(215,255,0,0.04)] transition-colors"
+                  style={{ borderBottom: i < filtered.length - 1 ? '1px solid rgba(215,255,0,0.06)' : 'none' }}
                 >
                   <td className="px-4 py-3 font-medium text-white" style={{ maxWidth: '160px' }}>
                     {entry.title}

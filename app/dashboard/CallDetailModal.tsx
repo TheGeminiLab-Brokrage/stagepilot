@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useT } from '@/lib/language-context'
 
 const STAGE_COLORS: Record<string, string> = {
@@ -56,6 +56,15 @@ export default function CallDetailModal({
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [audioLoading, setAudioLoading] = useState(false)
   const [audioError, setAudioError] = useState('')
+  const [playbackSpeed, setPlaybackSpeed] = useState(1)
+  const audioRef = useRef<HTMLAudioElement>(null)
+
+  const SPEED_STEPS = [1, 1.5, 2, 0.5]
+  function cycleSpeed() {
+    const next = SPEED_STEPS[(SPEED_STEPS.indexOf(playbackSpeed) + 1) % SPEED_STEPS.length]
+    setPlaybackSpeed(next)
+    if (audioRef.current) audioRef.current.playbackRate = next
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -157,7 +166,22 @@ export default function CallDetailModal({
                   )
                 }
                 return audioUrl ? (
-                  <audio controls src={audioUrl} className="w-full h-10 accent-blue-500" />
+                  <div className="flex items-center gap-2">
+                    <audio ref={audioRef} controls src={audioUrl} className="flex-1 h-10 accent-blue-500" />
+                    <button
+                      onClick={cycleSpeed}
+                      title="Change playback speed"
+                      style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 5,
+                        background: playbackSpeed !== 1 ? 'rgba(215,255,0,0.15)' : 'rgba(255,255,255,0.05)',
+                        border: playbackSpeed !== 1 ? '1px solid rgba(215,255,0,0.4)' : '1px solid rgba(255,255,255,0.12)',
+                        color: playbackSpeed !== 1 ? '#D7FF00' : 'rgba(255,255,255,0.4)',
+                        cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s',
+                      }}
+                    >
+                      {playbackSpeed}×
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={loadAudio}

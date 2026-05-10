@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useT } from '@/lib/language-context'
 
 interface PracticeSession {
@@ -37,10 +37,14 @@ function formatTime(isoString: string): string {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
+const SPEED_STEPS = [1, 1.5, 2, 0.5]
+
 export default function PracticeSessionsTable({ sessions }: { sessions: PracticeSession[] }) {
   const [playingSession, setPlayingSession] = useState<string | null>(null)
   const [loadingSession, setLoadingSession] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState<string>('')
+  const [playbackSpeed, setPlaybackSpeed] = useState(1)
+  const audioRef = useRef<HTMLAudioElement>(null)
   const t = useT()
 
   async function playSession(sessionId: string) {
@@ -61,11 +65,19 @@ export default function PracticeSessionsTable({ sessions }: { sessions: Practice
       const { signedUrl } = await res.json()
       setAudioUrl(signedUrl)
       setPlayingSession(sessionId)
+      setPlaybackSpeed(1)
     } catch (e) {
       console.error('Error fetching audio URL:', e)
     } finally {
       setLoadingSession(null)
     }
+  }
+
+  function cycleSpeed() {
+    const currentIdx = SPEED_STEPS.indexOf(playbackSpeed)
+    const nextSpeed = SPEED_STEPS[(currentIdx + 1) % SPEED_STEPS.length]
+    setPlaybackSpeed(nextSpeed)
+    if (audioRef.current) audioRef.current.playbackRate = nextSpeed
   }
 
   if (sessions.length === 0) {
@@ -138,19 +150,37 @@ export default function PracticeSessionsTable({ sessions }: { sessions: Practice
         </tbody>
       </table>
 
-      {/* Audio player (hidden, only for playback) */}
       {audioUrl && (
-        <div className="px-4 py-4 border-t border-gray-800/50 bg-gray-800/10">
-          <audio
-            key={audioUrl}
-            autoPlay
-            controls
-            onEnded={() => { setPlayingSession(null); setAudioUrl('') }}
-            className="w-full h-10"
-          >
-            <source src={audioUrl} type="audio/wav" />
-            Your browser does not support the audio element.
-          </audio>
+        <div className="px-4 py-3 border-t border-[rgba(215,255,0,0.12)] bg-[rgba(215,255,0,0.03)]">
+          <div className="flex items-center gap-3">
+            <audio
+              ref={audioRef}
+              key={audioUrl}
+              autoPlay
+              controls
+              onEnded={() => { setPlayingSession(null); setAudioUrl(''); setPlaybackSpeed(1) }}
+              className="flex-1 h-10"
+            >
+              <source src={audioUrl} type="audio/wav" />
+              Your browser does not support the audio element.
+            </audio>
+            <button
+              onClick={cycleSpeed}
+              title="Change playback speed"
+              style={{
+                fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 5,
+                background: playbackSpeed !== 1 ? 'rgba(215,255,0,0.15)' : 'rgba(255,255,255,0.05)',
+                border: playbackSpeed !== 1 ? '1px solid rgba(215,255,0,0.4)' : '1px solid rgba(255,255,255,0.12)',
+                color: playbackSpeed !== 1 ? '#D7FF00' : 'rgba(255,255,255,0.4)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                transition: 'all 0.15s',
+              }}
+            >
+              {playbackSpeed}×
+            </button>
+          </div>
         </div>
       )}
     </div>

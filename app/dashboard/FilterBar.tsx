@@ -21,6 +21,17 @@ type Props = {
   onFiltered: (filtered: Call[]) => void
 }
 
+const inputBase: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  color: 'rgba(255,255,255,0.7)',
+  borderRadius: 8,
+  fontSize: 12,
+  padding: '5px 10px',
+  outline: 'none',
+  fontFamily: "'Montserrat', sans-serif",
+}
+
 export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
   const t = useT()
   const [selectedStages, setSelectedStages] = useState<string[]>([])
@@ -107,27 +118,59 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
       <div className="relative" ref={stageRef}>
         <button
           onClick={() => setStageOpen(o => !o)}
-          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
-            selectedStages.length > 0
-              ? 'bg-blue-600/20 border-blue-500/50 text-blue-300'
-              : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
-          }`}
+          style={{
+            ...inputBase,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            cursor: 'pointer',
+            ...(selectedStages.length > 0 ? {
+              background: 'rgba(215,255,0,0.1)',
+              border: '1px solid rgba(215,255,0,0.4)',
+              color: '#D7FF00',
+            } : {}),
+          }}
         >
-          {t('filterStage')} {selectedStages.length > 0 && <span className="bg-blue-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">{selectedStages.length}</span>}
-          <span className="text-gray-600">▾</span>
+          {t('filterStage')}
+          {selectedStages.length > 0 && (
+            <span style={{
+              background: '#D7FF00', color: '#000', borderRadius: '50%',
+              width: 16, height: 16, display: 'inline-flex', alignItems: 'center',
+              justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0,
+            }}>
+              {selectedStages.length}
+            </span>
+          )}
+          <span style={{ color: selectedStages.length > 0 ? 'rgba(215,255,0,0.5)' : 'rgba(255,255,255,0.25)', fontSize: 10 }}>▾</span>
         </button>
         {stageOpen && (
-          <div className="absolute top-full left-0 mt-1 z-20 bg-gray-900 border border-gray-700 rounded-xl shadow-xl py-1 min-w-[200px]">
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 20,
+            background: '#111', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+            padding: '4px 0', minWidth: 200,
+          }}>
             {ALL_STAGES.map(s => {
               const stageKey = STAGE_KEY_MAP[s]
               const stageLabel = stageKey ? t(stageKey) : s
+              const checked = selectedStages.includes(s)
               return (
-                <label key={s} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-800 cursor-pointer text-xs text-gray-300 capitalize">
+                <label
+                  key={s}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                    color: checked ? '#D7FF00' : 'rgba(255,255,255,0.6)',
+                    background: checked ? 'rgba(215,255,0,0.06)' : 'transparent',
+                  }}
+                  onMouseEnter={e => { if (!checked) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)' }}
+                  onMouseLeave={e => { if (!checked) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                >
                   <input
                     type="checkbox"
-                    checked={selectedStages.includes(s)}
+                    checked={checked}
                     onChange={() => toggleStage(s)}
-                    className="accent-blue-500"
+                    style={{ accentColor: '#D7FF00', cursor: 'pointer' }}
                   />
                   {stageLabel}
                 </label>
@@ -143,7 +186,7 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
         placeholder={t('filterSearchClient')}
         value={clientSearch}
         onChange={e => setClientSearch(e.target.value)}
-        className="text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-600 w-36"
+        style={{ ...inputBase, width: 144 }}
       />
 
       {/* Team filter — leaders/admin only */}
@@ -151,11 +194,15 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
         <select
           value={teamFilter}
           onChange={e => setTeamFilter(e.target.value)}
-          className={`text-xs rounded-lg px-3 py-1.5 border focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-            teamFilter
-              ? 'bg-blue-600/20 border-blue-500/50 text-blue-300'
-              : 'bg-gray-800 border-gray-700 text-gray-400'
-          }`}
+          style={{
+            ...inputBase,
+            cursor: 'pointer',
+            ...(teamFilter ? {
+              background: 'rgba(215,255,0,0.1)',
+              border: '1px solid rgba(215,255,0,0.4)',
+              color: '#D7FF00',
+            } : {}),
+          }}
         >
           <option value="">{t('filterAllTeams')}</option>
           {teams.map(team => <option key={team} value={team}>{team}</option>)}
@@ -169,7 +216,7 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
           placeholder={t('filterSearchAgent')}
           value={agentSearch}
           onChange={e => setAgentSearch(e.target.value)}
-          className="text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-600 w-32"
+          style={{ ...inputBase, width: 128 }}
         />
       )}
 
@@ -178,21 +225,26 @@ export default function FilterBar({ calls, isLeader, onFiltered }: Props) {
         type="date"
         value={dateFrom}
         onChange={e => setDateFrom(e.target.value)}
-        className="text-xs bg-gray-800 border border-gray-700 text-gray-400 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        style={{ ...inputBase, cursor: 'pointer', colorScheme: 'dark' }}
       />
-      <span className="text-gray-600 text-xs">→</span>
+      <span style={{ color: 'rgba(215,255,0,0.4)', fontSize: 12 }}>→</span>
       <input
         type="date"
         value={dateTo}
         onChange={e => setDateTo(e.target.value)}
-        className="text-xs bg-gray-800 border border-gray-700 text-gray-400 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        style={{ ...inputBase, cursor: 'pointer', colorScheme: 'dark' }}
       />
 
       {/* Clear */}
       {hasFilters && (
         <button
           onClick={clearAll}
-          className="text-xs text-gray-600 hover:text-red-400 transition-colors px-1"
+          style={{
+            fontSize: 12, color: 'rgba(255,255,255,0.3)', background: 'none',
+            border: 'none', cursor: 'pointer', padding: '2px 4px', transition: 'color 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'rgba(239,68,68,0.7)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
         >
           {t('filterClearAll')}
         </button>

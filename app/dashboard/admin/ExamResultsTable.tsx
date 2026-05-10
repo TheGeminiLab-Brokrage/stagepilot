@@ -189,11 +189,12 @@ function DownloadButton({ result }: { result: ExamResult }) {
   if (downloaded) {
     return (
       <span style={{
-        fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 6,
+        fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 6,
         background: 'rgba(16,185,129,0.06)', color: 'rgba(16,185,129,0.5)',
-        border: '1px solid rgba(16,185,129,0.15)', display: 'inline-flex', alignItems: 'center', gap: 5,
+        border: '1px solid rgba(16,185,129,0.15)', display: 'inline-flex', alignItems: 'center', gap: 4,
+        whiteSpace: 'nowrap',
       }}>
-        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <polyline points="20 6 9 17 4 12"/>
         </svg>
         {t('adminDownloaded')}
@@ -320,8 +321,11 @@ export default function ExamResultsTable({ results }: { results: ExamResult[] })
                       {r.phase3_completed ? '✓' : '—'}
                     </span>
                   </td>
-                  <td className="px-5 py-3" style={{ color: '#D7FF00', fontWeight: 700 }}>
-                    {total}/{max} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: 11 }}>({pct}%)</span>
+                  <td className="px-5 py-3">
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                      <span style={{ color: '#D7FF00', fontWeight: 700 }}>{total}/{max}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: 10 }}>{pct}%</span>
+                    </div>
                   </td>
                   <td className="px-5 py-3">
                     <span
@@ -335,7 +339,7 @@ export default function ExamResultsTable({ results }: { results: ExamResult[] })
                       {passed ? t('userExamPassed') : t('userExamFailed')}
                     </span>
                   </td>
-                  <td className="px-5 py-3" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
+                  <td className="px-5 py-3" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, whiteSpace: 'nowrap' }}>
                     {new Date(r.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
                   <td className="px-5 py-3">
@@ -353,7 +357,7 @@ export default function ExamResultsTable({ results }: { results: ExamResult[] })
                       {t('adminViewDetails')}
                     </button>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-3" style={{ whiteSpace: 'nowrap' }}>
                     <DownloadButton result={r} />
                   </td>
                 </tr>
