@@ -294,7 +294,7 @@ export default function ExamResultsTable({ results }: { results: ExamResult[] })
                 t('adminColDate'),
                 '', '',
               ].map((h, i) => (
-                <th key={i} className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
+                <th key={i} className="text-left px-3 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
                   {h}
                 </th>
               ))}
@@ -309,25 +309,25 @@ export default function ExamResultsTable({ results }: { results: ExamResult[] })
 
               return (
                 <tr key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <td className="px-5 py-3 text-white font-medium">{r.user_name}</td>
-                  <td className="px-5 py-3" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                  <td className="px-3 py-3 text-white font-medium">{r.user_name}</td>
+                  <td className="px-3 py-3" style={{ color: 'rgba(255,255,255,0.6)' }}>
                     {r.phase1_score}/{r.phase1_max}
                   </td>
-                  <td className="px-5 py-3" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                  <td className="px-3 py-3" style={{ color: 'rgba(255,255,255,0.6)' }}>
                     {r.phase2_score}/{r.phase2_max}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-3 py-3">
                     <span style={{ color: r.phase3_completed ? '#10b981' : 'rgba(255,255,255,0.3)', fontSize: 13 }}>
                       {r.phase3_completed ? '✓' : '—'}
                     </span>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-3 py-3">
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                       <span style={{ color: '#D7FF00', fontWeight: 700 }}>{total}/{max}</span>
                       <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: 10 }}>{pct}%</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-3 py-3">
                     <span
                       style={{
                         padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
@@ -339,10 +339,10 @@ export default function ExamResultsTable({ results }: { results: ExamResult[] })
                       {passed ? t('userExamPassed') : t('userExamFailed')}
                     </span>
                   </td>
-                  <td className="px-5 py-3" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                  <td className="px-3 py-3" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
                     {new Date(r.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-3 py-3">
                     <button
                       onClick={() => setSelected(r)}
                       style={{
@@ -357,7 +357,7 @@ export default function ExamResultsTable({ results }: { results: ExamResult[] })
                       {t('adminViewDetails')}
                     </button>
                   </td>
-                  <td className="px-5 py-3" style={{ whiteSpace: 'nowrap' }}>
+                  <td className="px-3 py-3" style={{ whiteSpace: 'nowrap' }}>
                     <DownloadButton result={r} />
                   </td>
                 </tr>

@@ -123,27 +123,44 @@ export default function PracticeSessionsTable({ sessions }: { sessions: Practice
                 {formatDuration(session.duration_seconds)}
               </td>
               <td className="px-4 py-3">
-                <button
-                  onClick={() => playSession(session.id)}
-                  disabled={loadingSession === session.id}
-                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[rgba(215,255,0,0.08)] hover:bg-[#D7FF00] text-[#D7FF00] hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={playingSession === session.id ? 'Stop playback' : 'Play recording'}
-                >
-                  {loadingSession === session.id ? (
-                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 2v4m0 12v4M2 12h4m12 0h4" />
-                      <circle cx="12" cy="12" r="8" />
-                    </svg>
-                  ) : playingSession === session.id ? (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <rect x="4" y="4" width="16" height="16" rx="2" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => playSession(session.id)}
+                    disabled={loadingSession === session.id}
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[rgba(215,255,0,0.08)] hover:bg-[#D7FF00] text-[#D7FF00] hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={playingSession === session.id ? 'Stop playback' : 'Play recording'}
+                  >
+                    {loadingSession === session.id ? (
+                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 2v4m0 12v4M2 12h4m12 0h4" />
+                        <circle cx="12" cy="12" r="8" />
+                      </svg>
+                    ) : playingSession === session.id ? (
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="4" y="4" width="16" height="16" rx="2" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    )}
+                  </button>
+                  {playingSession === session.id && (
+                    <button
+                      onClick={cycleSpeed}
+                      title="Change playback speed"
+                      style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 5,
+                        background: playbackSpeed !== 1 ? 'rgba(215,255,0,0.15)' : 'rgba(255,255,255,0.05)',
+                        border: playbackSpeed !== 1 ? '1px solid rgba(215,255,0,0.4)' : '1px solid rgba(255,255,255,0.12)',
+                        color: playbackSpeed !== 1 ? '#D7FF00' : 'rgba(255,255,255,0.4)',
+                        cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s',
+                      }}
+                    >
+                      {playbackSpeed}×
+                    </button>
                   )}
-                </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -151,37 +168,15 @@ export default function PracticeSessionsTable({ sessions }: { sessions: Practice
       </table>
 
       {audioUrl && (
-        <div className="px-4 py-3 border-t border-[rgba(215,255,0,0.12)] bg-[rgba(215,255,0,0.03)]">
-          <div className="flex items-center gap-3">
-            <audio
-              ref={audioRef}
-              key={audioUrl}
-              autoPlay
-              controls
-              onEnded={() => { setPlayingSession(null); setAudioUrl(''); setPlaybackSpeed(1) }}
-              className="flex-1 h-10"
-            >
-              <source src={audioUrl} type="audio/wav" />
-              Your browser does not support the audio element.
-            </audio>
-            <button
-              onClick={cycleSpeed}
-              title="Change playback speed"
-              style={{
-                fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 5,
-                background: playbackSpeed !== 1 ? 'rgba(215,255,0,0.15)' : 'rgba(255,255,255,0.05)',
-                border: playbackSpeed !== 1 ? '1px solid rgba(215,255,0,0.4)' : '1px solid rgba(255,255,255,0.12)',
-                color: playbackSpeed !== 1 ? '#D7FF00' : 'rgba(255,255,255,0.4)',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                transition: 'all 0.15s',
-              }}
-            >
-              {playbackSpeed}×
-            </button>
-          </div>
-        </div>
+        <audio
+          ref={audioRef}
+          key={audioUrl}
+          autoPlay
+          onEnded={() => { setPlayingSession(null); setAudioUrl(''); setPlaybackSpeed(1) }}
+          style={{ display: 'none' }}
+        >
+          <source src={audioUrl} type="audio/wav" />
+        </audio>
       )}
     </div>
   )
