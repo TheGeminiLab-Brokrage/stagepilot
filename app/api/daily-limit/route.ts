@@ -58,18 +58,26 @@ export async function GET() {
   }
 
   if (role === 'agent') {
-    const { data: rows } = await admin
-      .from('practice_sessions')
-      .select('scenario_id')
-      .eq('user_id', user.id)
-      .gte('created_at', todayStart.toISOString())
-      .lt('created_at', tomorrowStart.toISOString())
+    const [practiceRes, examRes] = await Promise.all([
+      admin
+        .from('practice_sessions')
+        .select('scenario_id')
+        .eq('user_id', user.id)
+        .gte('created_at', todayStart.toISOString())
+        .lt('created_at', tomorrowStart.toISOString()),
+      admin
+        .from('exam_attempts')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', todayStart.toISOString())
+        .lt('created_at', tomorrowStart.toISOString()),
+    ])
 
     const usage: Record<string, number> = {}
-    for (const row of rows ?? []) {
+    for (const row of practiceRes.data ?? []) {
       usage[row.scenario_id] = (usage[row.scenario_id] ?? 0) + 1
     }
-    return NextResponse.json({ role: 'agent', limit: 3, usage })
+    return NextResponse.json({ role: 'agent', limit: 3, usage, usedExamToday: examRes.count ?? 0 })
   }
 
   return NextResponse.json({ role, unlimited: true })

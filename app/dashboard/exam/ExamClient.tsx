@@ -70,7 +70,8 @@ export default function ExamClient({ userId, companyId, userName, userEmail, onE
     fetch('/api/daily-limit')
       .then((r) => r.json())
       .then((data) => {
-        if (data.unlimited || (data.usedToday ?? 0) < 1) {
+        const examUsed = data.usedToday ?? data.usedExamToday ?? 0
+        if (data.unlimited || examUsed < 1) {
           setGate('intro')
         } else {
           setGate('blocked')
@@ -230,7 +231,7 @@ export default function ExamClient({ userId, companyId, userName, userEmail, onE
           </p>
         </div>
         <a
-          href="/auth/login"
+          href="/dashboard"
           style={{
             color: 'rgba(215,255,0,0.6)', fontSize: 12, textDecoration: 'underline',
             cursor: 'pointer', marginTop: 8,
