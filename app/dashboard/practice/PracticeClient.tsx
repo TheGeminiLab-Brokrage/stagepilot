@@ -475,6 +475,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
     // Defer heavy MP3 encoding so the UI state update flushes first
     if (chunks.length > 0 || mic.length > 0) {
       const durationSeconds = Math.round((Date.now() - startMs) / 1000)
+      setSaveStatus('saving') // lock the start button immediately — before the 50ms encode delay
       console.log('[SAVE] closeSession: deferring encode — chunks:', chunks.length, 'mic:', mic.length, 'startMs:', startMs, 'duration:', durationSeconds)
       setTimeout(async () => {
         try {
