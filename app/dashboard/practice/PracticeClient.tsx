@@ -1338,7 +1338,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
         {status === 'idle' || status === 'error' ? (
           <button
             onClick={startSession}
-            disabled={!selectedScenario || (isFreePlan && (dailyUsage[selectedScenario] ?? 0) >= DAILY_LIMIT)}
+            disabled={!selectedScenario || saveStatus === 'saving' || (isFreePlan && (dailyUsage[selectedScenario] ?? 0) >= DAILY_LIMIT)}
             className="tgl-btn-glow flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
               background: '#D7FF00',
