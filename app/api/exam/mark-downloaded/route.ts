@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!profile || (profile.role !== 'exam' && profile.role !== 'super_admin')) {
+  if (!profile || (profile.role !== 'exam' && profile.role !== 'agent' && profile.role !== 'super_admin')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
     .update({ report_downloaded_at: new Date().toISOString() })
     .eq('id', resultId)
 
-  // Exam users can only mark their own results; admins can mark any
-  if (profile.role === 'exam') {
+  // Exam users and agents can only mark their own results; admins can mark any
+  if (profile.role === 'exam' || profile.role === 'agent') {
     query.eq('user_id', user.id)
   }
 
