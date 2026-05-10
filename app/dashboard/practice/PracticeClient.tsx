@@ -936,7 +936,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer',
                     padding: '12px 18px 10px',
-                    fontSize: lang === 'ar' ? 13 : 11, fontWeight: 700, letterSpacing: '0.12em',
+                    fontSize: lang === 'ar' ? 15 : 11, fontWeight: 700, letterSpacing: '0.12em',
                     textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif",
                     color: isActive ? '#D7FF00' : 'rgba(255,255,255,0.35)',
                     borderBottom: isActive ? '2px solid #D7FF00' : '2px solid transparent',
