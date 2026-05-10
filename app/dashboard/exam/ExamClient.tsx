@@ -40,6 +40,23 @@ export default function ExamClient({ userId, companyId, userName, userEmail, onE
 
   const [gate, setGate] = useState<ExamGate>('loading')
   const [startError, setStartError] = useState('')
+  const [countdown, setCountdown] = useState('')
+
+  useEffect(() => {
+    if (gate !== 'blocked') return
+    function tick() {
+      const now = new Date()
+      const reset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+      const diff = Math.max(0, reset.getTime() - now.getTime())
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setCountdown(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [gate])
 
   const [phase, setPhase] = useState<ExamPhase>('phase1')
   const [questionTimeDisplay, setQuestionTimeDisplay] = useState(60)
@@ -230,6 +247,22 @@ export default function ExamClient({ userId, companyId, userName, userEmail, onE
             {t('examBlockedBody')}
           </p>
         </div>
+        {countdown && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+            background: 'rgba(215,255,0,0.04)',
+            border: '1px solid rgba(215,255,0,0.15)',
+            borderRadius: 12,
+            padding: '14px 32px',
+          }}>
+            <p style={{ color: 'rgba(215,255,0,0.5)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: "'Space Grotesk', sans-serif" }}>
+              {t('examBlockedResetsIn')}
+            </p>
+            <p style={{ color: '#D7FF00', fontSize: 28, fontWeight: 800, letterSpacing: '0.08em', fontVariantNumeric: 'tabular-nums', fontFamily: "'Space Grotesk', sans-serif" }}>
+              {countdown}
+            </p>
+          </div>
+        )}
         <a
           href="/dashboard"
           style={{

@@ -132,6 +132,7 @@ const en = {
   examLoading: 'Loading…',
   examBlockedTitle: 'You have used your daily exam attempt',
   examBlockedBody: 'Only one attempt is allowed per day. Come back tomorrow to try again.',
+  examBlockedResetsIn: 'Resets in',
   examBlockedLogout: 'Home Screen',
   examStartError: 'An error occurred. Please try again.',
 
@@ -402,6 +403,7 @@ const ar: typeof en = {
   examLoading: 'جاري التحميل…',
   examBlockedTitle: 'لقد استخدمت محاولة الاختبار اليومية',
   examBlockedBody: 'يُسمح بمحاولة واحدة فقط في اليوم. عد غداً للمحاولة مجدداً.',
+  examBlockedResetsIn: 'يعيد الضبط خلال',
   examBlockedLogout: 'الصفحة الرئيسية',
   examStartError: 'حدث خطأ. حاول مرة أخرى.',
 
