@@ -17,7 +17,7 @@ export default async function ExamPage() {
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'exam') redirect('/auth/login')
+  if (!profile || (profile.role !== 'exam' && profile.role !== 'agent')) redirect('/auth/login')
 
   const admin = createAdminClient()
   const { data: rawResults } = await admin
