@@ -110,7 +110,7 @@ export default function CallsTable({
       <div className="text-center py-20 text-gray-600">
         {t('noCallsYet')}{' '}
         {!isLeader && (
-          <a href="/dashboard/upload" className="text-blue-500 hover:underline">
+          <a href="/dashboard/upload" style={{ color: '#D7FF00' }} className="hover:underline">
             {t('uploadFirstCall')}
           </a>
         )}
@@ -203,9 +203,9 @@ export default function CallsTable({
                           className={`text-xs transition-colors ${
                             call.stage_corrected
                               ? correctionDiffers
-                                ? 'text-red-400 hover:text-blue-400'
-                                : 'text-green-400 hover:text-blue-400'
-                              : 'text-gray-500 hover:text-blue-400'
+                                ? 'text-red-400 hover:text-[#D7FF00]'
+                                : 'text-green-400 hover:text-[#D7FF00]'
+                              : 'text-gray-500 hover:text-[#D7FF00]'
                           }`}
                         >
                           {call.stage_corrected

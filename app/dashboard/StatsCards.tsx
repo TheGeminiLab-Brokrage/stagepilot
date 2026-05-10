@@ -68,7 +68,7 @@ export default function StatsCards({ calls }: { calls: Call[] }) {
           <p className="text-xs text-gray-500 mb-1">{t('statAiAccuracy')}</p>
           {accuracy !== null ? (
             <>
-              <p className="text-2xl font-bold text-blue-400">{accuracy}%</p>
+              <p className="text-2xl font-bold" style={{ color: '#D7FF00' }}>{accuracy}%</p>
               <p className="text-xs text-gray-600 mt-0.5">{notCorrected.length} {t('statOfCalls')} {classifiedCalls.length} {t('statCalls')}</p>
             </>
           ) : (
@@ -77,7 +77,7 @@ export default function StatsCards({ calls }: { calls: Call[] }) {
         </div>
         <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', padding: '12px 16px' }}>
           <p className="text-xs text-gray-500 mb-1">{t('statThisWeek')}</p>
-          <p className="text-2xl font-bold text-purple-400">{thisWeek}</p>
+          <p className="text-2xl font-bold text-white">{thisWeek}</p>
           <p className="text-xs text-gray-600 mt-0.5">{t('statLast7Days')}</p>
         </div>
         <div style={{ borderRadius: 12, background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', padding: '12px 16px' }}>
