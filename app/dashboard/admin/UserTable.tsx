@@ -262,24 +262,53 @@ export default function UserTable({
       )}
 
       {removingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-80 shadow-xl">
-            <h3 className="text-white font-semibold text-base mb-1">{t('adminRemoveUserTitle')}</h3>
-            <p className="text-gray-400 text-sm mb-4">{removingUser.name}</p>
-            <p className="text-gray-500 text-xs mb-5">{t('adminCannotUndo')}</p>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}>
+          <div style={{
+            background: '#0a0a0a',
+            border: '1px solid rgba(215,255,0,0.15)',
+            borderRadius: 16,
+            padding: '28px 28px 24px',
+            width: 340,
+            boxShadow: '0 0 0 1px rgba(215,255,0,0.05), 0 24px 60px rgba(0,0,0,0.8)',
+            fontFamily: "'Montserrat', sans-serif",
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                🗑️
+              </div>
+              <div>
+                <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 15, margin: 0 }}>{t('adminRemoveUserTitle')}</h3>
+                <p style={{ color: 'rgba(215,255,0,0.6)', fontSize: 13, margin: '2px 0 0', fontFamily: "'Space Grotesk', sans-serif" }}>{removingUser.name}</p>
+              </div>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, marginBottom: 20, lineHeight: 1.5 }}>{t('adminCannotUndo')}</p>
             {removeError && (
-              <p className="text-red-400 text-xs mb-4">{removeError}</p>
+              <p style={{ color: '#f87171', fontSize: 12, marginBottom: 16, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '8px 12px' }}>{removeError}</p>
             )}
-            <div className="flex gap-3 justify-end">
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setRemovingUser(null)}
-                className="px-4 py-1.5 text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-colors"
+                style={{
+                  padding: '8px 18px', fontSize: 13, fontWeight: 600, borderRadius: 8, cursor: 'pointer',
+                  background: 'transparent', color: 'rgba(255,255,255,0.45)',
+                  border: '1px solid rgba(255,255,255,0.12)', transition: 'all 0.15s',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)' }}
               >
                 {t('adminCancel')}
               </button>
               <button
                 onClick={confirmRemoveUser}
-                className="px-4 py-1.5 text-sm text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors"
+                style={{
+                  padding: '8px 18px', fontSize: 13, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
+                  background: 'rgba(239,68,68,0.15)', color: '#f87171',
+                  border: '1px solid rgba(239,68,68,0.3)', transition: 'all 0.15s',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.25)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)' }}
               >
                 {t('adminRemoveBtn')}
               </button>
