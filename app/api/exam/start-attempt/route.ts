@@ -13,7 +13,7 @@ export async function POST() {
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'exam') {
+  if (!profile || (profile.role !== 'exam' && profile.role !== 'agent')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

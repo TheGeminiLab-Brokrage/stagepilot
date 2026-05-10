@@ -243,7 +243,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
   const [dailyUsage, setDailyUsage] = useState<Record<string, number>>({})
 
   const DAILY_LIMIT = 3
-  const isFreePlan = role === 'trainee' && userEmail !== 'trainee@test.com'
+  const isFreePlan = role === 'trainee' || role === 'agent'
   const [sessionStartMs, setSessionStartMs] = useState(0)
   const [audioLevel, setAudioLevel] = useState(0)
   const [toolCallNote, setToolCallNote] = useState<string | null>(null)

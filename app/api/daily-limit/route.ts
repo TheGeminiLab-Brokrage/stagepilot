@@ -57,5 +57,20 @@ export async function GET() {
     return NextResponse.json({ role: 'exam', limit: 1, usedToday: count ?? 0 })
   }
 
+  if (role === 'agent') {
+    const { data: rows } = await admin
+      .from('practice_sessions')
+      .select('scenario_id')
+      .eq('user_id', user.id)
+      .gte('created_at', todayStart.toISOString())
+      .lt('created_at', tomorrowStart.toISOString())
+
+    const usage: Record<string, number> = {}
+    for (const row of rows ?? []) {
+      usage[row.scenario_id] = (usage[row.scenario_id] ?? 0) + 1
+    }
+    return NextResponse.json({ role: 'agent', limit: 3, usage })
+  }
+
   return NextResponse.json({ role, unlimited: true })
 }
