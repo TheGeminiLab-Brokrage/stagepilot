@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Mp3Encoder } from '@breezystack/lamejs'
 import AiOrb from '../practice/AiOrb'
+import { useLanguage } from '@/lib/language-context'
 
 const MODEL = 'models/gemini-3.1-flash-live-preview'
 const WS_BASE = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent'
@@ -176,6 +177,8 @@ interface Props {
 }
 
 export default function ExamPhase3({ onComplete, onRecordingSaved }: Props) {
+  const { lang } = useLanguage()
+  const isAr = lang === 'ar'
   const [status, setStatus] = useState<Status>('idle')
   const [turns, setTurns] = useState<Turn[]>([])
   const [errorMsg, setErrorMsg] = useState('')
@@ -611,12 +614,12 @@ export default function ExamPhase3({ onComplete, onRecordingSaved }: Props) {
   }, [setStatusSync, handleMessage, startMic, stopMic, stopPlayback, startRingSound])
 
   const statusLabels: Record<Status, string> = {
-    idle: 'جاهز للمرحلة الثالثة',
-    connecting: 'بيسمعك…',
-    listening: 'بيسمعك…',
-    speaking: 'بيتكلم…',
-    ending: 'جاري الإنهاء…',
-    error: 'خطأ في الاتصال',
+    idle:       isAr ? 'جاهز للمرحلة الثالثة' : 'Ready for Phase 3',
+    connecting: isAr ? 'جاري الاتصال…' : 'Connecting…',
+    listening:  isAr ? 'بيسمعك…' : 'Listening…',
+    speaking:   isAr ? 'بيتكلم…' : 'Speaking…',
+    ending:     isAr ? 'جاري الإنهاء…' : 'Ending…',
+    error:      isAr ? 'خطأ في الاتصال' : 'Connection Error',
   }
 
   return (
@@ -624,10 +627,10 @@ export default function ExamPhase3({ onComplete, onRecordingSaved }: Props) {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: "'Space Grotesk', sans-serif" }}>
-          المرحلة الثالثة — محاكاة الكول
+          {isAr ? 'المرحلة الثالثة — محاكاة الكول' : 'Phase 3 — Call Simulation'}
         </span>
         <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
-          د. ياسمين — Cold Call
+          {isAr ? 'د. ياسمين — Cold Call' : 'Dr. Yasmine — Cold Call'}
         </span>
       </div>
 
@@ -635,7 +638,9 @@ export default function ExamPhase3({ onComplete, onRecordingSaved }: Props) {
       {status === 'idle' && turns.length === 0 && (
         <div style={{ background: 'rgba(215,255,0,0.05)', border: '1px solid rgba(215,255,0,0.15)', borderRadius: 12, padding: '16px 20px', marginBottom: 16 }}>
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.7 }}>
-            هتتكلم مع د. ياسمين — دكتورة أسنان بعتت اهتمام في وحدة عيادية في التجمع الخامس. الـ AI هيلعب دورها وأنت تلعب دور الـ agent. جرب تعرض المشاريع المناسبة وتتعامل مع أسئلتها.
+            {isAr
+              ? 'هتتكلم مع د. ياسمين — دكتورة أسنان بعتت اهتمام في وحدة عيادية في التجمع الخامس. الـ AI هيلعب دورها وأنت تلعب دور الـ agent. جرب تعرض المشاريع المناسبة وتتعامل مع أسئلتها.'
+              : "You'll speak with Dr. Yasmine — a dentist interested in a clinic unit in Al-Tagamoa Al-Khames. The AI plays her role, you play the agent. Try to present suitable projects and handle her questions."}
           </p>
         </div>
       )}
@@ -662,14 +667,14 @@ export default function ExamPhase3({ onComplete, onRecordingSaved }: Props) {
               }, 2000)
             }}
           >
-            ⬇ تحميل التسجيل
+            {isAr ? '⬇ تحميل التسجيل' : '⬇ Download Recording'}
           </a>
         )}
-        {saveStatus === 'saving' && <div style={{ color: 'rgba(215,255,0,0.5)', fontSize: 12, marginTop: 4 }}>جاري حفظ التسجيل…</div>}
-        {saveStatus === 'saved' && <div style={{ color: '#26D701', fontSize: 12, marginTop: 4 }}>✓ تم حفظ التسجيل</div>}
+        {saveStatus === 'saving' && <div style={{ color: 'rgba(215,255,0,0.5)', fontSize: 12, marginTop: 4 }}>{isAr ? 'جاري حفظ التسجيل…' : 'Saving recording…'}</div>}
+        {saveStatus === 'saved' && <div style={{ color: '#26D701', fontSize: 12, marginTop: 4 }}>{isAr ? '✓ تم حفظ التسجيل' : '✓ Recording saved'}</div>}
         {saveStatus === 'error' && (
           <div style={{ color: '#f87171', fontSize: 12, marginTop: 4 }}>
-            {saveError ? `خطأ: ${saveError}` : 'فشل الرفع — تم التحميل محلياً'}
+            {saveError ? (isAr ? `خطأ: ${saveError}` : `Error: ${saveError}`) : (isAr ? 'فشل الرفع — تم التحميل محلياً' : 'Upload failed — saved locally')}
           </div>
         )}
         {errorMsg && <div style={{ color: '#f87171', fontSize: 12, marginTop: 4 }}>{errorMsg}</div>}
@@ -700,7 +705,7 @@ export default function ExamPhase3({ onComplete, onRecordingSaved }: Props) {
             onClick={startSession}
             style={{ background: '#D7FF00', color: '#000', fontWeight: 700, borderRadius: 10, padding: '12px 32px', fontSize: 14, border: 'none', cursor: 'pointer' }}
           >
-            ابدأ المكالمة
+            {isAr ? 'ابدأ المكالمة' : 'Start Call'}
           </button>
         )}
 
@@ -709,7 +714,7 @@ export default function ExamPhase3({ onComplete, onRecordingSaved }: Props) {
             onClick={closeSession}
             style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171', border: '1px solid rgba(248,113,113,0.3)', fontWeight: 700, borderRadius: 10, padding: '10px 24px', fontSize: 13, cursor: 'pointer' }}
           >
-            إنهاء المكالمة
+            {isAr ? 'إنهاء المكالمة' : 'End Call'}
           </button>
         )}
 
@@ -718,7 +723,7 @@ export default function ExamPhase3({ onComplete, onRecordingSaved }: Props) {
             onClick={onComplete}
             style={{ background: '#D7FF00', color: '#000', fontWeight: 700, borderRadius: 10, padding: '12px 32px', fontSize: 14, border: 'none', cursor: 'pointer' }}
           >
-            إنهاء الامتحان ✓
+            {isAr ? 'إنهاء الامتحان ✓' : 'Finish Exam ✓'}
           </button>
         )}
       </div>
