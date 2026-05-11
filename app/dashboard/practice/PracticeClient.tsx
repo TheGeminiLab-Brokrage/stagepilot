@@ -985,8 +985,8 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                       {cat}
                     </p>
 
-                    {/* 2-column card grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+                    {/* 2-column card grid — columnGap only; rowGap=0 so subgrid controls section heights */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', columnGap: 16 }}>
                           {catScenarios.map(s => {
                             const selected = selectedScenario === s.id
                             const scenarioLimitReached = isFreePlan && (dailyUsage[s.id] ?? 0) >= DAILY_LIMIT
@@ -1005,7 +1005,8 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                                 onClick={() => { if (!disabled) { setSelectedScenario(s.id); setPanelOpen(false) } }}
                                 disabled={disabled}
                                 style={{
-                                  display: 'block', width: '100%', textAlign: 'unset',
+                                  display: 'grid', gridRow: 'span 7', gridTemplateRows: 'subgrid', alignItems: 'start',
+                                  width: '100%', textAlign: 'unset',
                                   background: selected ? 'rgba(215,255,0,0.06)' : 'rgba(255,255,255,0.02)',
                                   border: selected ? '1px solid rgba(215,255,0,0.45)' : '1px solid rgba(255,255,255,0.06)',
                                   boxShadow: selected ? '0 0 28px rgba(215,255,0,0.10)' : 'none',
@@ -1051,7 +1052,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                                 </div>
 
                                 {/* Job title */}
-                                <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.38)', fontSize: 11, marginBottom: 12, fontFamily: "'Montserrat', sans-serif", minHeight: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.38)', fontSize: 11, marginBottom: 12, fontFamily: "'Montserrat', sans-serif" }}>
                                   {displayJob}
                                 </p>
 
@@ -1090,8 +1091,9 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                                   {t('practiceStartWith')} {displayName}
                                 </div>
 
-                                {isFreePlan && (
-                                  <div style={{ textAlign: 'center', marginTop: 8 }}>
+                                {/* Always rendered for subgrid row 6 consistency */}
+                                <div style={{ textAlign: 'center', marginTop: isFreePlan ? 8 : 0 }}>
+                                  {isFreePlan && (
                                     <span style={{
                                       background: 'rgba(255,40,40,0.12)',
                                       color: scenarioLimitReached ? 'rgba(255,80,80,0.95)' : 'rgba(255,90,90,0.8)',
@@ -1104,8 +1106,8 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                                         ? <><span>Limit reached</span><br /><span style={{ fontSize: 8, opacity: 0.75 }}>resets in {resetCountdown}</span></>
                                         : `${DAILY_LIMIT - usedToday}/${DAILY_LIMIT} left today`}
                                     </span>
-                                  </div>
-                                )}
+                                  )}
+                                </div>
 
                                 {/* Description */}
                                 <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
