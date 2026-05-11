@@ -243,6 +243,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
   const [saveError, setSaveError] = useState('')
   const [downloadUrl, setDownloadUrl] = useState<{ url: string; filename: string } | null>(null)
   const [dailyUsage, setDailyUsage] = useState<Record<string, number>>({})
+  const [resetCountdown, setResetCountdown] = useState<string>('')
 
   const DAILY_LIMIT = 3
   const isFreePlan = role === 'trainee' || role === 'agent'
@@ -301,6 +302,21 @@ export default function PracticeClient({ userId, companyId, userName, role, user
   }, [isFreePlan])
 
   useEffect(() => { refreshDailyUsage() }, [refreshDailyUsage])
+
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date()
+      const tomorrowUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+      const diff = tomorrowUTC.getTime() - now.getTime()
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setResetCountdown(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
 
   // Refresh usage count after a session is successfully saved
   useEffect(() => {
@@ -1035,7 +1051,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                                 </div>
 
                                 {/* Job title */}
-                                <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.38)', fontSize: 11, marginBottom: 12, fontFamily: "'Montserrat', sans-serif" }}>
+                                <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.38)', fontSize: 11, marginBottom: 12, fontFamily: "'Montserrat', sans-serif", minHeight: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   {displayJob}
                                 </p>
 
@@ -1077,27 +1093,29 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                                 {isFreePlan && (
                                   <div style={{ textAlign: 'center', marginTop: 8 }}>
                                     <span style={{
-                                      background: scenarioLimitReached ? 'rgba(255,60,60,0.12)' : 'rgba(255,255,255,0.05)',
-                                      color: scenarioLimitReached ? 'rgba(255,100,100,0.9)' : 'rgba(255,255,255,0.38)',
+                                      background: 'rgba(255,40,40,0.12)',
+                                      color: scenarioLimitReached ? 'rgba(255,80,80,0.95)' : 'rgba(255,90,90,0.8)',
                                       borderRadius: 4, padding: '3px 7px', fontSize: 9, lineHeight: 1.5,
                                       fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
-                                      border: scenarioLimitReached ? '1px solid rgba(255,60,60,0.25)' : '1px solid rgba(255,255,255,0.08)',
+                                      border: '1px solid rgba(255,60,60,0.25)',
                                       display: 'inline-block',
                                     }}>
-                                      {scenarioLimitReached ? 'Limit reached' : `${DAILY_LIMIT - usedToday}/${DAILY_LIMIT} left today`}
+                                      {scenarioLimitReached
+                                        ? <><span>Limit reached</span><br /><span style={{ fontSize: 8, opacity: 0.75 }}>resets in {resetCountdown}</span></>
+                                        : `${DAILY_LIMIT - usedToday}/${DAILY_LIMIT} left today`}
                                     </span>
                                   </div>
                                 )}
 
                                 {/* Description */}
                                 <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
-                                  <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
+                                  <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
                                     {isClient ? t('practiceScenarioLabel') : t('practiceAskAbout')}
                                   </p>
                                   <p style={{ fontSize: lang === 'ar' ? 13.5 : 11.5, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, marginBottom: 10, fontFamily: "'Montserrat', sans-serif" }}>
                                     {displayCtx}
                                   </p>
-                                  <p style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
+                                  <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.22)', marginBottom: 5, fontFamily: "'Space Grotesk', sans-serif" }}>
                                     {isClient ? t('practiceWhatToPractice') : t('practiceHowToUse')}
                                   </p>
                                   <p style={{ fontSize: lang === 'ar' ? 13.5 : 11.5, color: 'rgba(255,255,255,0.52)', lineHeight: 1.65, fontFamily: "'Montserrat', sans-serif" }}>
