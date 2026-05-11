@@ -1095,16 +1095,16 @@ export default function PracticeClient({ userId, companyId, userName, role, user
                                 <div style={{ textAlign: 'center', marginTop: isFreePlan ? 8 : 0 }}>
                                   {isFreePlan && (
                                     <span style={{
-                                      background: 'rgba(255,40,40,0.12)',
-                                      color: scenarioLimitReached ? 'rgba(255,80,80,0.95)' : 'rgba(255,90,90,0.8)',
+                                      background: scenarioLimitReached ? 'rgba(255,40,40,0.12)' : 'rgba(215,255,0,0.10)',
+                                      color: scenarioLimitReached ? 'rgba(255,80,80,0.95)' : '#D7FF00',
                                       borderRadius: 4, padding: '3px 7px', fontSize: 9, lineHeight: 1.5,
                                       fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
-                                      border: '1px solid rgba(255,60,60,0.25)',
+                                      border: scenarioLimitReached ? '1px solid rgba(255,60,60,0.25)' : '1px solid rgba(215,255,0,0.25)',
                                       display: 'inline-block',
                                     }}>
                                       {scenarioLimitReached
-                                        ? <><span>Limit reached</span><br /><span style={{ fontSize: 8, opacity: 0.75 }}>resets in {resetCountdown}</span></>
-                                        : `${DAILY_LIMIT - usedToday}/${DAILY_LIMIT} left today`}
+                                        ? <><span>{t('practiceLimitReached')}</span><br /><span style={{ fontSize: 8, opacity: 0.75 }}>{t('practiceResetsIn')} {resetCountdown}</span></>
+                                        : `${DAILY_LIMIT - usedToday}/${DAILY_LIMIT} ${t('practiceLeftToday')}`}
                                     </span>
                                   )}
                                 </div>

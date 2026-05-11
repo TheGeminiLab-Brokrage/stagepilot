@@ -267,6 +267,11 @@ const en = {
   adminCreatingBtn: 'Creating…',
   adminUserCreatedMsg: 'User created successfully. They can log in now.',
   adminRoleExam: 'Exam',
+
+  // ── Practice daily limit badge ────────────────────────────────────────────
+  practiceLeftToday: 'left today',
+  practiceLimitReached: 'Limit reached',
+  practiceResetsIn: 'resets in',
 }
 
 const ar: typeof en = {
@@ -538,6 +543,10 @@ const ar: typeof en = {
   adminCreatingBtn: 'جاري الإنشاء…',
   adminUserCreatedMsg: 'تم إنشاء المستخدم بنجاح. يمكنه تسجيل الدخول الآن.',
   adminRoleExam: 'اختبار',
+
+  practiceLeftToday: 'متبقي اليوم',
+  practiceLimitReached: 'وصلت للحد اليومي',
+  practiceResetsIn: 'يُعاد الضبط خلال',
 }
 
 export const translations = { en, ar }
