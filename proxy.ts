@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -28,17 +28,14 @@ export async function middleware(request: NextRequest) {
   const isAuthPage = request.nextUrl.pathname.startsWith('/auth')
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
 
-  // Redirect unauthenticated users to login (except auth pages and API routes)
   if (!user && !isAuthPage && !isApiRoute) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
   }
 
-  // Redirect authenticated users away from auth pages
   if (user && isAuthPage) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // Forward pathname to dashboard layout via header (for role-based redirects)
   supabaseResponse.headers.set('x-pathname', request.nextUrl.pathname)
 
   return supabaseResponse
