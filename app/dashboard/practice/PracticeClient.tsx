@@ -203,10 +203,30 @@ function playCallEndSound(existingCtx?: AudioContext | null) {
 }
 
 // ─── WhatsApp Popup ────────────────────────────────────────────────────────────
+async function resizeImageToDataURL(file: File, maxWidth = 800, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale = img.naturalWidth > maxWidth ? maxWidth / img.naturalWidth : 1
+      const w = Math.round(img.naturalWidth * scale)
+      const h = Math.round(img.naturalHeight * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
 function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void }) {
   const [messages, setMessages] = useState<string[]>([])
   const [input, setInput] = useState('')
   const [photoOpen, setPhotoOpen] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
   const chatRef = useRef<HTMLDivElement>(null)
 
   function sendMessage() {
@@ -214,6 +234,41 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
     if (!text) return
     setMessages(prev => [...prev, text])
     setInput('')
+  }
+
+  async function handleImageFile(file: File) {
+    if (!file.type.startsWith('image/')) return
+    try {
+      const dataUrl = await resizeImageToDataURL(file)
+      setMessages(prev => [...prev, dataUrl])
+    } catch (err) {
+      console.error('[WhatsApp] image processing failed:', err)
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault(); e.stopPropagation()
+    if (!isDragOver) setIsDragOver(true)
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    if (chatRef.current?.contains(e.relatedTarget as Node)) return
+    setIsDragOver(false)
+  }
+
+  async function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault(); e.stopPropagation()
+    setIsDragOver(false)
+    const imageFile = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/'))
+    if (imageFile) await handleImageFile(imageFile)
+  }
+
+  async function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const imageItem = Array.from(e.clipboardData.items).find(item => item.type.startsWith('image/'))
+    if (!imageItem) return
+    e.preventDefault()
+    const file = imageItem.getAsFile()
+    if (file) await handleImageFile(file)
   }
 
   useEffect(() => {
@@ -255,8 +310,16 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
         {/* Chat area */}
         <div
           ref={chatRef}
-          style={{ background: '#ECE5DD', flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 200 }}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          style={{ position: 'relative', background: isDragOver ? '#d4f5d4' : '#ECE5DD', outline: isDragOver ? '3px dashed #25D366' : 'none', transition: 'background 0.15s, outline 0.15s', flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 200 }}
         >
+          {isDragOver && (
+            <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(37,211,102,0.15)', border: '3px dashed #25D366', borderRadius: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+              <span style={{ color: '#25D366', fontSize: 16, fontWeight: 600, fontFamily: 'system-ui, sans-serif' }}>أفلت الصورة هنا</span>
+            </div>
+          )}
           <div style={{ textAlign: 'center', margin: '4px 0 10px' }}>
             <span style={{ background: 'rgba(0,0,0,0.11)', color: 'rgba(0,0,0,0.45)', fontSize: 11, padding: '4px 14px', borderRadius: 20, fontFamily: 'system-ui, sans-serif' }}>
               أرسل ما كنت ستبعثه لهشام على الواتساب
@@ -264,9 +327,15 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
           </div>
           {messages.map((msg, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <div style={{ background: '#DCF8C6', borderRadius: '12px 12px 4px 12px', padding: '7px 10px', maxWidth: '82%', fontSize: 14, color: '#111', boxShadow: '0 1px 2px rgba(0,0,0,0.12)', direction: 'rtl', lineHeight: 1.5, fontFamily: 'system-ui, sans-serif', wordBreak: 'break-word' }}>
-                {msg}
-                <span style={{ fontSize: 10, color: 'rgba(0,0,0,0.38)', marginRight: 6, display: 'inline-block', verticalAlign: 'bottom' }}>✓✓</span>
+              <div style={{ background: '#DCF8C6', borderRadius: '12px 12px 4px 12px', padding: msg.startsWith('data:image/') ? '4px' : '7px 10px', maxWidth: '82%', fontSize: 14, color: '#111', boxShadow: '0 1px 2px rgba(0,0,0,0.12)', direction: 'rtl', lineHeight: 1.5, fontFamily: 'system-ui, sans-serif', wordBreak: 'break-word' }}>
+                {msg.startsWith('data:image/') ? (
+                  <img src={msg} alt="صورة" style={{ maxWidth: '100%', borderRadius: 8, display: 'block' }} />
+                ) : (
+                  <>
+                    {msg}
+                    <span style={{ fontSize: 10, color: 'rgba(0,0,0,0.38)', marginRight: 6, display: 'inline-block', verticalAlign: 'bottom' }}>✓✓</span>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -278,6 +347,7 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+            onPaste={handlePaste}
             placeholder="اكتب رسالة..."
             dir="rtl"
             autoFocus
