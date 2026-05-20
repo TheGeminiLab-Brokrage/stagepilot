@@ -223,6 +223,7 @@ async function resizeImageToDataURL(file: File, maxWidth = 800, quality = 0.7): 
 }
 
 function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void }) {
+  const t = useT()
   const [messages, setMessages] = useState<string[]>([])
   const [input, setInput] = useState('')
   const [photoOpen, setPhotoOpen] = useState(false)
@@ -287,7 +288,7 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
         </div>
       )}
       {/* WhatsApp window */}
-      <div style={{ width: '100%', maxWidth: 420, borderRadius: 12, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', maxHeight: '65vh' }}>
+      <div style={{ width: '100%', maxWidth: 560, borderRadius: 12, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', maxHeight: '82vh' }}>
         {/* Header */}
         <div style={{ background: '#075E54', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <img
@@ -298,7 +299,7 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
           />
           <div>
             <div style={{ color: '#fff', fontWeight: 600, fontSize: 15, fontFamily: 'system-ui, sans-serif' }}>هشام</div>
-            <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11, fontFamily: 'system-ui, sans-serif' }}>متصل الآن</div>
+            <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11, fontFamily: 'system-ui, sans-serif' }}>{t('whatsappOnlineStatus')}</div>
           </div>
           <div style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.75)' }}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -313,23 +314,23 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          style={{ position: 'relative', backgroundColor: isDragOver ? '#d4f5d4' : '#ECE5DD', backgroundImage: isDragOver ? 'none' : 'url(/whatsapp-wallpaper.png)', backgroundRepeat: 'repeat', backgroundSize: 'auto', outline: isDragOver ? '3px dashed #25D366' : 'none', transition: 'background-color 0.15s, outline 0.15s', flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 200 }}
+          style={{ position: 'relative', backgroundColor: isDragOver ? '#d4f5d4' : '#ECE5DD', backgroundImage: isDragOver ? 'none' : 'url(/whatsapp-wallpaper.png)', backgroundRepeat: 'repeat', backgroundSize: 'auto', outline: isDragOver ? '3px dashed #25D366' : 'none', transition: 'background-color 0.15s, outline 0.15s', flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 300 }}
         >
           {isDragOver && (
             <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(37,211,102,0.15)', border: '3px dashed #25D366', borderRadius: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-              <span style={{ color: '#25D366', fontSize: 16, fontWeight: 600, fontFamily: 'system-ui, sans-serif' }}>أفلت الصورة هنا</span>
+              <span style={{ color: '#25D366', fontSize: 16, fontWeight: 600, fontFamily: 'system-ui, sans-serif' }}>{t('whatsappDropImage')}</span>
             </div>
           )}
           <div style={{ textAlign: 'center', margin: '4px 0 10px' }}>
             <span style={{ background: 'rgba(0,0,0,0.11)', color: 'rgba(0,0,0,0.45)', fontSize: 11, padding: '4px 14px', borderRadius: 20, fontFamily: 'system-ui, sans-serif' }}>
-              أرسل ما كنت ستبعته لهشام على الواتساب
+              {t('whatsappHint')}
             </span>
           </div>
           {messages.map((msg, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <div style={{ background: '#DCF8C6', borderRadius: '12px 12px 4px 12px', padding: msg.startsWith('data:image/') ? '4px' : '7px 10px', maxWidth: '82%', fontSize: 14, color: '#111', boxShadow: '0 1px 2px rgba(0,0,0,0.12)', direction: 'rtl', lineHeight: 1.5, fontFamily: 'system-ui, sans-serif', wordBreak: 'break-word' }}>
                 {msg.startsWith('data:image/') ? (
-                  <img src={msg} alt="صورة" style={{ maxWidth: '100%', borderRadius: 8, display: 'block' }} />
+                  <img src={msg} alt={t('whatsappImageAlt')} style={{ maxWidth: '100%', borderRadius: 8, display: 'block' }} />
                 ) : (
                   <>
                     {msg}
@@ -348,7 +349,7 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
             onPaste={handlePaste}
-            placeholder="اكتب رسالة..."
+            placeholder={t('whatsappPlaceholder')}
             dir="rtl"
             autoFocus
             style={{ flex: 1, background: '#fff', border: 'none', borderRadius: 22, padding: '9px 16px', fontSize: 14, outline: 'none', fontFamily: 'system-ui, sans-serif', color: '#111' }}
@@ -371,7 +372,7 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
         disabled={messages.length === 0}
         style={{ background: messages.length > 0 ? '#25D366' : 'rgba(255,255,255,0.12)', color: '#fff', border: 'none', borderRadius: 10, padding: '13px 40px', fontSize: 15, fontWeight: 700, cursor: messages.length > 0 ? 'pointer' : 'not-allowed', fontFamily: 'system-ui, sans-serif', transition: 'all 0.2s', opacity: messages.length === 0 ? 0.55 : 1 }}
       >
-        {messages.length === 0 ? 'أرسل رسالة أولاً' : 'إرسال وإنهاء'}
+        {messages.length === 0 ? t('whatsappSendFirst') : t('whatsappSendFinish')}
       </button>
     </div>
   )

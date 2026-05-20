@@ -93,6 +93,10 @@ const en = {
   tripleCPathDesc: 'Did the agent lock in a clear next step — a follow-up call, meeting, or any confirmed action with the client?',
 
   // ── UploadForm ────────────────────────────────────────────────────────────
+  uploadPageTitle: 'Upload Call Recording',
+  uploadPageSubtitle: 'Your recording will be transcribed and categorized automatically. Audio is never stored.',
+  uploadingAs: 'Uploading as',
+  uploadTeamLabel: 'team',
   uploadDropZone: 'Drag & drop audio file here',
   uploadClickBrowse: 'or click to browse',
   uploadSupportedFormats: 'M4A, MP3, WAV, AMR, AAC, FLAC supported',
@@ -272,6 +276,15 @@ const en = {
   practiceLeftToday: 'left today',
   practiceLimitReached: 'Limit reached',
   practiceResetsIn: 'resets in',
+
+  // ── WhatsApp popup ────────────────────────────────────────────────────────
+  whatsappOnlineStatus: 'Online',
+  whatsappDropImage: 'Drop image here',
+  whatsappHint: 'Send what you would have sent Hesham on WhatsApp',
+  whatsappPlaceholder: 'Type a message...',
+  whatsappSendFirst: 'Send a message first',
+  whatsappSendFinish: 'Send & Finish',
+  whatsappImageAlt: 'image',
 }
 
 const ar: typeof en = {
@@ -369,6 +382,10 @@ const ar: typeof en = {
   tripleCPathDesc: 'هل حدد الوكيل خطوة تالية واضحة — مكالمة متابعة أو اجتماع أو إجراء مؤكد مع العميل؟',
 
   // ── UploadForm ────────────────────────────────────────────────────────────
+  uploadPageTitle: 'رفع تسجيل المكالمة',
+  uploadPageSubtitle: 'سيتم نسخ تسجيلك وتصنيفه تلقائياً. لا يتم تخزين الصوت أبداً.',
+  uploadingAs: 'الرفع باسم',
+  uploadTeamLabel: 'فريق',
   uploadDropZone: 'اسحب وأفلت ملف الصوت هنا',
   uploadClickBrowse: 'أو انقر للتصفح',
   uploadSupportedFormats: 'M4A, MP3, WAV, AMR, AAC, FLAC مدعومة',
@@ -547,6 +564,15 @@ const ar: typeof en = {
   practiceLeftToday: 'متبقي اليوم',
   practiceLimitReached: 'وصلت للحد اليومي',
   practiceResetsIn: 'يُعاد الضبط خلال',
+
+  // ── WhatsApp popup ────────────────────────────────────────────────────────
+  whatsappOnlineStatus: 'متصل الآن',
+  whatsappDropImage: 'أفلت الصورة هنا',
+  whatsappHint: 'أرسل ما كنت ستبعته لهشام على الواتساب',
+  whatsappPlaceholder: 'اكتب رسالة...',
+  whatsappSendFirst: 'أرسل رسالة أولاً',
+  whatsappSendFinish: 'إرسال وإنهاء',
+  whatsappImageAlt: 'صورة',
 }
 
 export const translations = { en, ar }
