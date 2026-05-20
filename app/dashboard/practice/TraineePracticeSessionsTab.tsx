@@ -83,20 +83,33 @@ function GradeModal({ grade, onClose }: { grade: CallGrade; onClose: () => void 
 }
 
 function WhatsAppMessagesModal({ messages, date, onClose }: { messages: string[]; date: string; onClose: () => void }) {
+  const [photoOpen, setPhotoOpen] = useState(false)
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
       onClick={onClose}
     >
+      {/* Full-screen photo lightbox */}
+      {photoOpen && (
+        <div
+          onClick={e => { e.stopPropagation(); setPhotoOpen(false) }}
+          style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <img src="/avatars/heshamWP.jpeg" alt="هشام" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 8, objectFit: 'contain' }} />
+        </div>
+      )}
       <div
         style={{ width: '100%', maxWidth: 420, borderRadius: 12, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{ background: '#075E54', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#128C7E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, color: '#fff', flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>
-            ه
-          </div>
+          <img
+            src="/avatars/heshamWP.jpeg"
+            alt="هشام"
+            onClick={e => { e.stopPropagation(); setPhotoOpen(true) }}
+            style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, cursor: 'pointer', border: '2px solid rgba(255,255,255,0.25)' }}
+          />
           <div style={{ flex: 1 }}>
             <div style={{ color: '#fff', fontWeight: 600, fontSize: 15, fontFamily: 'system-ui, sans-serif' }}>هشام</div>
             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontFamily: 'system-ui, sans-serif' }}>{date}</div>

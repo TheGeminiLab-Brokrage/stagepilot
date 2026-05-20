@@ -206,6 +206,7 @@ function playCallEndSound(existingCtx?: AudioContext | null) {
 function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void }) {
   const [messages, setMessages] = useState<string[]>([])
   const [input, setInput] = useState('')
+  const [photoOpen, setPhotoOpen] = useState(false)
   const chatRef = useRef<HTMLDivElement>(null)
 
   function sendMessage() {
@@ -221,13 +222,25 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
+      {/* Full-screen photo lightbox */}
+      {photoOpen && (
+        <div
+          onClick={() => setPhotoOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <img src="/avatars/heshamWP.jpeg" alt="هشام" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 8, objectFit: 'contain' }} />
+        </div>
+      )}
       {/* WhatsApp window */}
       <div style={{ width: '100%', maxWidth: 420, borderRadius: 12, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', maxHeight: '65vh' }}>
         {/* Header */}
         <div style={{ background: '#075E54', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#128C7E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 17, color: '#fff', flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>
-            ه
-          </div>
+          <img
+            src="/avatars/heshamWP.jpeg"
+            alt="هشام"
+            onClick={() => setPhotoOpen(true)}
+            style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, cursor: 'pointer', border: '2px solid rgba(255,255,255,0.25)' }}
+          />
           <div>
             <div style={{ color: '#fff', fontWeight: 600, fontSize: 15, fontFamily: 'system-ui, sans-serif' }}>هشام</div>
             <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11, fontFamily: 'system-ui, sans-serif' }}>متصل الآن</div>
