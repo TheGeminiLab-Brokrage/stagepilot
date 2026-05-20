@@ -25,7 +25,7 @@ export default async function PracticePage() {
 
   const { data: rawSessions } = await supabase
     .from('practice_sessions')
-    .select('id, scenario_id, audio_path, duration_seconds, created_at, call_grade')
+    .select('id, scenario_id, audio_path, duration_seconds, created_at, call_grade, whatsapp_messages')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(50)

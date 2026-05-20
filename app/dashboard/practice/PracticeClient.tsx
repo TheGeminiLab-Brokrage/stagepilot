@@ -202,6 +202,98 @@ function playCallEndSound(existingCtx?: AudioContext | null) {
   else scheduleBeeps()
 }
 
+// ─── WhatsApp Popup ────────────────────────────────────────────────────────────
+function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void }) {
+  const [messages, setMessages] = useState<string[]>([])
+  const [input, setInput] = useState('')
+  const chatRef = useRef<HTMLDivElement>(null)
+
+  function sendMessage() {
+    const text = input.trim()
+    if (!text) return
+    setMessages(prev => [...prev, text])
+    setInput('')
+  }
+
+  useEffect(() => {
+    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
+  }, [messages])
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
+      {/* WhatsApp window */}
+      <div style={{ width: '100%', maxWidth: 420, borderRadius: 12, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', maxHeight: '65vh' }}>
+        {/* Header */}
+        <div style={{ background: '#075E54', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#128C7E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 17, color: '#fff', flexShrink: 0, fontFamily: 'system-ui, sans-serif' }}>
+            ه
+          </div>
+          <div>
+            <div style={{ color: '#fff', fontWeight: 600, fontSize: 15, fontFamily: 'system-ui, sans-serif' }}>هشام</div>
+            <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11, fontFamily: 'system-ui, sans-serif' }}>متصل الآن</div>
+          </div>
+          <div style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.75)' }}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* Chat area */}
+        <div
+          ref={chatRef}
+          style={{ background: '#ECE5DD', flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 200 }}
+        >
+          <div style={{ textAlign: 'center', margin: '4px 0 10px' }}>
+            <span style={{ background: 'rgba(0,0,0,0.11)', color: 'rgba(0,0,0,0.45)', fontSize: 11, padding: '4px 14px', borderRadius: 20, fontFamily: 'system-ui, sans-serif' }}>
+              أرسل ما كنت ستبعثه لهشام على الواتساب
+            </span>
+          </div>
+          {messages.map((msg, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ background: '#DCF8C6', borderRadius: '12px 12px 4px 12px', padding: '7px 10px', maxWidth: '82%', fontSize: 14, color: '#111', boxShadow: '0 1px 2px rgba(0,0,0,0.12)', direction: 'rtl', lineHeight: 1.5, fontFamily: 'system-ui, sans-serif', wordBreak: 'break-word' }}>
+                {msg}
+                <span style={{ fontSize: 10, color: 'rgba(0,0,0,0.38)', marginRight: 6, display: 'inline-block', verticalAlign: 'bottom' }}>✓✓</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Input row */}
+        <div style={{ background: '#F0F0F0', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, direction: 'rtl' }}>
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+            placeholder="اكتب رسالة..."
+            dir="rtl"
+            autoFocus
+            style={{ flex: 1, background: '#fff', border: 'none', borderRadius: 22, padding: '9px 16px', fontSize: 14, outline: 'none', fontFamily: 'system-ui, sans-serif', color: '#111' }}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={!input.trim()}
+            style={{ width: 42, height: 42, borderRadius: '50%', background: input.trim() ? '#25D366' : '#b0b0b0', border: 'none', cursor: input.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s' }}
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="#fff">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Submit / close button */}
+      <button
+        onClick={() => onSubmit(messages)}
+        disabled={messages.length === 0}
+        style={{ background: messages.length > 0 ? '#25D366' : 'rgba(255,255,255,0.12)', color: '#fff', border: 'none', borderRadius: 10, padding: '13px 40px', fontSize: 15, fontWeight: 700, cursor: messages.length > 0 ? 'pointer' : 'not-allowed', fontFamily: 'system-ui, sans-serif', transition: 'all 0.2s', opacity: messages.length === 0 ? 0.55 : 1 }}
+      >
+        {messages.length === 0 ? 'أرسل رسالة أولاً' : 'إرسال وإنهاء'}
+      </button>
+    </div>
+  )
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 interface PracticeClientProps {
   userId: string
@@ -244,6 +336,9 @@ export default function PracticeClient({ userId, companyId, userName, role, user
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
   const [downloadUrl, setDownloadUrl] = useState<{ url: string; filename: string } | null>(null)
+  const [showWhatsApp, setShowWhatsApp] = useState(false)
+  const [savedSessionId, setSavedSessionId] = useState<string | null>(null)
+  const pendingWhatsappRef = useRef<string[] | null>(null)
   const [dailyUsage, setDailyUsage] = useState<Record<string, number>>({})
   const [resetCountdown, setResetCountdown] = useState<string>('')
 
@@ -458,6 +553,18 @@ export default function PracticeClient({ userId, companyId, userName, role, user
             scenarioId: selectedScenarioRef.current,
           }),
         }).catch(() => {})
+
+        setSavedSessionId(metaJson.sessionId)
+
+        // If user already submitted WhatsApp messages before session finished saving, flush now
+        if (pendingWhatsappRef.current) {
+          fetch('/api/save-whatsapp-messages', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: metaJson.sessionId, messages: pendingWhatsappRef.current }),
+          }).catch(() => {})
+          pendingWhatsappRef.current = null
+        }
       }
 
       setSaveStatus('saved')
@@ -469,6 +576,21 @@ export default function PracticeClient({ userId, companyId, userName, role, user
       console.error('[PracticeClient] DB upload failed (local copy already saved):', msg)
     }
   }, [])
+
+  const handleWhatsAppSubmit = useCallback((messages: string[]) => {
+    setShowWhatsApp(false)
+    if (messages.length === 0) return
+    if (savedSessionId) {
+      fetch('/api/save-whatsapp-messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: savedSessionId, messages }),
+      }).catch(() => {})
+    } else {
+      // Session still uploading — store and flush when sessionId arrives
+      pendingWhatsappRef.current = messages
+    }
+  }, [savedSessionId])
 
   const closeSession = useCallback(() => {
     intentionalCloseRef.current = true
@@ -491,6 +613,12 @@ export default function PracticeClient({ userId, companyId, userName, role, user
     setTurns([])
     setErrorMsg('')
     setSessionStartMs(0)
+    setSavedSessionId(null)
+
+    // Show WhatsApp follow-up popup for Hesham (he always ends with "send it to me on WhatsApp")
+    if (selectedScenarioRef.current === 'hesham') {
+      setShowWhatsApp(true)
+    }
 
     // Defer heavy MP3 encoding so the UI state update flushes first
     if (chunks.length > 0 || mic.length > 0) {
@@ -1408,6 +1536,8 @@ export default function PracticeClient({ userId, companyId, userName, role, user
           </button>
         )}
       </div>
+
+      {showWhatsApp && <WhatsAppPopup onSubmit={handleWhatsAppSubmit} />}
     </div>
   )
 }
