@@ -214,6 +214,7 @@ interface PracticeClientProps {
 const AVATAR: Record<string, string> = {
   dr_yasmine: '/avatars/yasmin.jpg',
   dr_mariam: '/avatars/mariam.jpg',
+  hesham: '/avatars/hesham.jpeg',
   mohammed_tgl: '/avatars/mohammed-tgl.jpg',
   mohammed_madinet_masr: '/avatars/mohammed-madinet-masr.jpg',
   mona_hassan: '/avatars/mona.jpg',
@@ -223,6 +224,7 @@ const AVATAR: Record<string, string> = {
 const AVATAR_POSITION: Record<string, string> = {
   dr_yasmine: '48% center',
   dr_mariam: '18% center',
+  hesham: '50% center',
   mohammed_tgl: '44% center',
   mohammed_madinet_masr: '50% center',
   mona_hassan: '47% center',

@@ -8,6 +8,7 @@ import { MOHAMMED_TGL_PROMPT } from './scenario-prompts/prompt_mohammed_tgl'
 import { MOHAMMED_MADINET_MASR_PROMPT } from './scenario-prompts/prompt_mohammed_madinet_masr'
 import { MONA_HASSAN_PROMPT } from './scenario-prompts/prompt_mona_hassan'
 import { ALI_PROMPT } from './scenario-prompts/prompt_ali'
+import { HESHAM_PROMPT } from './scenario-prompts/prompt_hesham'
 
 export interface Scenario {
   id: string;
@@ -70,6 +71,26 @@ export const SCENARIOS: Scenario[] = [
     tagAr: "استفسار وحدة عيادة",
     contextAr: "قدّمت استفساراً عن وحدة عيادة عبر الإنترنت. هادئة ومحترفة، تُقيّم كل إجابة بصمت. اشتراطات تقنية صارمة: التصميم، الحمل الكهربائي، الخصوصية، وصورة المبنى.",
     practiceGoalAr: "تعامل مع مشترية متطلبة تقنياً تصرف كل محاولة لتحديد موعد. ستوافق فقط على ميركون VX 90 أو VX Golden Square — وبعد استيفاء جميع متطلباتها فعلياً لا مجرد الإقرار بها.",
+  },
+  {
+    id: "hesham",
+    label: "Hesham — Inbound Lead",
+    defaultVoice: "Charon",
+    prompt: HESHAM_PROMPT,
+    description: "Hesham is a 52-year-old civil engineer from Port Said who submitted a Facebook lead form about a clinic investment in Access Point. He's exploring — not committed — and gives nothing away unless directly asked. (Inbound Lead)",
+    category: "Clinics",
+    subcategory: "Clients",
+    name: "Hesham",
+    job: "Civil Engineer",
+    tag: "Facebook Lead — Clinic Investment",
+    iconType: "chart",
+    context: "He filled out a Facebook lead form about a clinic unit in Access Point, New Nargis, New Cairo. He's a remote buyer from Port Said — calm, reserved, and gives nothing away. Every detail about him must be earned through the right question.",
+    practiceGoal: "Qualify a cold inbound lead through targeted questions. Uncover his hidden motive (buying for his daughter who studies dentistry), handle a strong privacy objection about the shared reception, and close for sending materials on WhatsApp.",
+    nameAr: "هشام",
+    jobAr: "مهندس مدني",
+    tagAr: "ليد فيسبوك — وحدة طبية",
+    contextAr: "ملأ نموذج فيسبوك عن وحدة طبية في Access Point، النرجس الجديدة، القاهرة الجديدة. مشترٍ بعيد من بورسعيد — هادئ ومتحفظ ولا يعطي أي معلومة إلا لمن يسأل السؤال الصح.",
+    practiceGoalAr: "أهّل ليداً بارداً عبر أسئلة محددة. اكشف دافعه الخفي (يشتري لبنته الدارسة للأسنان)، تعامل مع اعتراض الخصوصية الخاص بالريسبشن المشترك، وأغلق بإرسال المواد على الواتس.",
   },
   {
     id: "mohammed_tgl",
