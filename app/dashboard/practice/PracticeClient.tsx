@@ -313,7 +313,7 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          style={{ position: 'relative', background: isDragOver ? '#d4f5d4' : '#ECE5DD', outline: isDragOver ? '3px dashed #25D366' : 'none', transition: 'background 0.15s, outline 0.15s', flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 200 }}
+          style={{ position: 'relative', backgroundColor: isDragOver ? '#d4f5d4' : '#ECE5DD', backgroundImage: isDragOver ? 'none' : 'url(/whatsapp-wallpaper.png)', backgroundRepeat: 'repeat', backgroundSize: 'auto', outline: isDragOver ? '3px dashed #25D366' : 'none', transition: 'background-color 0.15s, outline 0.15s', flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 200 }}
         >
           {isDragOver && (
             <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(37,211,102,0.15)', border: '3px dashed #25D366', borderRadius: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
@@ -322,7 +322,7 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
           )}
           <div style={{ textAlign: 'center', margin: '4px 0 10px' }}>
             <span style={{ background: 'rgba(0,0,0,0.11)', color: 'rgba(0,0,0,0.45)', fontSize: 11, padding: '4px 14px', borderRadius: 20, fontFamily: 'system-ui, sans-serif' }}>
-              أرسل ما كنت ستبعثه لهشام على الواتساب
+              أرسل ما كنت ستبعته لهشام على الواتساب
             </span>
           </div>
           {messages.map((msg, i) => (
