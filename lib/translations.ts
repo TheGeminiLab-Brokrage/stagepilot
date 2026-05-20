@@ -285,6 +285,7 @@ const en = {
   whatsappSendFirst: 'Send a message first',
   whatsappSendFinish: 'Send & Finish',
   whatsappImageAlt: 'image',
+  whatsappContactName: 'Hesham',
 }
 
 const ar: typeof en = {
@@ -573,6 +574,7 @@ const ar: typeof en = {
   whatsappSendFirst: 'أرسل رسالة أولاً',
   whatsappSendFinish: 'إرسال وإنهاء',
   whatsappImageAlt: 'صورة',
+  whatsappContactName: 'هشام',
 }
 
 export const translations = { en, ar }

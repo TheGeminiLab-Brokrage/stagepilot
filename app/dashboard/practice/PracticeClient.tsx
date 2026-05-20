@@ -284,7 +284,7 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
           onClick={() => setPhotoOpen(false)}
           style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          <img src="/avatars/heshamWP.jpeg" alt="هشام" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 8, objectFit: 'contain' }} />
+          <img src="/avatars/heshamWP.jpeg" alt={t('whatsappContactName')} style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 8, objectFit: 'contain' }} />
         </div>
       )}
       {/* WhatsApp window */}
@@ -293,12 +293,12 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
         <div style={{ background: '#075E54', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <img
             src="/avatars/heshamWP.jpeg"
-            alt="هشام"
+            alt={t('whatsappContactName')}
             onClick={() => setPhotoOpen(true)}
             style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, cursor: 'pointer', border: '2px solid rgba(255,255,255,0.25)' }}
           />
           <div>
-            <div style={{ color: '#fff', fontWeight: 600, fontSize: 15, fontFamily: 'system-ui, sans-serif' }}>هشام</div>
+            <div style={{ color: '#fff', fontWeight: 600, fontSize: 15, fontFamily: 'system-ui, sans-serif' }}>{t('whatsappContactName')}</div>
             <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 11, fontFamily: 'system-ui, sans-serif' }}>{t('whatsappOnlineStatus')}</div>
           </div>
           <div style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.75)' }}>
