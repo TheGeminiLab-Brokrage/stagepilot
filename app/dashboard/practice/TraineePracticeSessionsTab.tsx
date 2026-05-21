@@ -23,6 +23,7 @@ export interface PracticeSessionRow {
   created_at: string
   call_grade?: CallGrade | null
   whatsapp_messages?: string[] | null
+  client_stage?: string | null
 }
 
 const CRITERIA_LABELS: Record<keyof Omit<CallGrade, 'total_score' | 'overall_feedback' | 'graded_at'>, string> = {
@@ -139,6 +140,14 @@ function WhatsAppMessagesModal({ messages, date, onClose }: { messages: string[]
 }
 
 const EDUCATIONAL_SCENARIO_IDS = new Set(['mohammed_tgl', 'mohammed_madinet_masr', 'mona_hassan'])
+
+const STAGE_DISPLAY: Record<string, { label: string; labelAr: string; color: string }> = {
+  interested_follow_up: { label: 'Interested / Follow Up', labelAr: 'مهتم / متابعة',   color: '#93c5fd' },
+  potential_to_close:   { label: 'Potential to Close',     labelAr: 'قابل للإغلاق',    color: '#c4b5fd' },
+  direct_to_meeting:    { label: 'Direct to Meeting',      labelAr: 'توجيه للاجتماع',  color: '#5eead4' },
+  meeting_scheduled:    { label: 'Meeting Scheduled',      labelAr: 'اجتماع مجدول',    color: '#fde047' },
+  not_interested:       { label: 'Not Interested',         labelAr: 'غير مهتم',         color: '#fca5a5' },
+}
 
 function CallGradeCell({ grade, scenarioId }: { grade?: CallGrade | null; scenarioId: string }) {
   const [open, setOpen] = useState(false)
@@ -278,7 +287,7 @@ export default function TraineePracticeSessionsTab({ sessions, scenarioLabels }:
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }} dir="rtl">
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              {['السيناريو', 'التاريخ', 'الوقت', 'المدة', 'الدرجة', 'واتساب', ''].map((h, i) => (
+              {['السيناريو', 'التاريخ', 'الوقت', 'المدة', 'الدرجة', 'المرحلة', 'واتساب', ''].map((h, i) => (
                 <th
                   key={i}
                   style={{
@@ -322,6 +331,21 @@ export default function TraineePracticeSessionsTab({ sessions, scenarioLabels }:
                 </td>
                 <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
                   <CallGradeCell grade={session.call_grade} scenarioId={session.scenario_id} />
+                </td>
+                <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                  {session.client_stage && STAGE_DISPLAY[session.client_stage] ? (
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6,
+                      color: STAGE_DISPLAY[session.client_stage].color,
+                      background: `${STAGE_DISPLAY[session.client_stage].color}1a`,
+                      border: `1px solid ${STAGE_DISPLAY[session.client_stage].color}33`,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {isAr ? STAGE_DISPLAY[session.client_stage].labelAr : STAGE_DISPLAY[session.client_stage].label}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)' }}>—</span>
+                  )}
                 </td>
                 <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
                   {session.scenario_id === 'hesham' && session.whatsapp_messages?.length ? (

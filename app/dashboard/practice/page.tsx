@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { SCENARIOS } from '@/lib/gemini-scenarios'
 import PracticePageWrapper from './PracticePageWrapper'
 
@@ -23,9 +24,10 @@ export default async function PracticePage() {
     redirect('/auth/login')
   }
 
-  const { data: rawSessions } = await supabase
+  const admin = createAdminClient()
+  const { data: rawSessions } = await admin
     .from('practice_sessions')
-    .select('id, scenario_id, audio_path, duration_seconds, created_at, call_grade, whatsapp_messages')
+    .select('id, scenario_id, audio_path, duration_seconds, created_at, call_grade, whatsapp_messages, client_stage')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(50)

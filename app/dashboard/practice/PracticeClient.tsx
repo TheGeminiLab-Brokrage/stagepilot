@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Mp3Encoder } from '@breezystack/lamejs'
 import AiOrb from './AiOrb'
 import { useT, useLanguage } from '@/lib/language-context'
@@ -505,6 +506,8 @@ export default function PracticeClient({ userId, companyId, userName, role, user
   const [dailyUsage, setDailyUsage] = useState<Record<string, number>>({})
   const [resetCountdown, setResetCountdown] = useState<string>('')
 
+  const router = useRouter()
+
   const DAILY_LIMIT = 3
   const isFreePlan = role === 'trainee' || role === 'agent'
   const [sessionStartMs, setSessionStartMs] = useState(0)
@@ -741,6 +744,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
       }
 
       setSaveStatus('saved')
+      router.refresh()
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
