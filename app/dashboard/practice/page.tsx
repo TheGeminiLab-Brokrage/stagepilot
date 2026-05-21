@@ -33,7 +33,7 @@ export default async function PracticePage() {
     .limit(50)
 
   // client_stage column may not exist yet — fall back without it if so
-  const rawSessions = stageColError
+  let rawSessions = stageColError
     ? (await admin
         .from('practice_sessions')
         .select('id, scenario_id, audio_path, duration_seconds, created_at, call_grade, whatsapp_messages')
@@ -41,6 +41,19 @@ export default async function PracticePage() {
         .order('created_at', { ascending: false })
         .limit(50)).data
     : sessionsWithStage
+
+  // Safety net: if direct user_id query returned nothing, try via company filter
+  // (handles edge cases where user_id index or RLS behaves unexpectedly)
+  if ((!rawSessions || rawSessions.length === 0) && profile?.company_id) {
+    const { data: companySessions } = await admin
+      .from('practice_sessions')
+      .select('id, scenario_id, audio_path, duration_seconds, created_at, call_grade, whatsapp_messages, client_stage, user_id')
+      .eq('company_id', profile.company_id)
+      .order('created_at', { ascending: false })
+      .limit(200)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    rawSessions = (companySessions ?? []).filter(s => s.user_id === user.id).map(({ user_id: _uid, ...rest }) => rest)
+  }
 
   const scenarioLabels = Object.fromEntries(SCENARIOS.map(s => [s.id, s.label]))
 

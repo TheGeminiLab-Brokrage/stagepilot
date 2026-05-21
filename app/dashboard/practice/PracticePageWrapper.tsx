@@ -42,6 +42,11 @@ export default function PracticePageWrapper({
     } catch {}
   }, [])
 
+  const switchTab = useCallback((tab: Tab) => {
+    setActiveTab(tab)
+    if (tab === 'sessions') refetchSessions()
+  }, [refetchSessions])
+
   const tabs: { key: Tab; label: string }[] = [
     { key: 'practice', label: isAr ? 'التدريب' : 'Practice' },
     { key: 'sessions', label: isAr ? 'سجل جلساتي' : 'My Sessions' },
@@ -64,7 +69,7 @@ export default function PracticePageWrapper({
         {tabs.map(({ key, label }) => (
           <button
             key={key}
-            onClick={() => setActiveTab(key)}
+            onClick={() => switchTab(key)}
             style={{
               padding: '11px 28px',
               borderRadius: '8px 8px 0 0',
