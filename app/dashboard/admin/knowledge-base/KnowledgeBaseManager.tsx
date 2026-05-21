@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { useLanguage } from '@/lib/language-context'
 
 function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null)
@@ -99,10 +100,18 @@ const SCENARIOS = [
   { id: 'ali',                   label: 'علي' },
 ]
 
-const CATEGORY_LABELS: Record<Category, string> = {
-  clinic_project: 'Clinic Projects',
-  product_fact: 'Product Facts',
-  common_question: 'Common Questions',
+function getCategoryLabel(cat: Category, isAr: boolean): string {
+  const ar: Record<Category, string> = {
+    clinic_project: 'مشاريع العيادة',
+    product_fact: 'حقائق المنتج',
+    common_question: 'أسئلة شائعة',
+  }
+  const en: Record<Category, string> = {
+    clinic_project: 'Clinic Projects',
+    product_fact: 'Product Facts',
+    common_question: 'Common Questions',
+  }
+  return isAr ? ar[cat] : en[cat]
 }
 
 const VISIBLE_TABS: Category[] = ['product_fact', 'common_question']
@@ -189,6 +198,8 @@ function SheetConnectionsPanel() {
   const [syncing, setSyncing] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const { lang } = useLanguage()
+  const isAr = lang === 'ar'
 
   // Wizard state
   const [step, setStep] = useState(1)
@@ -370,7 +381,7 @@ function SheetConnectionsPanel() {
                     <td className="px-4 py-3 text-gray-400 font-mono">{conn.tab_name}</td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)' }}>
-                        {CATEGORY_LABELS[conn.category]}
+                        {getCategoryLabel(conn.category, isAr)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -548,7 +559,7 @@ function SheetConnectionsPanel() {
                           color: wizardCategory === cat ? '#D7FF00' : 'rgba(255,255,255,0.5)',
                         }}
                       >
-                        {CATEGORY_LABELS[cat]}
+                        {getCategoryLabel(cat, isAr)}
                       </button>
                     ))}
                   </div>
@@ -651,6 +662,8 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const { lang } = useLanguage()
+  const isAr = lang === 'ar'
 
   // Form state
   const [formTitle, setFormTitle] = useState('')
@@ -749,6 +762,20 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
 
   return (
     <>
+      {/* Page heading */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-semibold text-white">
+            {isAr ? 'قاعدة المعرفة' : 'Knowledge Base'}
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {isAr
+              ? 'إدارة البيانات التي يسترجعها الذكاء الاصطناعي أثناء الجلسات — مشاريع العيادة، حقائق المنتج، وأسئلة العملاء الشائعة.'
+              : 'Manage the data the AI retrieves during sessions — clinic projects, product facts, and common client questions.'}
+          </p>
+        </div>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-800">
         {VISIBLE_TABS.map((cat) => (
@@ -766,7 +793,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
               cursor: 'pointer',
             }}
           >
-            {CATEGORY_LABELS[cat]}
+            {getCategoryLabel(cat, isAr)}
             <span
               className="ml-1 px-1.5 py-0.5 rounded text-xs"
               style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}
@@ -810,8 +837,8 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
       {/* Table header + Add button */}
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs text-gray-500">
-          {activeTab === 'product_fact' && 'Injected into the system prompt at session start.'}
-          {activeTab === 'common_question' && 'Injected into buyer persona prompts — the AI uses these as realistic client questions.'}
+          {activeTab === 'product_fact' && (isAr ? 'يتم حقنها في موجه النظام عند بدء الجلسة.' : 'Injected into the system prompt at session start.')}
+          {activeTab === 'common_question' && (isAr ? 'يتم حقنها في موجهات شخصية المشتري — يستخدمها الذكاء الاصطناعي كأسئلة واقعية من العملاء.' : 'Injected into buyer persona prompts — the AI uses these as realistic client questions.')}
         </p>
         <button
           onClick={openAdd}
@@ -823,7 +850,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
             cursor: 'pointer',
           }}
         >
-          + Add Entry
+          {isAr ? '+ إضافة إدخال' : '+ Add Entry'}
         </button>
       </div>
 
@@ -831,23 +858,25 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
       <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)' }}>
         {filtered.length === 0 ? (
           <div className="py-12 text-center text-sm text-gray-600">
-            No {CATEGORY_LABELS[activeTab].toLowerCase()} yet. Click &ldquo;+ Add Entry&rdquo; to add the first one.
+            {isAr
+              ? `لا توجد ${getCategoryLabel(activeTab as Category, true)} بعد. انقر على "+ إضافة إدخال" لإضافة أول واحدة.`
+              : `No ${getCategoryLabel(activeTab as Category, false).toLowerCase()} yet. Click "+ Add Entry" to add the first one.`}
           </div>
         ) : (
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-[rgba(215,255,0,0.12)] text-xs uppercase tracking-wide" style={{ color: 'rgba(215,255,0,0.4)' }}>
-                <th className="text-left px-4 py-3 font-semibold">Title</th>
-                <th className="text-left px-4 py-3 font-semibold">Content</th>
+                <th className="text-left px-4 py-3 font-semibold">{isAr ? 'العنوان' : 'Title'}</th>
+                <th className="text-left px-4 py-3 font-semibold">{isAr ? 'المحتوى' : 'Content'}</th>
                 <th className="text-left px-4 py-3 font-semibold">
                   <span className="flex items-center gap-0.5">
-                    Scenarios
+                    {isAr ? 'السيناريوهات' : 'Scenarios'}
                     <InfoIcon tip="Which practice sessions include this entry. 'All' = no restriction, every session gets it. Restricted entries only appear in the selected personas." />
                   </span>
                 </th>
                 <th className="text-center px-4 py-3 font-semibold">
                   <span className="flex items-center justify-center gap-0.5">
-                    Active
+                    {isAr ? 'نشط' : 'Active'}
                     <InfoIcon tip="On = AI uses this entry in sessions. Off = stored but never shown to the AI. Toggle to pause without deleting." />
                   </span>
                 </th>
@@ -919,7 +948,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(215,255,0,0.12)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'rgba(215,255,0,0.05)')}
                     >
-                      Edit
+                      {isAr ? 'تعديل' : 'Edit'}
                     </button>
                     <button
                       onClick={() => handleDelete(entry.id)}
@@ -929,7 +958,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.12)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.05)')}
                     >
-                      {deleting === entry.id ? '…' : 'Delete'}
+                      {deleting === entry.id ? '…' : (isAr ? 'حذف' : 'Delete')}
                     </button>
                   </td>
                 </tr>
@@ -951,7 +980,9 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
             style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '90vh' }}
           >
             <h2 className="text-sm font-semibold text-white mb-5" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              {editingEntry ? 'Edit Entry' : `Add ${CATEGORY_LABELS[activeTab]}`}
+              {editingEntry
+                ? (isAr ? 'تعديل الإدخال' : 'Edit Entry')
+                : (isAr ? `إضافة ${getCategoryLabel(activeTab as Category, true)}` : `Add ${getCategoryLabel(activeTab as Category, false)}`)}
             </h2>
 
             {activeTab === 'clinic_project' ? (
@@ -1084,7 +1115,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                   onChange={(e) => setFormIsActive(e.target.checked)}
                   className="accent-yellow-300"
                 />
-                Active (visible to AI)
+                {isAr ? 'نشط (مرئي للذكاء الاصطناعي)' : 'Active (visible to AI)'}
                 <InfoIcon tip="Uncheck to temporarily hide this entry from the AI without deleting it. Useful for testing or seasonal content." />
               </label>
               <div className="flex-1" />
@@ -1093,7 +1124,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                 className="px-4 py-2 rounded-lg text-xs text-gray-400 transition-all"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
               >
-                Cancel
+                {isAr ? 'إلغاء' : 'Cancel'}
               </button>
               <button
                 onClick={handleSave}
@@ -1101,7 +1132,7 @@ export default function KnowledgeBaseManager({ initialEntries }: { initialEntrie
                 className="px-5 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
                 style={{ background: '#D7FF00', color: '#000', fontFamily: "'Space Grotesk', sans-serif" }}
               >
-                {saving ? 'Saving…' : editingEntry ? 'Save Changes' : 'Add Entry'}
+                {saving ? (isAr ? 'جارٍ الحفظ…' : 'Saving…') : editingEntry ? (isAr ? 'حفظ التغييرات' : 'Save Changes') : (isAr ? 'إضافة إدخال' : 'Add Entry')}
               </button>
             </div>
           </div>

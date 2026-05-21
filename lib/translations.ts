@@ -141,13 +141,13 @@ const en = {
   examStartError: 'An error occurred. Please try again.',
 
   // ── Stage names ───────────────────────────────────────────────────────────
-  stageDoneDeal: 'done deal',
-  stagePotentialToClose: 'potential to close',
-  stageMeetingScheduled: 'meeting scheduled',
-  stageMeetingDone: 'meeting done',
-  stageInterestedFollowUp: 'interested / follow up',
-  stageNotInterested: 'not interested',
-  stageLowBudget: 'low budget',
+  stageDoneDeal: 'Done Deal',
+  stagePotentialToClose: 'Potential to Close',
+  stageMeetingScheduled: 'Meeting Scheduled',
+  stageMeetingDone: 'Meeting Done',
+  stageInterestedFollowUp: 'Interested / Follow Up',
+  stageNotInterested: 'Not Interested',
+  stageLowBudget: 'Low Budget',
 
   // ── UserExamResultsTab columns ────────────────────────────────────────────
   userExamColPhase1: 'Phase 1',
@@ -207,6 +207,7 @@ const en = {
   practiceSaving: 'Saving…',
   practiceNew: '↺ New',
   practiceEndSession: 'End Session',
+  practiceBack: '← Back',
 
   // ── PracticeClient card labels ─────────────────────────────────────────
   practiceScenarioLabel: 'Scenario',
@@ -286,6 +287,11 @@ const en = {
   whatsappSendFinish: 'Send & Finish',
   whatsappImageAlt: 'image',
   whatsappContactName: 'Hesham',
+
+  // ── Client stage popup ────────────────────────────────────────────────────
+  clientStageTitle: 'Client Stage',
+  stageDirectToMeeting: 'Direct to Meeting',
+  clientStageConfirm: 'Confirm Stage',
 }
 
 const ar: typeof en = {
@@ -432,7 +438,7 @@ const ar: typeof en = {
 
   // ── Stage names ───────────────────────────────────────────────────────────
   stageDoneDeal: 'صفقة منجزة',
-  stagePotentialToClose: 'احتمال إغلاق',
+  stagePotentialToClose: 'قابل للإغلاق',
   stageMeetingScheduled: 'اجتماع مجدول',
   stageMeetingDone: 'اجتماع منتهي',
   stageInterestedFollowUp: 'مهتم / متابعة',
@@ -497,6 +503,7 @@ const ar: typeof en = {
   practiceSaving: 'جاري الحفظ…',
   practiceNew: '↺ جديد',
   practiceEndSession: 'إنهاء الجلسة',
+  practiceBack: '← رجوع',
 
   // ── PracticeClient card labels ─────────────────────────────────────────
   practiceScenarioLabel: 'السيناريو',
@@ -575,6 +582,11 @@ const ar: typeof en = {
   whatsappSendFinish: 'إرسال وإنهاء',
   whatsappImageAlt: 'صورة',
   whatsappContactName: 'هشام',
+
+  // ── Client stage popup ────────────────────────────────────────────────────
+  clientStageTitle: 'مرحلة العميل',
+  stageDirectToMeeting: 'توجيه للاجتماع',
+  clientStageConfirm: 'تأكيد المرحلة',
 }
 
 export const translations = { en, ar }

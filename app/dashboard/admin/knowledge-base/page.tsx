@@ -26,14 +26,6 @@ export default async function KnowledgeBasePage() {
 
   return (
     <div className="max-w-4xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-white">Knowledge Base</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Manage the data the AI retrieves during sessions — clinic projects, product facts, and common client questions.
-          </p>
-        </div>
-      </div>
       <KnowledgeBaseManager initialEntries={entries ?? []} />
     </div>
   )

@@ -24,7 +24,12 @@ function validateFile(f: File): string | null {
   return null
 }
 
-export default function UploadForm() {
+interface UploadFormProps {
+  agentName: string
+  teamName: string | null
+}
+
+export default function UploadForm({ agentName, teamName }: UploadFormProps) {
   const t = useT()
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -143,6 +148,19 @@ export default function UploadForm() {
   }
 
   return (
+    <>
+      <div className="mb-6">
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#fff', fontFamily: "'Montserrat', sans-serif", letterSpacing: '-0.02em' }}>
+          {t('uploadPageTitle')}
+        </h1>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginTop: 6, lineHeight: 1.6 }}>
+          {t('uploadPageSubtitle')}
+        </p>
+        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', marginTop: 4, fontFamily: "'Space Grotesk', sans-serif" }}>
+          {t('uploadingAs')} <span style={{ color: 'rgba(215,255,0,0.6)' }}>{agentName}</span>
+          {teamName && <> &middot; <span style={{ color: 'rgba(215,255,0,0.6)' }}>{teamName} {t('uploadTeamLabel')}</span></>}
+        </p>
+      </div>
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Drop zone */}
       <div
@@ -284,5 +302,6 @@ export default function UploadForm() {
         {status === 'uploading' ? t('uploadSubmittingBtn') : t('uploadSubmitBtn')}
       </button>
     </form>
+    </>
   )
 }

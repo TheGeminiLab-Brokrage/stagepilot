@@ -224,6 +224,7 @@ async function resizeImageToDataURL(file: File, maxWidth = 800, quality = 0.7): 
 
 function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void }) {
   const t = useT()
+  const { lang } = useLanguage()
   const [messages, setMessages] = useState<string[]>([])
   const [input, setInput] = useState('')
   const [photoOpen, setPhotoOpen] = useState(false)
@@ -277,7 +278,7 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
   }, [messages])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, flex: '0 0 771px' }}>
       {/* Full-screen photo lightbox */}
       {photoOpen && (
         <div
@@ -288,7 +289,7 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
         </div>
       )}
       {/* WhatsApp window */}
-      <div style={{ width: '100%', maxWidth: 560, borderRadius: 12, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', maxHeight: '82vh' }}>
+      <div style={{ width: '100%', maxWidth: 1100, borderRadius: 12, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
         {/* Header */}
         <div style={{ background: '#075E54', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <img
@@ -314,7 +315,7 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          style={{ position: 'relative', backgroundColor: isDragOver ? '#d4f5d4' : '#ECE5DD', backgroundImage: isDragOver ? 'none' : 'url(/whatsapp-wallpaper.png)', backgroundRepeat: 'repeat', backgroundSize: 'auto', outline: isDragOver ? '3px dashed #25D366' : 'none', transition: 'background-color 0.15s, outline 0.15s', flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 300 }}
+          style={{ position: 'relative', backgroundColor: isDragOver ? '#d4f5d4' : '#ECE5DD', backgroundImage: isDragOver ? 'none' : 'url(/whatsapp-wallpaper.png)', backgroundRepeat: 'repeat', backgroundSize: 'auto', outline: isDragOver ? '3px dashed #25D366' : 'none', transition: 'background-color 0.15s, outline 0.15s', flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 400 }}
         >
           {isDragOver && (
             <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(37,211,102,0.15)', border: '3px dashed #25D366', borderRadius: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
@@ -343,14 +344,14 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
         </div>
 
         {/* Input row */}
-        <div style={{ background: '#F0F0F0', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, direction: 'rtl' }}>
+        <div style={{ background: '#F0F0F0', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, direction: lang === 'ar' ? 'rtl' : 'ltr' }}>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
             onPaste={handlePaste}
             placeholder={t('whatsappPlaceholder')}
-            dir="rtl"
+            dir={lang === 'ar' ? 'rtl' : 'ltr'}
             autoFocus
             style={{ flex: 1, background: '#fff', border: 'none', borderRadius: 22, padding: '9px 16px', fontSize: 14, outline: 'none', fontFamily: 'system-ui, sans-serif', color: '#111' }}
           />
@@ -374,6 +375,82 @@ function WhatsAppPopup({ onSubmit }: { onSubmit: (messages: string[]) => void })
       >
         {messages.length === 0 ? t('whatsappSendFirst') : t('whatsappSendFinish')}
       </button>
+    </div>
+  )
+}
+
+// ─── Client Stage Popup ────────────────────────────────────────────────────────
+const STAGE_OPTIONS = [
+  { value: 'interested_follow_up',  labelKey: 'stageInterestedFollowUp',  accent: '#3b82f6', selectedBg: 'rgba(59,130,246,0.18)',  unselectedBg: 'rgba(59,130,246,0.06)',  text: '#93c5fd'  },
+  { value: 'potential_to_close',    labelKey: 'stagePotentialToClose',    accent: '#a855f7', selectedBg: 'rgba(168,85,247,0.18)',  unselectedBg: 'rgba(168,85,247,0.06)',  text: '#c4b5fd'  },
+  { value: 'direct_to_meeting',     labelKey: 'stageDirectToMeeting',     accent: '#14b8a6', selectedBg: 'rgba(20,184,166,0.18)',  unselectedBg: 'rgba(20,184,166,0.06)',  text: '#5eead4'  },
+  { value: 'meeting_scheduled',     labelKey: 'stageMeetingScheduled',    accent: '#eab308', selectedBg: 'rgba(234,179,8,0.18)',   unselectedBg: 'rgba(234,179,8,0.06)',   text: '#fde047'  },
+  { value: 'not_interested',        labelKey: 'stageNotInterested',       accent: '#ef4444', selectedBg: 'rgba(239,68,68,0.18)',   unselectedBg: 'rgba(239,68,68,0.06)',   text: '#fca5a5'  },
+] as const
+
+function ClientStagePopup({ onSubmit }: { onSubmit: (stage: string) => void }) {
+  const t = useT()
+  const [selected, setSelected] = useState<string | null>(null)
+
+  return (
+    <div style={{ width: '100%', maxWidth: 340, background: '#1a1a1a', borderRadius: 16, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ background: '#111', padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, fontFamily: 'system-ui, sans-serif', textAlign: 'center', letterSpacing: 0.3 }}>
+          {t('clientStageTitle')}
+        </div>
+      </div>
+
+      {/* Stage options */}
+      <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {STAGE_OPTIONS.map(({ value, labelKey, accent, selectedBg, unselectedBg, text }) => {
+          const isSelected = selected === value
+          return (
+            <button
+              key={value}
+              onClick={() => setSelected(value)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                background: isSelected ? selectedBg : unselectedBg,
+                border: `1.5px solid ${isSelected ? accent : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: 10, padding: '11px 14px', cursor: 'pointer',
+                transition: 'all 0.15s', textAlign: 'left',
+              }}
+            >
+              <div style={{
+                width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                border: `2px solid ${isSelected ? accent : 'rgba(255,255,255,0.35)'}`,
+                background: isSelected ? accent : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.15s',
+              }}>
+                {isSelected && <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />}
+              </div>
+              <span style={{ color: isSelected ? text : 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: 'system-ui, sans-serif', fontWeight: isSelected ? 600 : 400 }}>
+                {t(labelKey)}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Confirm button */}
+      <div style={{ padding: '4px 16px 16px' }}>
+        <button
+          onClick={() => selected && onSubmit(selected)}
+          disabled={!selected}
+          style={{
+            width: '100%', background: selected ? '#D7FF00' : 'rgba(255,255,255,0.1)',
+            color: selected ? '#000' : '#fff', border: 'none', borderRadius: 10,
+            padding: '13px 0', fontSize: 15, fontWeight: 700,
+            cursor: selected ? 'pointer' : 'not-allowed',
+            fontFamily: 'system-ui, sans-serif', transition: 'all 0.2s',
+            opacity: selected ? 1 : 0.5,
+          }}
+        >
+          {t('clientStageConfirm')}
+        </button>
+      </div>
     </div>
   )
 }
@@ -421,8 +498,10 @@ export default function PracticeClient({ userId, companyId, userName, role, user
   const [saveError, setSaveError] = useState('')
   const [downloadUrl, setDownloadUrl] = useState<{ url: string; filename: string } | null>(null)
   const [showWhatsApp, setShowWhatsApp] = useState(false)
+  const [showClientStage, setShowClientStage] = useState(false)
   const [savedSessionId, setSavedSessionId] = useState<string | null>(null)
   const pendingWhatsappRef = useRef<string[] | null>(null)
+  const pendingStageRef = useRef<string | null>(null)
   const [dailyUsage, setDailyUsage] = useState<Record<string, number>>({})
   const [resetCountdown, setResetCountdown] = useState<string>('')
 
@@ -649,6 +728,16 @@ export default function PracticeClient({ userId, companyId, userName, role, user
           }).catch(() => {})
           pendingWhatsappRef.current = null
         }
+
+        // If user already confirmed a client stage before session finished saving, flush now
+        if (pendingStageRef.current) {
+          fetch('/api/save-client-stage', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: metaJson.sessionId, clientStage: pendingStageRef.current }),
+          }).catch(() => {})
+          pendingStageRef.current = null
+        }
       }
 
       setSaveStatus('saved')
@@ -673,6 +762,19 @@ export default function PracticeClient({ userId, companyId, userName, role, user
     } else {
       // Session still uploading — store and flush when sessionId arrives
       pendingWhatsappRef.current = messages
+    }
+  }, [savedSessionId])
+
+  const handleStageSubmit = useCallback((stage: string) => {
+    setShowClientStage(false)
+    if (savedSessionId) {
+      fetch('/api/save-client-stage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: savedSessionId, clientStage: stage }),
+      }).catch(() => {})
+    } else {
+      pendingStageRef.current = stage
     }
   }, [savedSessionId])
 
@@ -703,6 +805,8 @@ export default function PracticeClient({ userId, companyId, userName, role, user
     if (selectedScenarioRef.current === 'hesham') {
       setShowWhatsApp(true)
     }
+    // Show client stage popup for every scenario
+    setShowClientStage(true)
 
     // Defer heavy MP3 encoding so the UI state update flushes first
     if (chunks.length > 0 || mic.length > 0) {
@@ -1569,7 +1673,21 @@ export default function PracticeClient({ userId, companyId, userName, role, user
             {t('practiceNew')}
           </button>
         ) : (
-          <div />
+          <button
+            onClick={() => setPanelOpen(true)}
+            className="text-xs px-3 py-2 rounded-lg font-medium transition-all"
+            style={{
+              border: '1px solid rgba(255,255,255,0.15)',
+              color: 'rgba(255,255,255,0.5)',
+              background: 'transparent',
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: '0.05em',
+            }}
+            onMouseEnter={e => { (e.target as HTMLButtonElement).style.borderColor = 'rgba(215,255,0,0.4)'; (e.target as HTMLButtonElement).style.color = '#D7FF00' }}
+            onMouseLeave={e => { (e.target as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.15)'; (e.target as HTMLButtonElement).style.color = 'rgba(255,255,255,0.5)' }}
+          >
+            {t('practiceBack')}
+          </button>
         )}
 
         {status === 'idle' || status === 'error' ? (
@@ -1621,7 +1739,12 @@ export default function PracticeClient({ userId, companyId, userName, role, user
         )}
       </div>
 
-      {showWhatsApp && <WhatsAppPopup onSubmit={handleWhatsAppSubmit} />}
+      {(showWhatsApp || showClientStage) && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 24 }}>
+          {showWhatsApp && <WhatsAppPopup onSubmit={handleWhatsAppSubmit} />}
+          {showClientStage && <ClientStagePopup onSubmit={handleStageSubmit} />}
+        </div>
+      )}
     </div>
   )
 }
