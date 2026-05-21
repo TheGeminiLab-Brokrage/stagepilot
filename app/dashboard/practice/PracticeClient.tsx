@@ -473,6 +473,7 @@ const AVATAR: Record<string, string> = {
   mohammed_madinet_masr: '/avatars/mohammed-madinet-masr.jpg',
   mona_hassan: '/avatars/mona.jpg',
   ali: '/avatars/ali.jpg',
+  dr_zeyad: '/avatars/Zeyad.jpeg',
 }
 
 const AVATAR_POSITION: Record<string, string> = {
@@ -483,6 +484,7 @@ const AVATAR_POSITION: Record<string, string> = {
   mohammed_madinet_masr: '50% center',
   mona_hassan: '47% center',
   ali: '50% center',
+  dr_zeyad: '50% center',
 }
 
 export default function PracticeClient({ userId, companyId, userName, role, userEmail }: PracticeClientProps) {

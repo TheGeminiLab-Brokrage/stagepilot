@@ -9,6 +9,7 @@ import { MOHAMMED_MADINET_MASR_PROMPT } from './scenario-prompts/prompt_mohammed
 import { MONA_HASSAN_PROMPT } from './scenario-prompts/prompt_mona_hassan'
 import { ALI_PROMPT } from './scenario-prompts/prompt_ali'
 import { HESHAM_PROMPT } from './scenario-prompts/prompt_hesham'
+import { DR_ZEYAD_PROMPT } from './scenario-prompts/prompt_dr_zeyad'
 
 export interface Scenario {
   id: string;
@@ -91,6 +92,26 @@ export const SCENARIOS: Scenario[] = [
     tagAr: "ليد فيسبوك — وحدة طبية",
     contextAr: "ملأ نموذج فيسبوك عن وحدة طبية في Access Point، النرجس الجديدة، القاهرة الجديدة. مشترٍ بعيد من بورسعيد — هادئ ومتحفظ ولا يعطي أي معلومة إلا لمن يسأل السؤال الصح.",
     practiceGoalAr: "أهّل ليداً بارداً عبر أسئلة محددة. اكشف دافعه الخفي (يشتري لبنته الدارسة للأسنان)، تعامل مع اعتراض الخصوصية الخاص بالريسبشن المشترك، وأغلق بإرسال المواد على الواتس.",
+  },
+  {
+    id: "dr_zeyad",
+    label: "Dr. Zeyad — Clinic Investment",
+    defaultVoice: "Charon",
+    prompt: DR_ZEYAD_PROMPT,
+    description: "Dr. Zeyad Ramy is a pediatric ophthalmologist evaluating clinic unit investments in New Cairo. Strict financial and timeline criteria — he ends the call the moment any criterion fails. (Inbound Lead)",
+    category: "Clinics",
+    subcategory: "Clients",
+    name: "Dr. Zeyad",
+    job: "Pediatric Ophthalmologist",
+    tag: "Inbound Lead — Clinic Unit",
+    iconType: "tooth",
+    context: "A pediatric ophthalmologist who submitted lead forms across multiple brokerages and vaguely remembers one for a New Cairo clinic unit. He's not a hot buyer — he filters options and evaluates silently against strict financial and timeline criteria he never volunteers.",
+    practiceGoal: "Qualify a doctor-investor who reveals nothing unless you earn it. Uncover 7 hidden deal-breaker criteria (delivery date, down payment, monthly installment, period, unit size, location, ownership type). He ends the call the moment any single criterion fails.",
+    nameAr: "د. زياد",
+    jobAr: "طبيب عيون أطفال",
+    tagAr: "ليد واردة — وحدة عيادة",
+    contextAr: "طبيب عيون أطفال ملأ نماذج لدى عدة وسطاء ويتذكر بشكل مبهم نموذجاً عن وحدة عيادة في القاهرة الجديدة. ليس مشترياً ساخناً — يفلتر الخيارات ويقيّم بصمت وفق اشتراطات مالية وزمنية صارمة لا يبوح بها.",
+    practiceGoalAr: "أهّل مستثمراً طبيباً لا يعطي أي معلومة إلا لمن يكسبها. اكشف ٧ معايير خفية حاسمة (التسليم، الداون بيمنت، القسط الشهري، فترة التقسيط، المساحة، الموقع، التمليك). ينهي المكالمة فور فشل أي اشتراط واحد.",
   },
   {
     id: "mohammed_tgl",
