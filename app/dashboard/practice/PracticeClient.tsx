@@ -463,6 +463,7 @@ interface PracticeClientProps {
   userName: string
   role: string
   userEmail: string
+  onSessionSaved?: () => void
 }
 
 const AVATAR: Record<string, string> = {
@@ -487,7 +488,7 @@ const AVATAR_POSITION: Record<string, string> = {
   dr_zeyad: '50% center',
 }
 
-export default function PracticeClient({ userId, companyId, userName, role, userEmail }: PracticeClientProps) {
+export default function PracticeClient({ userId, companyId, userName, role, userEmail, onSessionSaved }: PracticeClientProps) {
   const t = useT()
   const { lang } = useLanguage()
   const [status, setStatus] = useState<Status>('idle')
@@ -509,6 +510,9 @@ export default function PracticeClient({ userId, companyId, userName, role, user
   const [resetCountdown, setResetCountdown] = useState<string>('')
 
   const router = useRouter()
+  const onSessionSavedRef = useRef(onSessionSaved)
+  useEffect(() => { onSessionSavedRef.current = onSessionSaved }, [onSessionSaved])
+
 
   const DAILY_LIMIT = 3
   const isFreePlan = role === 'trainee' || role === 'agent'
@@ -747,6 +751,7 @@ export default function PracticeClient({ userId, companyId, userName, role, user
 
       setSaveStatus('saved')
       router.refresh()
+      onSessionSavedRef.current?.()
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)

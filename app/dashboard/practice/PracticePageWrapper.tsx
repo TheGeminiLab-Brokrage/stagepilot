@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import PracticeClient from './PracticeClient'
 import TraineePracticeSessionsTab, { type PracticeSessionRow } from './TraineePracticeSessionsTab'
 import { useLanguage } from '@/lib/language-context'
@@ -27,8 +27,20 @@ export default function PracticePageWrapper({
   scenarioLabels,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('practice')
+  const [sessions, setSessions] = useState(initialSessions)
   const { lang } = useLanguage()
   const isAr = lang === 'ar'
+
+  useEffect(() => { setSessions(initialSessions) }, [initialSessions])
+
+  const refetchSessions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/practice-sessions')
+      if (!res.ok) return
+      const { sessions: fresh } = await res.json()
+      setSessions(fresh)
+    } catch {}
+  }, [])
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'practice', label: isAr ? 'التدريب' : 'Practice' },
@@ -68,7 +80,7 @@ export default function PracticePageWrapper({
             }}
           >
             {label}
-            {key === 'sessions' && initialSessions.length > 0 && (
+            {key === 'sessions' && sessions.length > 0 && (
               <span
                 style={{
                   marginRight: 8,
@@ -80,7 +92,7 @@ export default function PracticePageWrapper({
                   fontWeight: 800,
                 }}
               >
-                {initialSessions.length}
+                {sessions.length}
               </span>
             )}
           </button>
@@ -96,12 +108,13 @@ export default function PracticePageWrapper({
             userName={userName}
             role={role}
             userEmail={userEmail}
+            onSessionSaved={refetchSessions}
           />
         )}
         {activeTab === 'sessions' && (
           <div className="flex-1 overflow-y-auto">
             <TraineePracticeSessionsTab
-              sessions={initialSessions}
+              sessions={sessions}
               scenarioLabels={scenarioLabels}
             />
           </div>
