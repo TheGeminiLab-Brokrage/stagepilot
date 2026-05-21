@@ -25,12 +25,22 @@ export default async function PracticePage() {
   }
 
   const admin = createAdminClient()
-  const { data: rawSessions } = await admin
+  const { data: sessionsWithStage, error: stageColError } = await admin
     .from('practice_sessions')
     .select('id, scenario_id, audio_path, duration_seconds, created_at, call_grade, whatsapp_messages, client_stage')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(50)
+
+  // client_stage column may not exist yet — fall back without it if so
+  const rawSessions = stageColError
+    ? (await admin
+        .from('practice_sessions')
+        .select('id, scenario_id, audio_path, duration_seconds, created_at, call_grade, whatsapp_messages')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50)).data
+    : sessionsWithStage
 
   const scenarioLabels = Object.fromEntries(SCENARIOS.map(s => [s.id, s.label]))
 
