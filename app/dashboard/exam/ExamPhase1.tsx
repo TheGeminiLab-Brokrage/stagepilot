@@ -24,10 +24,15 @@ interface Props {
   onTimerTick: (seconds: number) => void
 }
 
-const typeLabel: Record<string, string> = {
+const typeLabelAr: Record<string, string> = {
   mcq: 'اختيار من متعدد',
   truefalse: 'صح أو غلط',
   essay: 'سؤال مقالي',
+}
+const typeLabelEn: Record<string, string> = {
+  mcq: 'MCQ',
+  truefalse: 'True / False',
+  essay: 'Essay',
 }
 
 const typeColor: Record<string, string> = {
@@ -184,7 +189,7 @@ export default function ExamPhase1({ onComplete, onTimerTick }: Props) {
       <div className="mb-3">
         <div className="flex justify-between items-center mb-2">
           <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: "'Space Grotesk', sans-serif" }}>
-            المرحلة الأولى — الأسئلة
+            {isAr ? 'المرحلة الأولى — الأسئلة' : 'Phase 1 — Questions'}
           </span>
           <span style={{ color: '#D7FF00', fontSize: 13, fontWeight: 700 }}>
             {current + 1} / {questions.length}
@@ -227,9 +232,9 @@ export default function ExamPhase1({ onComplete, onTimerTick }: Props) {
               fontFamily: "'Space Grotesk', sans-serif",
             }}
           >
-            {typeLabel[q.type]}
+            {(isAr ? typeLabelAr : typeLabelEn)[q.type]}
           </span>
-          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>{q.points} درجة</span>
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>{q.points} {isAr ? 'درجة' : 'pt'}</span>
         </div>
 
         {/* Question text */}
@@ -265,9 +270,10 @@ export default function ExamPhase1({ onComplete, onTimerTick }: Props) {
         {/* T/F choices */}
         {q.type === 'truefalse' && (
           <div className="flex gap-4 mt-2">
-            {['صح', 'غلط'].map(opt => {
+            {(['صح', 'غلط'] as const).map(opt => {
               const selected = currentAnswer === opt
               const isTrue = opt === 'صح'
+              const displayLabel = isAr ? opt : (isTrue ? 'True' : 'False')
               return (
                 <button
                   key={opt}
@@ -286,7 +292,7 @@ export default function ExamPhase1({ onComplete, onTimerTick }: Props) {
                     cursor: 'pointer', fontSize: 16, fontWeight: 700, transition: 'all 0.15s',
                   }}
                 >
-                  {opt}
+                  {displayLabel}
                 </button>
               )
             })}
@@ -298,7 +304,7 @@ export default function ExamPhase1({ onComplete, onTimerTick }: Props) {
           <textarea
             value={currentAnswer}
             onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))}
-            placeholder="اكتب إجابتك هنا…"
+            placeholder={isAr ? 'اكتب إجابتك هنا…' : 'Write your answer here…'}
             rows={4}
             style={{
               width: '100%', borderRadius: 10,
@@ -328,10 +334,10 @@ export default function ExamPhase1({ onComplete, onTimerTick }: Props) {
           }}
         >
           {grading
-            ? (isAr ? 'جاري التصحيح…' : 'Grading…')
+            ? (isAr ? 'جاري التصحيح…' : '…Grading')
             : isLast
               ? (isAr ? 'تسليم المرحلة الأولى ✓' : 'Submit Phase 1 ✓')
-              : (isAr ? 'التالي →' : 'Next →')}
+              : (isAr ? 'التالي →' : '→ Next')}
         </button>
       </div>
     </div>

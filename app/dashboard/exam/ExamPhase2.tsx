@@ -162,10 +162,10 @@ export default function ExamPhase2({ onComplete, onTimerTick }: Props) {
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
           <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: "'Space Grotesk', sans-serif" }}>
-            المرحلة الثانية — سيناريوهات العملاء
+            {isAr ? 'المرحلة الثانية — سيناريوهات العملاء' : 'Phase 2 — Client Scenarios'}
           </span>
           <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
-            السؤال {current + 1} / {questions.length}
+            {isAr ? 'السؤال' : 'Question'} {current + 1} / {questions.length}
           </span>
         </div>
         <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
@@ -215,7 +215,7 @@ export default function ExamPhase2({ onComplete, onTimerTick }: Props) {
                 fontFamily: "'Space Grotesk', sans-serif",
               }}
             >
-              {q.subtype === 'narrative' ? 'سيناريو' : 'ميزانية'}
+              {q.subtype === 'narrative' ? (isAr ? 'سيناريو' : 'Scenario') : (isAr ? 'ميزانية' : 'Budget')}
             </span>
           </div>
 
@@ -275,7 +275,7 @@ export default function ExamPhase2({ onComplete, onTimerTick }: Props) {
             }}
           >
             {submitting
-              ? (isAr ? 'جاري التصحيح…' : 'Grading…')
+              ? (isAr ? 'جاري التصحيح…' : '…Grading')
               : (isAr ? 'تسليم المرحلة الثانية ✓' : 'Submit Phase 2 ✓')}
           </button>
         ) : (
