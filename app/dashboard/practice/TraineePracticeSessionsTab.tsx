@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLanguage } from '@/lib/language-context'
 
 interface CriterionGrade { score: number; max: number; feedback: string }
@@ -197,7 +197,8 @@ function formatTime(isoString: string): string {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function TraineePracticeSessionsTab({ sessions, scenarioLabels }: Props) {
+export default function TraineePracticeSessionsTab({ sessions: initialSessions, scenarioLabels }: Props) {
+  const [sessions, setSessions] = useState<PracticeSessionRow[]>(initialSessions)
   const [playingSession, setPlayingSession] = useState<string | null>(null)
   const [loadingSession, setLoadingSession] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState<string>('')
@@ -205,6 +206,14 @@ export default function TraineePracticeSessionsTab({ sessions, scenarioLabels }:
   const [whatsAppSession, setWhatsAppSession] = useState<{ messages: string[]; date: string } | null>(null)
   const { lang } = useLanguage()
   const isAr = lang === 'ar'
+
+  // Fetch fresh sessions every time this tab mounts (user switches to My Sessions)
+  useEffect(() => {
+    fetch('/api/practice-sessions')
+      .then(r => r.ok ? r.json() : null)
+      .then(body => { if (body?.sessions) setSessions(body.sessions) })
+      .catch(() => {})
+  }, [])
 
   async function playSession(sessionId: string) {
     if (playingSession === sessionId) {
