@@ -33,6 +33,7 @@ const QUESTION_TIME = 60
 
 export default function ExamPhase2({ onComplete, onTimerTick }: Props) {
   const { lang } = useLanguage()
+  const isAr = lang === 'ar'
   const [questions, setQuestions] = useState<Question[] | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [current, setCurrent] = useState(0)
@@ -117,7 +118,6 @@ export default function ExamPhase2({ onComplete, onTimerTick }: Props) {
   }
 
   if (!started) {
-    const isAr = lang === 'ar'
     return (
       <div className="flex flex-col items-center justify-center h-full gap-6">
         <div className="text-center space-y-3">
@@ -274,7 +274,9 @@ export default function ExamPhase2({ onComplete, onTimerTick }: Props) {
               transition: 'background 0.15s',
             }}
           >
-            {submitting ? 'جاري التصحيح…' : 'تسليم المرحلة الثانية ✓'}
+            {submitting
+              ? (isAr ? 'جاري التصحيح…' : 'Grading…')
+              : (isAr ? 'تسليم المرحلة الثانية ✓' : 'Submit Phase 2 ✓')}
           </button>
         ) : (
           <button
@@ -288,7 +290,7 @@ export default function ExamPhase2({ onComplete, onTimerTick }: Props) {
               transition: 'background 0.15s',
             }}
           >
-            التالي ←
+            {isAr ? 'التالي ←' : 'Next ←'}
           </button>
         )}
       </div>
