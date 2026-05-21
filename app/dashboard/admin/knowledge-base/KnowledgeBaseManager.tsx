@@ -529,8 +529,8 @@ function SheetConnectionsPanel() {
                     className="w-full px-3 py-2 rounded-lg text-sm text-white focus:outline-none"
                     style={inputStyle}
                   >
-                    <option value="">Select tab…</option>
-                    {wizardTabs.map((t) => <option key={t} value={t}>{t}</option>)}
+                    <option value="" style={{ color: '#000' }}>Select tab…</option>
+                    {wizardTabs.map((t) => <option key={t} value={t} style={{ color: '#000' }}>{t}</option>)}
                   </select>
                 </div>
                 <div>
