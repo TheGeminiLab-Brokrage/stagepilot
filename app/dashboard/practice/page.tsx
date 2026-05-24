@@ -14,7 +14,10 @@ export default async function PracticePage() {
     redirect('/auth/login')
   }
 
-  const { data: profile } = await supabase
+  const admin = createAdminClient()
+
+  // Use admin client for profile lookup to bypass any RLS issues
+  const { data: profile } = await admin
     .from('profiles')
     .select('full_name, company_id, role')
     .eq('id', user.id)
@@ -24,7 +27,7 @@ export default async function PracticePage() {
     redirect('/auth/login')
   }
 
-  const admin = createAdminClient()
+  // Step 1: fast path — direct user_id match
   const { data: sessionsWithStage, error: stageColError } = await admin
     .from('practice_sessions')
     .select('id, scenario_id, audio_path, duration_seconds, created_at, call_grade, whatsapp_messages, client_stage')
@@ -32,7 +35,6 @@ export default async function PracticePage() {
     .order('created_at', { ascending: false })
     .limit(50)
 
-  // client_stage column may not exist yet — fall back without it if so
   let rawSessions = stageColError
     ? (await admin
         .from('practice_sessions')
@@ -42,17 +44,27 @@ export default async function PracticePage() {
         .limit(50)).data
     : sessionsWithStage
 
-  // Safety net: if direct user_id query returned nothing, try via company filter
-  // (handles edge cases where user_id index or RLS behaves unexpectedly)
-  if ((!rawSessions || rawSessions.length === 0) && profile?.company_id) {
-    const { data: companySessions } = await admin
+  // Step 2: UUID-drift fallback — find all profile IDs with the same full_name
+  // in this company, then fetch sessions for any of those IDs
+  if ((!rawSessions || rawSessions.length === 0) && profile?.company_id && profile?.full_name) {
+    const { data: matchingProfiles } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('company_id', profile.company_id)
+      .eq('full_name', profile.full_name)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const candidateIds = [...new Set([user.id, ...(matchingProfiles ?? []).map((p: any) => p.id as string)])]
+
+    const { data: fallbackSessions } = await admin
       .from('practice_sessions')
-      .select('id, scenario_id, audio_path, duration_seconds, created_at, call_grade, whatsapp_messages, client_stage, user_id')
+      .select('id, scenario_id, audio_path, duration_seconds, created_at, call_grade, whatsapp_messages, client_stage')
+      .in('user_id', candidateIds)
       .eq('company_id', profile.company_id)
       .order('created_at', { ascending: false })
-      .limit(200)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    rawSessions = (companySessions ?? []).filter(s => s.user_id === user.id).map(({ user_id: _uid, ...rest }) => rest)
+      .limit(50)
+
+    rawSessions = fallbackSessions ?? []
   }
 
   const scenarioLabels = Object.fromEntries(SCENARIOS.map(s => [s.id, s.label]))

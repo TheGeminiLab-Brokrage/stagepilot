@@ -14,19 +14,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 })
   }
 
-  // 3. Fetch the practice session — RLS scopes based on user role
-  const { data: session } = await supabase
-    .from('practice_sessions')
-    .select('audio_path')
-    .eq('id', sessionId)
-    .single()
+  const admin = createAdminClient()
+
+  // 3. Fetch the session and the user's profile via admin client (bypasses RLS)
+  // This allows agents to play sessions saved under a drifted UID (same company)
+  const [{ data: session }, { data: userProfile }] = await Promise.all([
+    admin.from('practice_sessions').select('audio_path, company_id').eq('id', sessionId).single(),
+    admin.from('profiles').select('company_id').eq('id', user.id).single(),
+  ])
 
   if (!session?.audio_path) {
-    return NextResponse.json({ error: 'Session not found or access denied' }, { status: 404 })
+    return NextResponse.json({ error: 'Session not found' }, { status: 404 })
   }
 
-  // 4. Generate signed URL via admin client (service role can access private storage)
-  const admin = createAdminClient()
+  // 4. Company-level access check (prevents cross-company access)
+  if (session.company_id !== userProfile?.company_id) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+  }
+
+  // 5. Generate signed URL via admin client (service role can access private storage)
   const { data: signedData, error: signedError } = await admin.storage
     .from('practice-recordings')
     .createSignedUrl(session.audio_path, 3600) // 1 hour expiry
