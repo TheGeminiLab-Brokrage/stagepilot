@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useLanguage } from '@/lib/language-context'
+import { useLanguage, useT } from '@/lib/language-context'
 
 interface CriterionGrade { score: number; max: number; feedback: string }
 
@@ -199,6 +199,8 @@ function formatTime(isoString: string): string {
 
 export default function TraineePracticeSessionsTab({ sessions: initialSessions, scenarioLabels }: Props) {
   const [sessions, setSessions] = useState<PracticeSessionRow[]>(initialSessions)
+  // Sync with parent whenever PracticePageWrapper refreshes sessions after a save
+  useEffect(() => { setSessions(initialSessions) }, [initialSessions])
   const [playingSession, setPlayingSession] = useState<string | null>(null)
   const [loadingSession, setLoadingSession] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState<string>('')
@@ -206,6 +208,7 @@ export default function TraineePracticeSessionsTab({ sessions: initialSessions, 
   const [whatsAppSession, setWhatsAppSession] = useState<{ messages: string[]; date: string } | null>(null)
   const { lang } = useLanguage()
   const isAr = lang === 'ar'
+  const t = useT()
 
   // Fetch fresh sessions every time this tab mounts (user switches to My Sessions)
   useEffect(() => {
@@ -293,15 +296,15 @@ export default function TraineePracticeSessionsTab({ sessions: initialSessions, 
         />
       )}
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }} dir="rtl">
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }} dir={isAr ? 'rtl' : 'ltr'}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              {['السيناريو', 'التاريخ', 'الوقت', 'المدة', 'الدرجة', 'المرحلة', 'واتساب', ''].map((h, i) => (
+              {[t('adminColScenario'), t('adminColDate'), t('adminColTime'), t('adminColDuration'), t('adminColScore'), t('filterStage'), 'WhatsApp', ''].map((h, i) => (
                 <th
                   key={i}
                   style={{
                     padding: '10px 16px',
-                    textAlign: 'right',
+                    textAlign: isAr ? 'right' : 'left',
                     color: 'rgba(255,255,255,0.3)',
                     fontWeight: 700,
                     fontSize: 10,
