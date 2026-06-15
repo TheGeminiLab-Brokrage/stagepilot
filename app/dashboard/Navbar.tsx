@@ -22,7 +22,7 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
   const t = useT()
   const pathname = usePathname()
 
-  const navLinks =
+  const roleNavLinks =
     role === 'trainee'
       ? [{ href: '/dashboard/practice', label: t('navAiPractice') }]
       : role === 'exam'
@@ -39,6 +39,11 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
             { href: '/dashboard/admin/knowledge-base', label: t('navKnowledgeBase') },
           ] : []),
         ]
+
+  const navLinks = [
+    ...roleNavLinks,
+    { href: '/dashboard/find-property', label: 'Find a Property' },
+  ]
 
   const roleLabel = ROLE_KEY_MAP[role] ? t(ROLE_KEY_MAP[role]) : role.replace('_', ' ')
 

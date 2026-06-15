@@ -23,13 +23,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const langCookie = cookieStore.get('sp_lang')?.value
   const initialLang = (langCookie === 'en' || langCookie === 'ar') ? langCookie : 'ar'
 
-  // Trainee redirect: they only access /dashboard/practice
+  // Trainee redirect: they only access /dashboard/practice and /dashboard/find-property
   const headersList = await headers()
   const pathname = headersList.get('x-pathname') ?? ''
-  if (role === 'trainee' && !pathname.startsWith('/dashboard/practice')) {
+  if (role === 'trainee' && !pathname.startsWith('/dashboard/practice') && !pathname.startsWith('/dashboard/find-property')) {
     redirect('/dashboard/practice')
   }
-  if (role === 'exam' && !pathname.startsWith('/dashboard/exam')) {
+  if (role === 'exam' && !pathname.startsWith('/dashboard/exam') && !pathname.startsWith('/dashboard/find-property')) {
     redirect('/dashboard/exam')
   }
 
