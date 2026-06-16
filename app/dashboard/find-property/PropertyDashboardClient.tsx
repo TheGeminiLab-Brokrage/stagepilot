@@ -46,6 +46,26 @@ type Filters = {
 type PriceStep = { label: string; price: number }
 
 const PAGE_SIZE = 24
+
+const R8_PROJECT_NORMS = [
+  'diploeast','residenceeight','dejoya1','qamari','madai','layal','hava',
+  'ayyam','winterpark','plato','queenland','canyon8','yaru','ramatan','ri8',
+  'lumia','skycapital2','dejoya2','thecurve','anakaji','laverdenewcapital',
+  'laverdecasette','floria5','theislands','ion','elitepark','roses',
+  'thecityoval','menorca','moraya','lagoons','dejoya4','chapters','sagelake',
+  'lightcity','upmount','orbis','defaf','lareva','ray','kardia','suli','ravia',
+]
+
+function normProject(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function isR8Project(project: string): boolean {
+  const propNorm = normProject(project)
+  if (propNorm.length < 3) return false
+  return R8_PROJECT_NORMS.some(r8 => propNorm.includes(r8) || r8.includes(propNorm))
+}
+
 const DEFAULT_FILTERS: Filters = {
   search: '', city: '', type: '', finish: '', beds: '',
   priceMin: '', priceMax: '', areaMin: '', areaMax: '',
@@ -125,6 +145,7 @@ export default function PropertyDashboardClient() {
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [applied, setApplied] = useState<Filters>(DEFAULT_FILTERS)
+  const [zone, setZone] = useState<'R' | 'R7' | 'R8'>('R')
   const [sort, setSort] = useState('price-asc')
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [page, setPage] = useState(1)
@@ -160,6 +181,10 @@ export default function PropertyDashboardClient() {
     setPriceKpiState(0)
   }, [])
 
+  useEffect(() => {
+    if (applied.city !== 'new capital') setZone('R')
+  }, [applied.city])
+
   const filtered = useMemo(() => {
     if (!rawData.length) return []
     const f = applied
@@ -172,6 +197,11 @@ export default function PropertyDashboardClient() {
     return rawData.filter(r => {
       if (search && !r.project.toLowerCase().includes(search) && !r.developer.toLowerCase().includes(search) && !r.city.toLowerCase().includes(search)) return false
       if (f.city && r.city !== f.city) return false
+      if (zone !== 'R' && f.city === 'new capital') {
+        const inR8 = isR8Project(r.project)
+        if (zone === 'R8' && !inR8) return false
+        if (zone === 'R7' && inR8) return false
+      }
       if (f.type && r.type !== f.type) return false
       if (f.finish && r.finish !== f.finish) return false
       if (f.beds) {
@@ -192,7 +222,7 @@ export default function PropertyDashboardClient() {
       if (f.extras === 'roof' && !(parseFloat(String(r.roof)) > 0)) return false
       return true
     })
-  }, [rawData, applied])
+  }, [rawData, applied, zone])
 
   const sorted = useMemo(() => {
     const arr = [...filtered]
@@ -239,14 +269,18 @@ export default function PropertyDashboardClient() {
 
   if (loading) {
     return (
-      <div className="ph-loading" style={{ minHeight: 'calc(100vh - 56px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="ph-spinner" />
-        <p>Loading property database…</p>
+      <div className="ph-root">
+        <div className="ph-loading" style={{ minHeight: 'calc(100vh - 56px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="ph-spinner" />
+          <p>Loading property database…</p>
+        </div>
       </div>
     )
   }
 
   return (
+    <div className="ph-root">
+
     <div className="ph-layout">
 
       {/* ── SIDEBAR ── */}
@@ -470,6 +504,13 @@ export default function PropertyDashboardClient() {
             Showing <span>{sorted.length > 0 ? `${showStart}–${showEnd}` : '0'}</span> of <span>{sorted.length.toLocaleString()}</span> units
           </div>
           <div className="ph-view-controls">
+            {applied.city === 'new capital' && (
+              <select className="ph-sort-select" value={zone} onChange={e => { setZone(e.target.value as 'R' | 'R7' | 'R8'); setPage(1) }}>
+                <option value="R">R (All)</option>
+                <option value="R7">R7</option>
+                <option value="R8">R8</option>
+              </select>
+            )}
             <select className="ph-sort-select" value={sort} onChange={e => { setSort(e.target.value); setPage(1) }}>
               <option value="price-asc">Price ↑</option>
               <option value="price-desc">Price ↓</option>
@@ -499,7 +540,6 @@ export default function PropertyDashboardClient() {
               const discount = parseFloat(String(r.discount))
               return (
                 <div key={idx} className="ph-property-card" onClick={() => setSelectedIdx(idx)}>
-                  {discount >= 20 && <div className="ph-discount-ribbon">{discount}% OFF</div>}
                   <div className="ph-card-top">
                     <div className="ph-city-badge">{r.city}</div>
                     <div className="ph-card-project">{r.project}</div>
@@ -671,6 +711,8 @@ export default function PropertyDashboardClient() {
           </div>
         </div>
       )}
+    </div>
+
     </div>
   )
 }
