@@ -317,11 +317,15 @@ export default function PropertyDashboardClient() {
       .catch(() => setLoading(false))
   }, [])
 
-  const handleSearchChange = useCallback((val: string) => {
-    setFilters(f => ({ ...f, search: val }))
-    setApplied(f => ({ ...f, search: val }))
+  const setFilter = useCallback(<K extends keyof Filters>(key: K, val: Filters[K]) => {
+    setFilters(f => ({ ...f, [key]: val }))
+    setApplied(f => ({ ...f, [key]: val }))
     setPage(1)
   }, [])
+
+  const handleSearchChange = useCallback((val: string) => {
+    setFilter('search', val)
+  }, [setFilter])
 
   const applyFilters = useCallback(() => {
     setApplied(filters)
@@ -493,7 +497,7 @@ export default function PropertyDashboardClient() {
           <label className="ph-filter-label">City</label>
           <Combobox
             value={filters.city}
-            onChange={v => setFilters(f => ({ ...f, city: v }))}
+            onChange={v => setFilter('city', v)}
             options={CITY_OPTIONS}
             placeholder="All Cities"
           />
@@ -504,21 +508,21 @@ export default function PropertyDashboardClient() {
           <label className="ph-filter-label">Unit Type</label>
           <Combobox
             value={filters.type}
-            onChange={v => setFilters(f => ({ ...f, type: v }))}
+            onChange={v => setFilter('type', v)}
             options={TYPE_OPTIONS}
             placeholder="All Types"
           />
           <label className="ph-filter-label">Finishing</label>
           <Combobox
             value={filters.finish}
-            onChange={v => setFilters(f => ({ ...f, finish: v }))}
+            onChange={v => setFilter('finish', v)}
             options={FINISH_OPTIONS}
             placeholder="All Finishes"
           />
           <label className="ph-filter-label">Bedrooms</label>
           <Combobox
             value={filters.beds}
-            onChange={v => setFilters(f => ({ ...f, beds: v }))}
+            onChange={v => setFilter('beds', v)}
             options={BEDS_OPTIONS}
             placeholder="Any"
           />
@@ -560,7 +564,7 @@ export default function PropertyDashboardClient() {
           <h3>📅 Delivery</h3>
           <Combobox
             value={filters.delivery}
-            onChange={v => setFilters(f => ({ ...f, delivery: v }))}
+            onChange={v => setFilter('delivery', v)}
             options={DELIVERY_OPTIONS}
             placeholder="Any Year"
           />
@@ -571,14 +575,14 @@ export default function PropertyDashboardClient() {
           <label className="ph-filter-label">Cash Discount</label>
           <Combobox
             value={filters.discount}
-            onChange={v => setFilters(f => ({ ...f, discount: v }))}
+            onChange={v => setFilter('discount', v)}
             options={DISCOUNT_OPTIONS}
             placeholder="Any"
           />
           <label className="ph-filter-label">Garden / Roof</label>
           <Combobox
             value={filters.extras}
-            onChange={v => setFilters(f => ({ ...f, extras: v }))}
+            onChange={v => setFilter('extras', v)}
             options={EXTRAS_OPTIONS}
             placeholder="Any"
           />
