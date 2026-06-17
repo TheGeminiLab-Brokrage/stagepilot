@@ -247,7 +247,7 @@ export default function PropertyDashboardClient() {
 
   const availableProjects = useMemo(() => {
     if (!rawData.length) return []
-    const f = applied
+    const f = filters
     const priceMin = parseFloat(f.priceMin) * 1e6 || 0
     const priceMax = parseFloat(f.priceMax) * 1e6 || Infinity
     const areaMin = parseFloat(f.areaMin) || 0
@@ -282,7 +282,7 @@ export default function PropertyDashboardClient() {
       projects.add(r.project)
     })
     return Array.from(projects).sort((a, b) => a.localeCompare(b))
-  }, [rawData, applied, zone])
+  }, [rawData, filters, zone])
   const currentPriceStep = priceSteps[priceKpiState]
   const selectedProperty = selectedIdx !== null ? sorted[selectedIdx] : null
 
