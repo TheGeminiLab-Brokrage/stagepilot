@@ -313,7 +313,7 @@ export default function PropertyDashboardClient() {
   useEffect(() => {
     fetch('/property-data.json')
       .then(r => r.json())
-      .then((data: Property[]) => { setRawData(data); setLoading(false) })
+      .then((data: Property[]) => { setRawData(data.filter(r => parseFloat(String(r.price)) > 0)); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
