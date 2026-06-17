@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import './property.css'
 
 type Property = {
@@ -138,6 +138,164 @@ function buildPriceSteps(data: Property[]): PriceStep[] {
     steps.push({ label: 'Largest Unit · Price · click ›', price: bigPrice })
   }
   return steps
+}
+
+const CITY_OPTIONS = [
+  { value: '6th of october', label: '6th Of October' },
+  { value: 'al maadi', label: 'Al Maadi' },
+  { value: 'Alexandria', label: 'Alexandria' },
+  { value: 'Badr city', label: 'Badr City' },
+  { value: 'Dubai', label: 'Dubai' },
+  { value: 'Ein elsokhna', label: 'Ein Elsokhna' },
+  { value: 'El Mokattam', label: 'El Mokattam' },
+  { value: 'el mostakbal city', label: 'El Mostakbal City' },
+  { value: 'elobour city', label: 'Elobour City' },
+  { value: 'elshourok city', label: 'Elshourok City' },
+  { value: 'Heliopolis', label: 'Heliopolis' },
+  { value: 'Hurghada', label: 'Hurghada' },
+  { value: 'Jirian El Shiekh Zayed', label: 'Jirian El Shiekh Zayed' },
+  { value: 'Katameya', label: 'Katameya' },
+  { value: 'matrouh', label: 'Matrouh' },
+  { value: 'Minya Governorate', label: 'Minya Governorate' },
+  { value: 'nasr city', label: 'Nasr City' },
+  { value: 'new cairo', label: 'New Cairo' },
+  { value: 'new capital', label: 'New Capital' },
+  { value: 'new heliopolis', label: 'New Heliopolis' },
+  { value: 'new zayed', label: 'New Zayed' },
+  { value: 'North coast', label: 'North Coast' },
+  { value: 'ras sedr', label: 'Ras Sedr' },
+  { value: 'sheikh zayed city', label: 'Sheikh Zayed City' },
+  { value: 'sixth settlement', label: 'Sixth Settlement' },
+]
+
+const TYPE_OPTIONS = [
+  { value: 'apartment', label: 'Apartment' },
+  { value: 'beach house', label: 'Beach House' },
+  { value: 'beachfront apt', label: 'Beachfront Apt' },
+  { value: 'cabin', label: 'Cabin' },
+  { value: 'chalet', label: 'Chalet' },
+  { value: 'condo', label: 'Condo' },
+  { value: 'duplex', label: 'Duplex' },
+  { value: 'family house', label: 'Family House' },
+  { value: 'garden millennial', label: 'Garden Millennial' },
+  { value: 'i villa', label: 'I Villa' },
+  { value: 'iv beach house', label: 'Iv Beach House' },
+  { value: 'lake house', label: 'Lake House' },
+  { value: 'loft', label: 'Loft' },
+  { value: 'millennial', label: 'Millennial' },
+  { value: 'one story', label: 'One Story' },
+  { value: 'palace', label: 'Palace' },
+  { value: 'penthouse', label: 'Penthouse' },
+  { value: 's villa', label: 'S Villa' },
+  { value: 'sky scape', label: 'Sky Scape' },
+  { value: 'standalone', label: 'Standalone' },
+  { value: 'studio', label: 'Studio' },
+  { value: 'town house', label: 'Town House' },
+  { value: 'townhouse', label: 'Townhouse' },
+  { value: 'townhouse corner', label: 'Townhouse Corner' },
+  { value: 'townhouse middle', label: 'Townhouse Middle' },
+]
+
+const FINISH_OPTIONS = [
+  { value: 'core and shell', label: 'Core And Shell' },
+  { value: 'flexi', label: 'Flexi' },
+  { value: 'fully finished', label: 'Fully Finished' },
+  { value: 'fully finished with ac', label: 'Fully Finished With AC' },
+  { value: 'fully finished with ac and kitchen cabinets', label: 'Fully Finished With AC & Kitchen' },
+  { value: 'fully finished with kitchen cabinets', label: 'Fully Finished With Kitchen' },
+  { value: 'fully furnished', label: 'Fully Furnished' },
+  { value: 'fully furnished with ac', label: 'Fully Furnished With AC' },
+  { value: 'semi finished', label: 'Semi Finished' },
+]
+
+const BEDS_OPTIONS = [
+  { value: '1', label: '1 Bedroom' },
+  { value: '2', label: '2 Bedrooms' },
+  { value: '3', label: '3 Bedrooms' },
+  { value: '4', label: '4 Bedrooms' },
+  { value: '5', label: '5+ Bedrooms' },
+]
+
+const DELIVERY_OPTIONS = [
+  { value: '2025', label: '2025' },
+  { value: '2026', label: '2026' },
+  { value: '2027', label: '2027' },
+  { value: '2028', label: '2028' },
+  { value: '2029', label: '2029' },
+  { value: '2030', label: '2030' },
+  { value: '2031', label: '2031+' },
+]
+
+const DISCOUNT_OPTIONS = [
+  { value: '10', label: '10%+' },
+  { value: '20', label: '20%+' },
+  { value: '30', label: '30%+' },
+  { value: '40', label: '40%+' },
+]
+
+const EXTRAS_OPTIONS = [
+  { value: 'garden', label: 'Has Garden' },
+  { value: 'roof', label: 'Has Roof' },
+]
+
+function Combobox({ value, onChange, options, placeholder }: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  placeholder: string
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const selectedLabel = options.find(o => o.value === value)?.label ?? ''
+  const list = query
+    ? options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
+    : options
+
+  return (
+    <div className="ph-combo" ref={ref}>
+      <input
+        className="ph-input ph-combo-input"
+        value={open ? query : selectedLabel}
+        placeholder={placeholder}
+        onFocus={() => { setOpen(true); setQuery('') }}
+        onChange={e => { setQuery(e.target.value); setOpen(true) }}
+        onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); setQuery('') } }}
+      />
+      <span className="ph-combo-arrow">{open ? '▲' : '▼'}</span>
+      {open && (
+        <ul className="ph-combo-list">
+          <li
+            className={value === '' ? 'ph-combo-selected' : ''}
+            onMouseDown={() => { onChange(''); setOpen(false); setQuery('') }}
+          >
+            {placeholder}
+          </li>
+          {list.map(o => (
+            <li
+              key={o.value}
+              className={value === o.value ? 'ph-combo-selected' : ''}
+              onMouseDown={() => { onChange(o.value); setOpen(false); setQuery('') }}
+            >
+              {o.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }
 
 export default function PropertyDashboardClient() {
@@ -322,104 +480,48 @@ export default function PropertyDashboardClient() {
       <aside className="ph-sidebar">
         <div className="ph-filter-section">
           <h3>🔍 Project</h3>
-          <select
-            className="ph-select"
+          <Combobox
             value={filters.search}
-            onChange={e => handleSearchChange(e.target.value)}
-          >
-            <option value="">All Projects ({availableProjects.length})</option>
-            {availableProjects.map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
+            onChange={handleSearchChange}
+            options={availableProjects.map(p => ({ value: p, label: p }))}
+            placeholder={`All Projects (${availableProjects.length})`}
+          />
         </div>
 
         <div className="ph-filter-section">
           <h3>📍 Location</h3>
           <label className="ph-filter-label">City</label>
-          <select className="ph-select" value={filters.city} onChange={e => setFilters(f => ({ ...f, city: e.target.value }))}>
-            <option value="">All Cities</option>
-            <option value="6th of october">6th Of October</option>
-            <option value="Alexandria">Alexandria</option>
-            <option value="Badr city">Badr City</option>
-            <option value="Dubai">Dubai</option>
-            <option value="Ein elsokhna">Ein Elsokhna</option>
-            <option value="El Mokattam">El Mokattam</option>
-            <option value="Heliopolis">Heliopolis</option>
-            <option value="Hurghada">Hurghada</option>
-            <option value="Jirian El Shiekh Zayed">Jirian El Shiekh Zayed</option>
-            <option value="Katameya">Katameya</option>
-            <option value="Minya Governorate">Minya Governorate</option>
-            <option value="North coast">North Coast</option>
-            <option value="al maadi">Al Maadi</option>
-            <option value="el mostakbal city">El Mostakbal City</option>
-            <option value="elobour city">Elobour City</option>
-            <option value="elshourok city">Elshourok City</option>
-            <option value="matrouh">Matrouh</option>
-            <option value="nasr city">Nasr City</option>
-            <option value="new cairo">New Cairo</option>
-            <option value="new capital">New Capital</option>
-            <option value="new heliopolis">New Heliopolis</option>
-            <option value="new zayed">New Zayed</option>
-            <option value="ras sedr">Ras Sedr</option>
-            <option value="sheikh zayed city">Sheikh Zayed City</option>
-            <option value="sixth settlement">Sixth Settlement</option>
-          </select>
+          <Combobox
+            value={filters.city}
+            onChange={v => setFilters(f => ({ ...f, city: v }))}
+            options={CITY_OPTIONS}
+            placeholder="All Cities"
+          />
         </div>
 
         <div className="ph-filter-section">
           <h3>🏠 Property</h3>
           <label className="ph-filter-label">Unit Type</label>
-          <select className="ph-select" value={filters.type} onChange={e => setFilters(f => ({ ...f, type: e.target.value }))}>
-            <option value="">All Types</option>
-            <option value="apartment">Apartment</option>
-            <option value="beach house">Beach House</option>
-            <option value="beachfront apt">Beachfront Apt</option>
-            <option value="cabin">Cabin</option>
-            <option value="chalet">Chalet</option>
-            <option value="condo">Condo</option>
-            <option value="duplex">Duplex</option>
-            <option value="family house">Family House</option>
-            <option value="garden millennial">Garden Millennial</option>
-            <option value="i villa">I Villa</option>
-            <option value="iv beach house">Iv Beach House</option>
-            <option value="lake house">Lake House</option>
-            <option value="loft">Loft</option>
-            <option value="millennial">Millennial</option>
-            <option value="one story">One Story</option>
-            <option value="palace">Palace</option>
-            <option value="penthouse">Penthouse</option>
-            <option value="s villa">S Villa</option>
-            <option value="sky scape">Sky Scape</option>
-            <option value="standalone">Standalone</option>
-            <option value="studio">Studio</option>
-            <option value="town house">Town House</option>
-            <option value="townhouse">Townhouse</option>
-            <option value="townhouse corner">Townhouse Corner</option>
-            <option value="townhouse middle">Townhouse Middle</option>
-          </select>
+          <Combobox
+            value={filters.type}
+            onChange={v => setFilters(f => ({ ...f, type: v }))}
+            options={TYPE_OPTIONS}
+            placeholder="All Types"
+          />
           <label className="ph-filter-label">Finishing</label>
-          <select className="ph-select" value={filters.finish} onChange={e => setFilters(f => ({ ...f, finish: e.target.value }))}>
-            <option value="">All Finishes</option>
-            <option value="core and shell">Core And Shell</option>
-            <option value="flexi">Flexi</option>
-            <option value="fully finished">Fully Finished</option>
-            <option value="fully finished with ac">Fully Finished With AC</option>
-            <option value="fully finished with ac and kitchen cabinets">Fully Finished With AC &amp; Kitchen</option>
-            <option value="fully finished with kitchen cabinets">Fully Finished With Kitchen</option>
-            <option value="fully furnished">Fully Furnished</option>
-            <option value="fully furnished with ac">Fully Furnished With AC</option>
-            <option value="semi finished">Semi Finished</option>
-          </select>
+          <Combobox
+            value={filters.finish}
+            onChange={v => setFilters(f => ({ ...f, finish: v }))}
+            options={FINISH_OPTIONS}
+            placeholder="All Finishes"
+          />
           <label className="ph-filter-label">Bedrooms</label>
-          <select className="ph-select" value={filters.beds} onChange={e => setFilters(f => ({ ...f, beds: e.target.value }))}>
-            <option value="">Any</option>
-            <option value="1">1 Bedroom</option>
-            <option value="2">2 Bedrooms</option>
-            <option value="3">3 Bedrooms</option>
-            <option value="4">4 Bedrooms</option>
-            <option value="5">5+ Bedrooms</option>
-          </select>
+          <Combobox
+            value={filters.beds}
+            onChange={v => setFilters(f => ({ ...f, beds: v }))}
+            options={BEDS_OPTIONS}
+            placeholder="Any"
+          />
         </div>
 
         <div className="ph-filter-section">
@@ -456,34 +558,30 @@ export default function PropertyDashboardClient() {
 
         <div className="ph-filter-section">
           <h3>📅 Delivery</h3>
-          <select className="ph-select" value={filters.delivery} onChange={e => setFilters(f => ({ ...f, delivery: e.target.value }))}>
-            <option value="">Any Year</option>
-            <option value="2025">2025</option>
-            <option value="2026">2026</option>
-            <option value="2027">2027</option>
-            <option value="2028">2028</option>
-            <option value="2029">2029</option>
-            <option value="2030">2030</option>
-            <option value="2031">2031+</option>
-          </select>
+          <Combobox
+            value={filters.delivery}
+            onChange={v => setFilters(f => ({ ...f, delivery: v }))}
+            options={DELIVERY_OPTIONS}
+            placeholder="Any Year"
+          />
         </div>
 
         <div className="ph-filter-section">
           <h3>🏷️ Extras</h3>
           <label className="ph-filter-label">Cash Discount</label>
-          <select className="ph-select" value={filters.discount} onChange={e => setFilters(f => ({ ...f, discount: e.target.value }))}>
-            <option value="">Any</option>
-            <option value="10">10%+</option>
-            <option value="20">20%+</option>
-            <option value="30">30%+</option>
-            <option value="40">40%+</option>
-          </select>
+          <Combobox
+            value={filters.discount}
+            onChange={v => setFilters(f => ({ ...f, discount: v }))}
+            options={DISCOUNT_OPTIONS}
+            placeholder="Any"
+          />
           <label className="ph-filter-label">Garden / Roof</label>
-          <select className="ph-select" value={filters.extras} onChange={e => setFilters(f => ({ ...f, extras: e.target.value }))}>
-            <option value="">Any</option>
-            <option value="garden">Has Garden</option>
-            <option value="roof">Has Roof</option>
-          </select>
+          <Combobox
+            value={filters.extras}
+            onChange={v => setFilters(f => ({ ...f, extras: v }))}
+            options={EXTRAS_OPTIONS}
+            placeholder="Any"
+          />
         </div>
 
         <button className="ph-btn-primary" onClick={applyFilters}>Apply Filters</button>

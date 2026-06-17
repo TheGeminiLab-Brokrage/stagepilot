@@ -1,9 +1,12 @@
 /* ── Find a Property Dashboard ── */
 
+.ph-root {
+  margin: -24px;
+}
+
 .ph-layout {
   display: flex;
   min-height: calc(100vh - 56px);
-  margin: -24px;
 }
 
 /* SIDEBAR */
@@ -191,10 +194,10 @@
   opacity: 0.12;
 }
 
-.ph-kpi-energy .ph-kpi-val { color: #d7ff00; }
-.ph-kpi-gold .ph-kpi-val   { color: #f5a623; }
-.ph-kpi-green .ph-kpi-val  { color: #22c55e; }
-.ph-kpi-white .ph-kpi-val  { color: #ffffff; }
+.ph-kpi-energy .ph-kpi-val,
+.ph-kpi-gold .ph-kpi-val,
+.ph-kpi-green .ph-kpi-val,
+.ph-kpi-white .ph-kpi-val  { color: #d7ff00; }
 
 /* RESULTS HEADER */
 .ph-results-header {
@@ -330,6 +333,11 @@
   border-radius: 20px;
   text-transform: capitalize;
   font-family: 'Space Grotesk', sans-serif;
+}
+
+[dir="rtl"] .ph-type-badge {
+  right: auto;
+  left: 14px;
 }
 
 .ph-card-body {
@@ -723,6 +731,54 @@
   font-family: 'Space Grotesk', sans-serif;
 }
 
+/* COMBOBOX */
+.ph-combo {
+  position: relative;
+}
+.ph-combo-input {
+  width: 100%;
+  padding-right: 28px;
+  cursor: text;
+  box-sizing: border-box;
+}
+.ph-combo-arrow {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: #888;
+  pointer-events: none;
+}
+.ph-combo-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  z-index: 100;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+.ph-combo-list li {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #ccc;
+  cursor: pointer;
+}
+.ph-combo-list li:hover {
+  background: #252525;
+  color: #fff;
+}
+.ph-combo-list li.ph-combo-selected {
+  color: #d7ff00;
+}
+
 /* RESPONSIVE */
 @media (max-width: 900px) {
   .ph-sidebar { width: 220px; min-width: 220px; }
@@ -731,7 +787,7 @@
 }
 
 @media (max-width: 700px) {
-  .ph-layout { flex-direction: column; margin: -24px -24px 0; }
+  .ph-layout { flex-direction: column; }
   .ph-sidebar { width: 100%; max-height: none; position: static; }
   .ph-list-city, .ph-list-delivery { display: none; }
 }
