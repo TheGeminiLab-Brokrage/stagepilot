@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import './property.css'
 
 type Property = {
@@ -151,7 +151,6 @@ export default function PropertyDashboardClient() {
   const [page, setPage] = useState(1)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [priceKpiState, setPriceKpiState] = useState(0)
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     fetch('/property-data.json')
@@ -162,11 +161,8 @@ export default function PropertyDashboardClient() {
 
   const handleSearchChange = useCallback((val: string) => {
     setFilters(f => ({ ...f, search: val }))
-    clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => {
-      setApplied(f => ({ ...f, search: val }))
-      setPage(1)
-    }, 300)
+    setApplied(f => ({ ...f, search: val }))
+    setPage(1)
   }, [])
 
   const applyFilters = useCallback(() => {
@@ -193,9 +189,9 @@ export default function PropertyDashboardClient() {
     const areaMin = parseFloat(f.areaMin) || 0
     const areaMax = parseFloat(f.areaMax) || Infinity
     const discountMin = parseFloat(f.discount) || 0
-    const search = f.search.toLowerCase().trim()
+    const search = f.search
     return rawData.filter(r => {
-      if (search && !r.project.toLowerCase().includes(search) && !r.developer.toLowerCase().includes(search) && !r.city.toLowerCase().includes(search)) return false
+      if (search && r.project !== search) return false
       if (f.city && r.city !== f.city) return false
       if (zone !== 'R' && f.city === 'new capital') {
         const inR8 = isR8Project(r.project)
@@ -248,6 +244,45 @@ export default function PropertyDashboardClient() {
   const kpiMinArea = kpiAreas.length ? safeMin(kpiAreas) : null
   const kpiMaxArea = kpiAreas.length ? safeMax(kpiAreas) : null
   const kpiProjects = useMemo(() => new Set(filtered.map(r => r.project)).size, [filtered])
+
+  const availableProjects = useMemo(() => {
+    if (!rawData.length) return []
+    const f = applied
+    const priceMin = parseFloat(f.priceMin) * 1e6 || 0
+    const priceMax = parseFloat(f.priceMax) * 1e6 || Infinity
+    const areaMin = parseFloat(f.areaMin) || 0
+    const areaMax = parseFloat(f.areaMax) || Infinity
+    const discountMin = parseFloat(f.discount) || 0
+    const projects = new Set<string>()
+    rawData.forEach(r => {
+      if (f.city && r.city !== f.city) return
+      if (zone !== 'R' && f.city === 'new capital') {
+        const inR8 = isR8Project(r.project)
+        if (zone === 'R8' && !inR8) return
+        if (zone === 'R7' && inR8) return
+      }
+      if (f.type && r.type !== f.type) return
+      if (f.finish && r.finish !== f.finish) return
+      if (f.beds) {
+        const b = parseInt(String(r.beds)) || 0
+        if (f.beds === '5' && b < 5) return
+        else if (f.beds !== '5' && b !== parseInt(f.beds)) return
+      }
+      const p = parseFloat(String(r.price)) || 0
+      if (p > 0 && (p < priceMin || p > priceMax)) return
+      const a = parseFloat(String(r.area)) || 0
+      if (a > 0 && (a < areaMin || a > areaMax)) return
+      if (f.delivery) {
+        if (f.delivery === '2031') { if (parseInt(r.delivery_year) < 2031) return }
+        else if (r.delivery_year !== f.delivery) return
+      }
+      if (discountMin) { const d = parseFloat(String(r.discount)) || 0; if (d < discountMin) return }
+      if (f.extras === 'garden' && !(parseFloat(String(r.garden)) > 0)) return
+      if (f.extras === 'roof' && !(parseFloat(String(r.roof)) > 0)) return
+      projects.add(r.project)
+    })
+    return Array.from(projects).sort((a, b) => a.localeCompare(b))
+  }, [rawData, applied, zone])
   const currentPriceStep = priceSteps[priceKpiState]
   const selectedProperty = selectedIdx !== null ? sorted[selectedIdx] : null
 
@@ -286,19 +321,17 @@ export default function PropertyDashboardClient() {
       {/* ── SIDEBAR ── */}
       <aside className="ph-sidebar">
         <div className="ph-filter-section">
-          <h3>🔍 Search</h3>
-          <div className="ph-search-wrap">
-            <svg className="ph-search-icon" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
-            <input
-              type="text"
-              className="ph-input"
-              placeholder="Project name, developer…"
-              value={filters.search}
-              onChange={e => handleSearchChange(e.target.value)}
-            />
-          </div>
+          <h3>🔍 Project</h3>
+          <select
+            className="ph-select"
+            value={filters.search}
+            onChange={e => handleSearchChange(e.target.value)}
+          >
+            <option value="">All Projects ({availableProjects.length})</option>
+            {availableProjects.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
         </div>
 
         <div className="ph-filter-section">
