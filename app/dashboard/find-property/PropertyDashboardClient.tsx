@@ -29,18 +29,18 @@ type Property = {
 }
 
 type Filters = {
-  search: string
-  city: string
-  type: string
-  finish: string
-  beds: string
+  search: string[]
+  city: string[]
+  type: string[]
+  finish: string[]
+  beds: string[]
   priceMin: string
   priceMax: string
   areaMin: string
   areaMax: string
-  delivery: string
-  discount: string
-  extras: string
+  delivery: string[]
+  discount: string[]
+  extras: string[]
 }
 
 type PriceStep = { label: string; price: number }
@@ -67,9 +67,9 @@ function isR8Project(project: string): boolean {
 }
 
 const DEFAULT_FILTERS: Filters = {
-  search: '', city: '', type: '', finish: '', beds: '',
+  search: [], city: [], type: [], finish: [], beds: [],
   priceMin: '', priceMax: '', areaMin: '', areaMax: '',
-  delivery: '', discount: '', extras: '',
+  delivery: [], discount: [], extras: [],
 }
 
 function fmt(n: unknown): string {
@@ -238,9 +238,9 @@ const EXTRAS_OPTIONS = [
   { value: 'roof', label: 'Has Roof' },
 ]
 
-function Combobox({ value, onChange, options, placeholder }: {
-  value: string
-  onChange: (v: string) => void
+function MultiCombobox({ value, onChange, options, placeholder }: {
+  value: string[]
+  onChange: (v: string[]) => void
   options: { value: string; label: string }[]
   placeholder: string
 }) {
@@ -259,16 +259,25 @@ function Combobox({ value, onChange, options, placeholder }: {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const selectedLabel = options.find(o => o.value === value)?.label ?? ''
+  const displayValue =
+    value.length === 0 ? '' :
+    value.length === 1 ? (options.find(o => o.value === value[0])?.label ?? value[0]) :
+    `${value.length} selected`
+
   const list = query
     ? options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
     : options
+
+  function toggle(v: string) {
+    const next = value.includes(v) ? value.filter(x => x !== v) : [...value, v]
+    onChange(next)
+  }
 
   return (
     <div className="ph-combo" ref={ref}>
       <input
         className="ph-input ph-combo-input"
-        value={open ? query : selectedLabel}
+        value={open ? query : displayValue}
         placeholder={placeholder}
         onFocus={() => { setOpen(true); setQuery('') }}
         onChange={e => { setQuery(e.target.value); setOpen(true) }}
@@ -278,18 +287,18 @@ function Combobox({ value, onChange, options, placeholder }: {
       {open && (
         <ul className="ph-combo-list">
           <li
-            className={value === '' ? 'ph-combo-selected' : ''}
-            onMouseDown={() => { onChange(''); setOpen(false); setQuery('') }}
+            className={value.length === 0 ? 'ph-combo-selected' : ''}
+            onMouseDown={() => { onChange([]); setOpen(false); setQuery('') }}
           >
             {placeholder}
           </li>
           {list.map(o => (
             <li
               key={o.value}
-              className={value === o.value ? 'ph-combo-selected' : ''}
-              onMouseDown={() => { onChange(o.value); setOpen(false); setQuery('') }}
+              className={value.includes(o.value) ? 'ph-combo-selected' : ''}
+              onMouseDown={e => { e.preventDefault(); toggle(o.value) }}
             >
-              {o.label}
+              {value.includes(o.value) ? '✓ ' : ''}{o.label}
             </li>
           ))}
         </ul>
@@ -323,8 +332,8 @@ export default function PropertyDashboardClient() {
     setPage(1)
   }, [])
 
-  const handleSearchChange = useCallback((val: string) => {
-    setFilter('search', val)
+  const handleSearchChange = useCallback((vals: string[]) => {
+    setFilter('search', vals)
   }, [setFilter])
 
   const applyFilters = useCallback(() => {
@@ -340,7 +349,7 @@ export default function PropertyDashboardClient() {
   }, [])
 
   useEffect(() => {
-    if (applied.city !== 'new capital') setZone('R')
+    if (!applied.city.includes('new capital')) setZone('R')
   }, [applied.city])
 
   const filtered = useMemo(() => {
@@ -350,34 +359,38 @@ export default function PropertyDashboardClient() {
     const priceMax = parseFloat(f.priceMax) * 1e6 || Infinity
     const areaMin = parseFloat(f.areaMin) || 0
     const areaMax = parseFloat(f.areaMax) || Infinity
-    const discountMin = parseFloat(f.discount) || 0
-    const search = f.search
     return rawData.filter(r => {
-      if (search && r.project !== search) return false
-      if (f.city && r.city !== f.city) return false
-      if (zone !== 'R' && f.city === 'new capital') {
+      if (f.search.length && !f.search.includes(r.project)) return false
+      if (f.city.length && !f.city.includes(r.city)) return false
+      if (zone !== 'R' && f.city.includes('new capital')) {
         const inR8 = isR8Project(r.project)
         if (zone === 'R8' && !inR8) return false
         if (zone === 'R7' && inR8) return false
       }
-      if (f.type && r.type !== f.type) return false
-      if (f.finish && r.finish !== f.finish) return false
-      if (f.beds) {
+      if (f.type.length && !f.type.includes(r.type)) return false
+      if (f.finish.length && !f.finish.includes(r.finish)) return false
+      if (f.beds.length) {
         const b = parseInt(String(r.beds)) || 0
-        if (f.beds === '5' && b < 5) return false
-        else if (f.beds !== '5' && b !== parseInt(f.beds)) return false
+        const key = b >= 5 ? '5' : String(b)
+        if (!f.beds.includes(key)) return false
       }
       const p = parseFloat(String(r.price)) || 0
       if (p > 0 && (p < priceMin || p > priceMax)) return false
       const a = parseFloat(String(r.area)) || 0
       if (a > 0 && (a < areaMin || a > areaMax)) return false
-      if (f.delivery) {
-        if (f.delivery === '2031') { if (parseInt(r.delivery_year) < 2031) return false }
-        else if (r.delivery_year !== f.delivery) return false
+      if (f.delivery.length) {
+        const key = parseInt(r.delivery_year) >= 2031 ? '2031' : r.delivery_year
+        if (!f.delivery.includes(key)) return false
       }
-      if (discountMin) { const d = parseFloat(String(r.discount)) || 0; if (d < discountMin) return false }
-      if (f.extras === 'garden' && !(parseFloat(String(r.garden)) > 0)) return false
-      if (f.extras === 'roof' && !(parseFloat(String(r.roof)) > 0)) return false
+      if (f.discount.length) {
+        const d = parseFloat(String(r.discount)) || 0
+        if (!f.discount.some(thr => d >= parseInt(thr))) return false
+      }
+      if (f.extras.length) {
+        const hasGarden = parseFloat(String(r.garden)) > 0
+        const hasRoof = parseFloat(String(r.roof)) > 0
+        if (!f.extras.some(e => (e === 'garden' && hasGarden) || (e === 'roof' && hasRoof))) return false
+      }
       return true
     })
   }, [rawData, applied, zone])
@@ -398,7 +411,9 @@ export default function PropertyDashboardClient() {
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
   const pageItems = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const isFilterActive = useMemo(() => Object.values(applied).some(v => v !== ''), [applied])
+  const isFilterActive = useMemo(() =>
+    Object.values(applied).some(v => Array.isArray(v) ? v.length > 0 : v !== ''),
+  [applied])
   const priceSteps = useMemo(() => isFilterActive ? buildPriceSteps(filtered) : [], [filtered, isFilterActive])
   useEffect(() => { setPriceKpiState(0) }, [priceSteps])
 
@@ -414,33 +429,38 @@ export default function PropertyDashboardClient() {
     const priceMax = parseFloat(f.priceMax) * 1e6 || Infinity
     const areaMin = parseFloat(f.areaMin) || 0
     const areaMax = parseFloat(f.areaMax) || Infinity
-    const discountMin = parseFloat(f.discount) || 0
     const projects = new Set<string>()
     rawData.forEach(r => {
-      if (f.city && r.city !== f.city) return
-      if (zone !== 'R' && f.city === 'new capital') {
+      if (f.city.length && !f.city.includes(r.city)) return
+      if (zone !== 'R' && f.city.includes('new capital')) {
         const inR8 = isR8Project(r.project)
         if (zone === 'R8' && !inR8) return
         if (zone === 'R7' && inR8) return
       }
-      if (f.type && r.type !== f.type) return
-      if (f.finish && r.finish !== f.finish) return
-      if (f.beds) {
+      if (f.type.length && !f.type.includes(r.type)) return
+      if (f.finish.length && !f.finish.includes(r.finish)) return
+      if (f.beds.length) {
         const b = parseInt(String(r.beds)) || 0
-        if (f.beds === '5' && b < 5) return
-        else if (f.beds !== '5' && b !== parseInt(f.beds)) return
+        const key = b >= 5 ? '5' : String(b)
+        if (!f.beds.includes(key)) return
       }
       const p = parseFloat(String(r.price)) || 0
       if (p > 0 && (p < priceMin || p > priceMax)) return
       const a = parseFloat(String(r.area)) || 0
       if (a > 0 && (a < areaMin || a > areaMax)) return
-      if (f.delivery) {
-        if (f.delivery === '2031') { if (parseInt(r.delivery_year) < 2031) return }
-        else if (r.delivery_year !== f.delivery) return
+      if (f.delivery.length) {
+        const key = parseInt(r.delivery_year) >= 2031 ? '2031' : r.delivery_year
+        if (!f.delivery.includes(key)) return
       }
-      if (discountMin) { const d = parseFloat(String(r.discount)) || 0; if (d < discountMin) return }
-      if (f.extras === 'garden' && !(parseFloat(String(r.garden)) > 0)) return
-      if (f.extras === 'roof' && !(parseFloat(String(r.roof)) > 0)) return
+      if (f.discount.length) {
+        const d = parseFloat(String(r.discount)) || 0
+        if (!f.discount.some(thr => d >= parseInt(thr))) return
+      }
+      if (f.extras.length) {
+        const hasGarden = parseFloat(String(r.garden)) > 0
+        const hasRoof = parseFloat(String(r.roof)) > 0
+        if (!f.extras.some(e => (e === 'garden' && hasGarden) || (e === 'roof' && hasRoof))) return
+      }
       projects.add(r.project)
     })
     return Array.from(projects).sort((a, b) => a.localeCompare(b))
@@ -452,32 +472,35 @@ export default function PropertyDashboardClient() {
     const priceMax = parseFloat(f.priceMax) * 1e6 || Infinity
     const areaMin = parseFloat(f.areaMin) || 0
     const areaMax = parseFloat(f.areaMax) || Infinity
-    const discountMinVal = parseFloat(f.discount) || 0
 
     function passes(r: Property, skip: string): boolean {
       const p = parseFloat(String(r.price)) || 0
       const a = parseFloat(String(r.area)) || 0
       const b = parseInt(String(r.beds)) || 0
-      if (skip !== 'city' && f.city && r.city !== f.city) return false
-      if (skip !== 'search' && f.search && r.project !== f.search) return false
-      if (skip !== 'type' && f.type && r.type !== f.type) return false
-      if (skip !== 'finish' && f.finish && r.finish !== f.finish) return false
-      if (skip !== 'beds' && f.beds) {
-        if (f.beds === '5' ? b < 5 : b !== parseInt(f.beds)) return false
+      if (skip !== 'city' && f.city.length && !f.city.includes(r.city)) return false
+      if (skip !== 'search' && f.search.length && !f.search.includes(r.project)) return false
+      if (skip !== 'type' && f.type.length && !f.type.includes(r.type)) return false
+      if (skip !== 'finish' && f.finish.length && !f.finish.includes(r.finish)) return false
+      if (skip !== 'beds' && f.beds.length) {
+        const key = b >= 5 ? '5' : String(b)
+        if (!f.beds.includes(key)) return false
       }
       if (p > 0 && (p < priceMin || p > priceMax)) return false
       if (a > 0 && (a < areaMin || a > areaMax)) return false
-      if (skip !== 'delivery' && f.delivery) {
-        if (f.delivery === '2031' ? parseInt(r.delivery_year) < 2031 : r.delivery_year !== f.delivery) return false
+      if (skip !== 'delivery' && f.delivery.length) {
+        const key = parseInt(r.delivery_year) >= 2031 ? '2031' : r.delivery_year
+        if (!f.delivery.includes(key)) return false
       }
-      if (skip !== 'discount' && discountMinVal) {
-        if ((parseFloat(String(r.discount)) || 0) < discountMinVal) return false
+      if (skip !== 'discount' && f.discount.length) {
+        const d = parseFloat(String(r.discount)) || 0
+        if (!f.discount.some(thr => d >= parseInt(thr))) return false
       }
-      if (skip !== 'extras' && f.extras) {
-        if (f.extras === 'garden' && !(parseFloat(String(r.garden)) > 0)) return false
-        if (f.extras === 'roof' && !(parseFloat(String(r.roof)) > 0)) return false
+      if (skip !== 'extras' && f.extras.length) {
+        const hasGarden = parseFloat(String(r.garden)) > 0
+        const hasRoof = parseFloat(String(r.roof)) > 0
+        if (!f.extras.some(e => (e === 'garden' && hasGarden) || (e === 'roof' && hasRoof))) return false
       }
-      if (zone !== 'R' && f.city === 'new capital') {
+      if (zone !== 'R' && f.city.includes('new capital')) {
         const inR8 = isR8Project(r.project)
         if (zone === 'R8' && !inR8) return false
         if (zone === 'R7' && inR8) return false
@@ -561,7 +584,7 @@ export default function PropertyDashboardClient() {
       <aside className="ph-sidebar">
         <div className="ph-filter-section">
           <h3>🔍 Project</h3>
-          <Combobox
+          <MultiCombobox
             value={filters.search}
             onChange={handleSearchChange}
             options={availableProjects.map(p => ({ value: p, label: p }))}
@@ -572,7 +595,7 @@ export default function PropertyDashboardClient() {
         <div className="ph-filter-section">
           <h3>📍 Location</h3>
           <label className="ph-filter-label">City</label>
-          <Combobox
+          <MultiCombobox
             value={filters.city}
             onChange={v => setFilter('city', v)}
             options={CITY_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.city[o.value] || 0})` }))}
@@ -583,21 +606,21 @@ export default function PropertyDashboardClient() {
         <div className="ph-filter-section">
           <h3>🏠 Property</h3>
           <label className="ph-filter-label">Unit Type</label>
-          <Combobox
+          <MultiCombobox
             value={filters.type}
             onChange={v => setFilter('type', v)}
             options={TYPE_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.type[o.value] || 0})` }))}
             placeholder="All Types"
           />
           <label className="ph-filter-label">Finishing</label>
-          <Combobox
+          <MultiCombobox
             value={filters.finish}
             onChange={v => setFilter('finish', v)}
             options={FINISH_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.finish[o.value] || 0})` }))}
             placeholder="All Finishes"
           />
           <label className="ph-filter-label">Bedrooms</label>
-          <Combobox
+          <MultiCombobox
             value={filters.beds}
             onChange={v => setFilter('beds', v)}
             options={BEDS_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.beds[o.value] || 0})` }))}
@@ -639,7 +662,7 @@ export default function PropertyDashboardClient() {
 
         <div className="ph-filter-section">
           <h3>📅 Delivery</h3>
-          <Combobox
+          <MultiCombobox
             value={filters.delivery}
             onChange={v => setFilter('delivery', v)}
             options={DELIVERY_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.delivery[o.value] || 0})` }))}
@@ -650,14 +673,14 @@ export default function PropertyDashboardClient() {
         <div className="ph-filter-section">
           <h3>🏷️ Extras</h3>
           <label className="ph-filter-label">Cash Discount</label>
-          <Combobox
+          <MultiCombobox
             value={filters.discount}
             onChange={v => setFilter('discount', v)}
             options={DISCOUNT_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.discount[o.value] || 0})` }))}
             placeholder="Any"
           />
           <label className="ph-filter-label">Garden / Roof</label>
-          <Combobox
+          <MultiCombobox
             value={filters.extras}
             onChange={v => setFilter('extras', v)}
             options={EXTRAS_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.extras[o.value] || 0})` }))}
@@ -716,7 +739,7 @@ export default function PropertyDashboardClient() {
             Showing <span>{sorted.length > 0 ? `${showStart}–${showEnd}` : '0'}</span> of <span>{sorted.length.toLocaleString()}</span> units
           </div>
           <div className="ph-view-controls">
-            {applied.city === 'new capital' && (
+            {applied.city.includes('new capital') && (
               <select className="ph-sort-select" value={zone} onChange={e => { setZone(e.target.value as 'R' | 'R7' | 'R8'); setPage(1) }}>
                 <option value="R">R (All)</option>
                 <option value="R7">R7</option>
