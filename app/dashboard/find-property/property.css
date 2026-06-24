@@ -11,8 +11,8 @@
 
 /* SIDEBAR */
 .ph-sidebar {
-  width: 280px;
-  min-width: 280px;
+  width: 440px;
+  min-width: 440px;
   background: #0f0f0f;
   border-right: 1px solid rgba(215, 255, 0, 0.15);
   padding: 14px;
@@ -20,6 +20,17 @@
   max-height: calc(100vh - 56px);
   position: sticky;
   top: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-content: start;
+}
+
+/* Project section and buttons span both columns */
+.ph-sidebar .ph-filter-section:first-child,
+.ph-sidebar .ph-btn-primary,
+.ph-sidebar .ph-btn-reset {
+  grid-column: 1 / -1;
 }
 
 .ph-filter-section {
@@ -781,7 +792,11 @@
 
 /* RESPONSIVE */
 @media (max-width: 900px) {
-  .ph-sidebar { width: 220px; min-width: 220px; }
+  .ph-sidebar {
+    width: 220px;
+    min-width: 220px;
+    display: block;
+  }
   .ph-kpi { min-width: 110px; }
   .ph-modal-grid { grid-template-columns: 1fr; }
 }
