@@ -217,13 +217,13 @@ const BEDS_OPTIONS = [
 ]
 
 const DELIVERY_OPTIONS = [
-  { value: '2025', label: '2025' },
-  { value: '2026', label: '2026' },
-  { value: '2027', label: '2027' },
-  { value: '2028', label: '2028' },
-  { value: '2029', label: '2029' },
-  { value: '2030', label: '2030' },
-  { value: '2031', label: '2031+' },
+  { value: '2025', label: 'By 2025' },
+  { value: '2026', label: 'By 2026' },
+  { value: '2027', label: 'By 2027' },
+  { value: '2028', label: 'By 2028' },
+  { value: '2029', label: 'By 2029' },
+  { value: '2030', label: 'By 2030' },
+  { value: '2031', label: 'By 2031+' },
 ]
 
 const DISCOUNT_OPTIONS = [
@@ -379,8 +379,9 @@ export default function PropertyDashboardClient() {
       const a = parseFloat(String(r.area)) || 0
       if (a > 0 && (a < areaMin || a > areaMax)) return false
       if (f.delivery.length) {
-        const key = parseInt(r.delivery_year) >= 2031 ? '2031' : r.delivery_year
-        if (!f.delivery.includes(key)) return false
+        const maxSelected = Math.max(...f.delivery.map(y => parseInt(y)))
+        const yr = parseInt(r.delivery_year) || 0
+        if (maxSelected < 2031 && yr > maxSelected) return false
       }
       if (f.discount.length) {
         const d = parseFloat(String(r.discount)) || 0
@@ -449,8 +450,9 @@ export default function PropertyDashboardClient() {
       const a = parseFloat(String(r.area)) || 0
       if (a > 0 && (a < areaMin || a > areaMax)) return
       if (f.delivery.length) {
-        const key = parseInt(r.delivery_year) >= 2031 ? '2031' : r.delivery_year
-        if (!f.delivery.includes(key)) return
+        const maxSelected = Math.max(...f.delivery.map(y => parseInt(y)))
+        const yr = parseInt(r.delivery_year) || 0
+        if (maxSelected < 2031 && yr > maxSelected) return
       }
       if (f.discount.length) {
         const d = parseFloat(String(r.discount)) || 0
@@ -488,8 +490,9 @@ export default function PropertyDashboardClient() {
       if (p > 0 && (p < priceMin || p > priceMax)) return false
       if (a > 0 && (a < areaMin || a > areaMax)) return false
       if (skip !== 'delivery' && f.delivery.length) {
-        const key = parseInt(r.delivery_year) >= 2031 ? '2031' : r.delivery_year
-        if (!f.delivery.includes(key)) return false
+        const maxSelected = Math.max(...f.delivery.map(y => parseInt(y)))
+        const yr = parseInt(r.delivery_year) || 0
+        if (maxSelected < 2031 && yr > maxSelected) return false
       }
       if (skip !== 'discount' && f.discount.length) {
         const d = parseFloat(String(r.discount)) || 0
@@ -542,7 +545,14 @@ export default function PropertyDashboardClient() {
       }
     })
 
-    return { city, type, finish, beds, delivery, discount, extras }
+    const deliveryCumulative: Record<string, number> = {}
+    let runningTotal = 0
+    for (const opt of DELIVERY_OPTIONS) {
+      runningTotal += delivery[opt.value] || 0
+      deliveryCumulative[opt.value] = runningTotal
+    }
+
+    return { city, type, finish, beds, delivery: deliveryCumulative, discount, extras }
   }, [rawData, filters, zone])
 
   const currentPriceStep = priceSteps[priceKpiState]
