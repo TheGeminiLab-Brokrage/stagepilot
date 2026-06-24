@@ -445,6 +445,83 @@ export default function PropertyDashboardClient() {
     })
     return Array.from(projects).sort((a, b) => a.localeCompare(b))
   }, [rawData, filters, zone])
+
+  const facetCounts = useMemo(() => {
+    const f = filters
+    const priceMin = parseFloat(f.priceMin) * 1e6 || 0
+    const priceMax = parseFloat(f.priceMax) * 1e6 || Infinity
+    const areaMin = parseFloat(f.areaMin) || 0
+    const areaMax = parseFloat(f.areaMax) || Infinity
+    const discountMinVal = parseFloat(f.discount) || 0
+
+    function passes(r: Property, skip: string): boolean {
+      const p = parseFloat(String(r.price)) || 0
+      const a = parseFloat(String(r.area)) || 0
+      const b = parseInt(String(r.beds)) || 0
+      if (skip !== 'city' && f.city && r.city !== f.city) return false
+      if (skip !== 'search' && f.search && r.project !== f.search) return false
+      if (skip !== 'type' && f.type && r.type !== f.type) return false
+      if (skip !== 'finish' && f.finish && r.finish !== f.finish) return false
+      if (skip !== 'beds' && f.beds) {
+        if (f.beds === '5' ? b < 5 : b !== parseInt(f.beds)) return false
+      }
+      if (p > 0 && (p < priceMin || p > priceMax)) return false
+      if (a > 0 && (a < areaMin || a > areaMax)) return false
+      if (skip !== 'delivery' && f.delivery) {
+        if (f.delivery === '2031' ? parseInt(r.delivery_year) < 2031 : r.delivery_year !== f.delivery) return false
+      }
+      if (skip !== 'discount' && discountMinVal) {
+        if ((parseFloat(String(r.discount)) || 0) < discountMinVal) return false
+      }
+      if (skip !== 'extras' && f.extras) {
+        if (f.extras === 'garden' && !(parseFloat(String(r.garden)) > 0)) return false
+        if (f.extras === 'roof' && !(parseFloat(String(r.roof)) > 0)) return false
+      }
+      if (zone !== 'R' && f.city === 'new capital') {
+        const inR8 = isR8Project(r.project)
+        if (zone === 'R8' && !inR8) return false
+        if (zone === 'R7' && inR8) return false
+      }
+      return true
+    }
+
+    const city: Record<string, number> = {}
+    const type: Record<string, number> = {}
+    const finish: Record<string, number> = {}
+    const beds: Record<string, number> = {}
+    const delivery: Record<string, number> = {}
+    const discount: Record<string, number> = {}
+    const extras: Record<string, number> = {}
+
+    rawData.forEach(r => {
+      if (passes(r, 'city')) city[r.city] = (city[r.city] || 0) + 1
+      if (passes(r, 'type')) type[r.type] = (type[r.type] || 0) + 1
+      if (passes(r, 'finish')) finish[r.finish] = (finish[r.finish] || 0) + 1
+      if (passes(r, 'beds')) {
+        const b = parseInt(String(r.beds)) || 0
+        const key = b >= 5 ? '5' : String(b)
+        beds[key] = (beds[key] || 0) + 1
+      }
+      if (passes(r, 'delivery')) {
+        const yr = r.delivery_year
+        const key = parseInt(yr) >= 2031 ? '2031' : yr
+        delivery[key] = (delivery[key] || 0) + 1
+      }
+      if (passes(r, 'discount')) {
+        const d = parseFloat(String(r.discount)) || 0
+        for (const threshold of ['10', '20', '30', '40']) {
+          if (d >= parseInt(threshold)) discount[threshold] = (discount[threshold] || 0) + 1
+        }
+      }
+      if (passes(r, 'extras')) {
+        if (parseFloat(String(r.garden)) > 0) extras['garden'] = (extras['garden'] || 0) + 1
+        if (parseFloat(String(r.roof)) > 0) extras['roof'] = (extras['roof'] || 0) + 1
+      }
+    })
+
+    return { city, type, finish, beds, delivery, discount, extras }
+  }, [rawData, filters, zone])
+
   const currentPriceStep = priceSteps[priceKpiState]
   const selectedProperty = selectedIdx !== null ? sorted[selectedIdx] : null
 
@@ -498,7 +575,7 @@ export default function PropertyDashboardClient() {
           <Combobox
             value={filters.city}
             onChange={v => setFilter('city', v)}
-            options={CITY_OPTIONS}
+            options={CITY_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.city[o.value] || 0})` }))}
             placeholder="All Cities"
           />
         </div>
@@ -509,21 +586,21 @@ export default function PropertyDashboardClient() {
           <Combobox
             value={filters.type}
             onChange={v => setFilter('type', v)}
-            options={TYPE_OPTIONS}
+            options={TYPE_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.type[o.value] || 0})` }))}
             placeholder="All Types"
           />
           <label className="ph-filter-label">Finishing</label>
           <Combobox
             value={filters.finish}
             onChange={v => setFilter('finish', v)}
-            options={FINISH_OPTIONS}
+            options={FINISH_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.finish[o.value] || 0})` }))}
             placeholder="All Finishes"
           />
           <label className="ph-filter-label">Bedrooms</label>
           <Combobox
             value={filters.beds}
             onChange={v => setFilter('beds', v)}
-            options={BEDS_OPTIONS}
+            options={BEDS_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.beds[o.value] || 0})` }))}
             placeholder="Any"
           />
         </div>
@@ -565,7 +642,7 @@ export default function PropertyDashboardClient() {
           <Combobox
             value={filters.delivery}
             onChange={v => setFilter('delivery', v)}
-            options={DELIVERY_OPTIONS}
+            options={DELIVERY_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.delivery[o.value] || 0})` }))}
             placeholder="Any Year"
           />
         </div>
@@ -576,14 +653,14 @@ export default function PropertyDashboardClient() {
           <Combobox
             value={filters.discount}
             onChange={v => setFilter('discount', v)}
-            options={DISCOUNT_OPTIONS}
+            options={DISCOUNT_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.discount[o.value] || 0})` }))}
             placeholder="Any"
           />
           <label className="ph-filter-label">Garden / Roof</label>
           <Combobox
             value={filters.extras}
             onChange={v => setFilter('extras', v)}
-            options={EXTRAS_OPTIONS}
+            options={EXTRAS_OPTIONS.map(o => ({ value: o.value, label: `${o.label} (${facetCounts.extras[o.value] || 0})` }))}
             placeholder="Any"
           />
         </div>
