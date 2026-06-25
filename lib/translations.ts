@@ -7,6 +7,7 @@ const en = {
   navUploadCall: 'Upload Call',
   navAdmin: 'Admin',
   navKnowledgeBase: 'Knowledge Base',
+  navReports: 'Reports',
 
   // ── Role badge names ──────────────────────────────────────────────────────
   roleAgent: 'Agent',
@@ -304,6 +305,7 @@ const ar: typeof en = {
   navUploadCall: 'رفع مكالمة',
   navAdmin: 'الإدارة',
   navKnowledgeBase: 'قاعدة المعرفة',
+  navReports: 'التقارير',
 
   // ── Role badge names ──────────────────────────────────────────────────────
   roleAgent: 'وكيل',

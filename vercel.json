@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/sync-sheets",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/daily-report",
+      "schedule": "55 21 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-report",
+      "schedule": "30 21 * * 4"
     }
   ]
 }
