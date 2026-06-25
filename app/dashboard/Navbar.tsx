@@ -29,6 +29,7 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
       ? [{ href: '/dashboard/exam', label: t('navExam') }]
       : [
           { href: '/dashboard', label: role === 'agent' ? t('navMyCalls') : t('navTeamCalls') },
+          { href: '/dashboard/performance', label: 'Performance' },
           ...(role === 'agent' ? [
             { href: '/dashboard/upload', label: t('navUploadCall') },
             { href: '/dashboard/practice', label: t('navAiPractice') },
@@ -37,6 +38,7 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
           ...(role === 'super_admin' ? [
             { href: '/dashboard/admin', label: t('navAdmin') },
             { href: '/dashboard/admin/knowledge-base', label: t('navKnowledgeBase') },
+            { href: '/dashboard/admin/reports', label: t('navReports') },
           ] : []),
         ]
 
