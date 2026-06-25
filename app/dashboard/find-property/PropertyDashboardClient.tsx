@@ -380,8 +380,8 @@ export default function PropertyDashboardClient() {
       if (a > 0 && (a < areaMin || a > areaMax)) return false
       if (f.delivery.length) {
         const maxSelected = Math.max(...f.delivery.map(y => parseInt(y)))
-        const yr = parseInt(r.delivery_year) || 0
-        if (maxSelected < 2031 && yr > maxSelected) return false
+        const rawYr = parseInt(r.delivery_year)
+        if (rawYr >= 2020 && rawYr <= 2050 && maxSelected < 2031 && rawYr > maxSelected) return false
       }
       if (f.discount.length) {
         const d = parseFloat(String(r.discount)) || 0
@@ -451,8 +451,8 @@ export default function PropertyDashboardClient() {
       if (a > 0 && (a < areaMin || a > areaMax)) return
       if (f.delivery.length) {
         const maxSelected = Math.max(...f.delivery.map(y => parseInt(y)))
-        const yr = parseInt(r.delivery_year) || 0
-        if (maxSelected < 2031 && yr > maxSelected) return
+        const rawYr = parseInt(r.delivery_year)
+        if (rawYr >= 2020 && rawYr <= 2050 && maxSelected < 2031 && rawYr > maxSelected) return
       }
       if (f.discount.length) {
         const d = parseFloat(String(r.discount)) || 0
@@ -491,8 +491,8 @@ export default function PropertyDashboardClient() {
       if (a > 0 && (a < areaMin || a > areaMax)) return false
       if (skip !== 'delivery' && f.delivery.length) {
         const maxSelected = Math.max(...f.delivery.map(y => parseInt(y)))
-        const yr = parseInt(r.delivery_year) || 0
-        if (maxSelected < 2031 && yr > maxSelected) return false
+        const rawYr = parseInt(r.delivery_year)
+        if (rawYr >= 2020 && rawYr <= 2050 && maxSelected < 2031 && rawYr > maxSelected) return false
       }
       if (skip !== 'discount' && f.discount.length) {
         const d = parseFloat(String(r.discount)) || 0
