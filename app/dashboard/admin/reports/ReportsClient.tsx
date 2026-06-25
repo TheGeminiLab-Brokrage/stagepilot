@@ -2,13 +2,12 @@
 
 import { useState, useMemo } from 'react'
 import type { Report } from './page'
-import CrmStatusChanges from './CrmStatusChanges'
 
 interface Props {
   reports: Report[]
 }
 
-type ReportTab = 'daily' | 'weekly' | 'monthly' | 'crm'
+type ReportTab = 'daily' | 'weekly' | 'monthly'
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -653,7 +652,6 @@ export default function ReportsClient({ reports }: Props) {
     { key: 'daily', label: 'Daily' },
     { key: 'weekly', label: 'Weekly' },
     { key: 'monthly', label: 'Monthly' },
-    { key: 'crm', label: 'Status Changes' },
   ]
 
   return (
@@ -772,7 +770,6 @@ export default function ReportsClient({ reports }: Props) {
         </div>
       )}
 
-      {activeTab === 'crm' && <CrmStatusChanges />}
     </div>
   )
 }

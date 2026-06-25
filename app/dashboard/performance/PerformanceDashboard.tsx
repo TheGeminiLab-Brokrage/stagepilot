@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
+import CrmStatusChanges from '../admin/reports/CrmStatusChanges'
 
 type Call = {
   id: string
@@ -107,6 +108,8 @@ const chipStyle = (active: boolean) => ({
   transition: 'all 0.15s',
 })
 
+type PerfTab = 'leads' | 'crm'
+
 export default function PerformanceDashboard({
   calls,
   role,
@@ -114,6 +117,7 @@ export default function PerformanceDashboard({
   calls: Call[]
   role: string
 }) {
+  const [activeTab, setActiveTab] = useState<PerfTab>('leads')
   const [activeChip, setActiveChip] = useState<string | null>(null)
   const [activeCampaign, setActiveCampaign] = useState<string | null>(null)
   const [hiddenStages, setHiddenStages] = useState<Set<string>>(new Set())
@@ -225,8 +229,46 @@ export default function PerformanceDashboard({
     { label: 'Direct to Meeting', value: String(metrics.directToMeeting), note: 'no prior follow-up' },
   ]
 
+  const tabs: { key: PerfTab; label: string }[] = [
+    { key: 'leads', label: 'Leads Over Stages' },
+    ...(role === 'super_admin' ? [{ key: 'crm' as PerfTab, label: 'Status Changes' }] : []),
+  ]
+
   return (
     <div style={{ color: '#fff', fontFamily: "'Montserrat', sans-serif" }}>
+      {/* Tab bar */}
+      <div style={{
+        display: 'flex',
+        gap: 4,
+        marginBottom: 24,
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+      }}>
+        {tabs.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            style={{
+              padding: '11px 28px',
+              borderRadius: '8px 8px 0 0',
+              fontSize: 15,
+              fontWeight: 700,
+              border: 'none',
+              cursor: 'pointer',
+              background: activeTab === key ? 'rgba(215,255,0,0.08)' : 'transparent',
+              color: activeTab === key ? '#D7FF00' : 'rgba(255,255,255,0.4)',
+              borderBottom: activeTab === key ? '2px solid #D7FF00' : '2px solid transparent',
+              transition: 'all 0.15s',
+              fontFamily: "'Montserrat', sans-serif",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'crm' && <CrmStatusChanges />}
+
+      {activeTab === 'leads' && <>
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>
@@ -534,6 +576,7 @@ export default function PerformanceDashboard({
           No processed calls found.
         </div>
       )}
+      </>}
     </div>
   )
 }
