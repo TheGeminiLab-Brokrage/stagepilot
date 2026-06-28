@@ -32,6 +32,20 @@ type NumericFilter = { min: string; max: string }
 type FilterValue = string[] | NumericFilter
 type FilterState = Record<string, FilterValue>
 
+// Returns inline styles for status badge based on value text
+function badgeStyle(value: string): React.CSSProperties {
+  const v = value.toLowerCase()
+  if (/avail|متاح|ready|for sale/.test(v))
+    return { background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.25)' }
+  if (/sold|مباع|closed/.test(v))
+    return { background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }
+  if (/reserv|محجوز|hold|pending/.test(v))
+    return { background: 'rgba(245,166,35,0.1)', color: '#f5a623', border: '1px solid rgba(245,166,35,0.25)' }
+  if (/off.?plan|upcoming|future/.test(v))
+    return { background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.25)' }
+  return { background: 'rgba(245,166,35,0.1)', color: '#f5a623', border: '1px solid rgba(245,166,35,0.25)' }
+}
+
 function buildDefaultConfig(columns: ColumnMeta[]): ViewConfig {
   const categorical = columns.filter(c => c.type === 'categorical')
   const numeric = columns.filter(c => c.type === 'numeric')
@@ -45,11 +59,11 @@ function buildDefaultConfig(columns: ColumnMeta[]): ViewConfig {
       ...numeric.slice(0, 4).map(c => c.key),
       ...year.slice(0, 1).map(c => c.key),
     ],
-    filterColumns: [
+    filterColumns: [...new Set([
       ...categorical.map(c => c.key),
       ...year.map(c => c.key),
       ...numeric.slice(0, 3).map(c => c.key),
-    ],
+    ])],
     sortColumn: numeric[0]?.key ?? '',
     sortDir: 'asc',
   }
@@ -226,7 +240,7 @@ function ConfigPanel({
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 4, fontFamily: "'Montserrat', sans-serif" }}>
-                Badge (small tag, top-right)
+                Status Badge (small tag, top-right)
               </label>
               <select
                 style={inputStyle}
@@ -351,6 +365,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [config, setConfig] = useState<ViewConfig | null>(null)
   const [filters, setFilters] = useState<FilterState>({})
   const [sort, setSort] = useState('')
+  const [search, setSearch] = useState('')
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [page, setPage] = useState(1)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
@@ -494,10 +509,21 @@ export default function PropertyViewerClient({ userId, companyId }: {
     })
   }, [filtered, sort])
 
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
-  const showStart = sorted.length > 0 ? (page - 1) * PAGE_SIZE + 1 : 0
-  const showEnd = Math.min(page * PAGE_SIZE, sorted.length)
-  const pageItems = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  // Search applied after sort — narrows displayed results
+  const afterSearch = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q || !config) return sorted
+    return sorted.filter(row =>
+      [config.titleColumn, config.subtitleColumn, config.badgeColumn]
+        .filter(Boolean)
+        .some(k => String(row[k] ?? '').toLowerCase().includes(q))
+    )
+  }, [sorted, search, config])
+
+  const totalPages = Math.ceil(afterSearch.length / PAGE_SIZE)
+  const showStart = afterSearch.length > 0 ? (page - 1) * PAGE_SIZE + 1 : 0
+  const showEnd = Math.min(page * PAGE_SIZE, afterSearch.length)
+  const pageItems = afterSearch.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const handlePage = useCallback((p: number) => {
     setPage(Math.max(1, Math.min(p, totalPages)))
@@ -512,8 +538,33 @@ export default function PropertyViewerClient({ userId, companyId }: {
       { value: `${c.key}-desc`, label: `${c.label} ↓` },
     ]), [numericCols])
 
-  const kpiNumerics = numericCols.slice(0, 3)
-  const selectedProperty = selectedIdx !== null ? sorted[selectedIdx] : null
+  // Pick the most meaningful numeric column for KPI display
+  // Prefer columns whose label matches common property field keywords
+  const kpiCol = useMemo(() => {
+    if (numericCols.length === 0) return null
+    const preferred = numericCols.find(c =>
+      /price|value|area|size|sqm|sq\.?ft|m²|bedroom|bed|unit/i.test(c.label)
+    )
+    return preferred ?? numericCols[0]
+  }, [numericCols])
+
+  const kpiMin = useMemo(() => {
+    if (!kpiCol) return null
+    const vals = filtered
+      .map(r => parseFloat(String(r[kpiCol.key] ?? '').replace(/,/g, '')))
+      .filter(n => !isNaN(n) && isFinite(n))
+    return vals.length ? Math.min(...vals) : null
+  }, [kpiCol, filtered])
+
+  const kpiMax = useMemo(() => {
+    if (!kpiCol) return null
+    const vals = filtered
+      .map(r => parseFloat(String(r[kpiCol.key] ?? '').replace(/,/g, '')))
+      .filter(n => !isNaN(n) && isFinite(n))
+    return vals.length ? Math.max(...vals) : null
+  }, [kpiCol, filtered])
+
+  const selectedProperty = selectedIdx !== null ? afterSearch[selectedIdx] : null
 
   // ── LOADING ──
   if (phase === 'loading') {
@@ -583,6 +634,11 @@ export default function PropertyViewerClient({ userId, companyId }: {
     .map(k => colByKey[k])
     .filter(Boolean)
 
+  const hasActiveFilters = activeFilterCols.some(col => {
+    const f = filters[col.key]
+    return f ? (Array.isArray(f) ? f.length > 0 : f.min !== '' || f.max !== '') : false
+  })
+
   return (
     <div className="ph-root" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}>
       {/* Sheet manager bar */}
@@ -615,6 +671,28 @@ export default function PropertyViewerClient({ userId, companyId }: {
       <div className="ph-layout">
         {/* ── SIDEBAR ── */}
         <aside className="ph-sidebar">
+          {/* Search box — always shown at top */}
+          <div style={{ gridColumn: '1 / -1', marginBottom: 4 }}>
+            <div className="ph-search-wrap">
+              <svg className="ph-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                type="text"
+                className="ph-input ph-combo-input"
+                placeholder="Search properties…"
+                value={search}
+                onChange={e => { setSearch(e.target.value); setPage(1) }}
+              />
+              {search && (
+                <button
+                  onClick={() => { setSearch(''); setPage(1) }}
+                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 2 }}
+                >✕</button>
+              )}
+            </div>
+          </div>
+
           {activeFilterCols.length === 0 ? (
             <div style={{ gridColumn: '1 / -1', padding: '20px 0', textAlign: 'center' }}>
               <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, fontFamily: "'Montserrat', sans-serif", margin: 0 }}>No filters selected.</p>
@@ -665,7 +743,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                 return null
               })}
               <button className="ph-btn-reset" style={{ gridColumn: '1 / -1' }} onClick={() => { setFilters(emptyFilters(columns, cfg.filterColumns)); setPage(1) }}>
-                ↺ Reset All
+                ↺ Reset All Filters
               </button>
             </>
           )}
@@ -675,28 +753,43 @@ export default function PropertyViewerClient({ userId, companyId }: {
         <main className="ph-main">
           {/* KPIs */}
           <div className="ph-kpi-row">
+            {/* Total in dataset */}
             <div className="ph-kpi ph-kpi-energy">
-              <div className="ph-kpi-icon">🏠</div>
-              <div className="ph-kpi-val">{filtered.length.toLocaleString()}</div>
-              <div className="ph-kpi-lbl">Total Units</div>
+              <div className="ph-kpi-icon">🏢</div>
+              <div className="ph-kpi-val">{rows.length.toLocaleString()}</div>
+              <div className="ph-kpi-lbl">Total Properties</div>
             </div>
-            {kpiNumerics.map(col => {
-              const vals = filtered.map(r => parseFloat(String(r[col.key] ?? '').replace(/,/g, ''))).filter(n => !isNaN(n) && isFinite(n))
-              const minVal = vals.length ? Math.min(...vals) : null
-              return (
-                <div key={col.key} className="ph-kpi ph-kpi-gold">
-                  <div className="ph-kpi-icon">📊</div>
-                  <div className="ph-kpi-val">{minVal != null ? fmt(minVal) : '—'}</div>
-                  <div className="ph-kpi-lbl">Min {col.label}</div>
-                </div>
-              )
-            })}
+
+            {/* Matching current filters */}
+            <div className="ph-kpi ph-kpi-gold">
+              <div className="ph-kpi-icon">✓</div>
+              <div className="ph-kpi-val" style={{ color: hasActiveFilters || search ? '#d7ff00' : 'rgba(255,255,255,0.5)' }}>
+                {afterSearch.length.toLocaleString()}
+              </div>
+              <div className="ph-kpi-lbl">{hasActiveFilters || search ? 'Matching' : 'Showing'}</div>
+            </div>
+
+            {/* Key numeric range — only if column exists and has variance */}
+            {kpiCol && kpiMin !== null && kpiMax !== null && kpiMin !== kpiMax && (
+              <div className="ph-kpi ph-kpi-gold">
+                <div className="ph-kpi-icon">📐</div>
+                <div className="ph-kpi-val">{fmt(kpiMin)}</div>
+                <div className="ph-kpi-lbl">From · {kpiCol.label}</div>
+              </div>
+            )}
+            {kpiCol && kpiMin !== null && kpiMax !== null && kpiMin !== kpiMax && (
+              <div className="ph-kpi ph-kpi-gold">
+                <div className="ph-kpi-icon">📐</div>
+                <div className="ph-kpi-val">{fmt(kpiMax)}</div>
+                <div className="ph-kpi-lbl">Up to · {kpiCol.label}</div>
+              </div>
+            )}
           </div>
 
           {/* Results header */}
           <div className="ph-results-header">
             <div className="ph-results-count">
-              Showing <span>{sorted.length > 0 ? `${showStart}–${showEnd}` : '0'}</span> of <span>{sorted.length.toLocaleString()}</span> units
+              Showing <span>{afterSearch.length > 0 ? `${showStart}–${showEnd}` : '0'}</span> of <span>{afterSearch.length.toLocaleString()}</span> properties
             </div>
             <div className="ph-view-controls">
               {numericSortOptions.length > 0 && (
@@ -710,25 +803,41 @@ export default function PropertyViewerClient({ userId, companyId }: {
           </div>
 
           {/* Results */}
-          {sorted.length === 0 ? (
+          {afterSearch.length === 0 ? (
             <div className="ph-empty">
               <div className="ph-empty-icon">🔍</div>
-              <h3>No records found</h3>
-              <p>Try adjusting your filters</p>
+              <h3>No properties found</h3>
+              <p>{search ? `No results for "${search}"` : 'Try adjusting your filters'}</p>
+              {(hasActiveFilters || search) && (
+                <button
+                  className="ph-btn-reset"
+                  style={{ marginTop: 16, display: 'inline-block', width: 'auto', padding: '7px 20px' }}
+                  onClick={() => { setFilters(emptyFilters(columns, cfg.filterColumns)); setSearch(''); setPage(1) }}
+                >
+                  ↺ Clear all filters
+                </button>
+              )}
             </div>
           ) : view === 'grid' ? (
             <div className="ph-grid-view">
               {pageItems.map((row, i) => {
                 const idx = (page - 1) * PAGE_SIZE + i
-                const titleVal = cfg.titleColumn ? String(row[cfg.titleColumn] ?? '—') : null
-                const subtitleVal = cfg.subtitleColumn ? String(row[cfg.subtitleColumn] ?? '') : null
-                const badgeVal = cfg.badgeColumn ? String(row[cfg.badgeColumn] ?? '') : null
+                const titleVal = cfg.titleColumn ? String(row[cfg.titleColumn] ?? '') : ''
+                const subtitleVal = cfg.subtitleColumn ? String(row[cfg.subtitleColumn] ?? '') : ''
+                const badgeVal = cfg.badgeColumn ? String(row[cfg.badgeColumn] ?? '') : ''
+                const showBadge = badgeVal && badgeVal !== '—'
                 return (
                   <div key={idx} className="ph-property-card" onClick={() => setSelectedIdx(idx)}>
                     <div className="ph-card-top">
-                      {titleVal && <div className="ph-city-badge">{titleVal}</div>}
-                      {subtitleVal && <div className="ph-card-project">{subtitleVal}</div>}
-                      {badgeVal && <div className="ph-type-badge">{badgeVal}</div>}
+                      {showBadge && (
+                        <div className="ph-type-badge" style={badgeStyle(badgeVal)}>{badgeVal}</div>
+                      )}
+                      {titleVal && titleVal !== '—' && (
+                        <div className="ph-card-title">{titleVal}</div>
+                      )}
+                      {subtitleVal && subtitleVal !== '—' && (
+                        <div className="ph-card-developer">{subtitleVal}</div>
+                      )}
                     </div>
                     <div className="ph-card-body">
                       <div className="ph-card-specs">
@@ -751,7 +860,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                         .map(k => {
                           const col = colByKey[k]
                           const val = row[k]
-                          if (!col || val == null || val === '') return null
+                          if (!col || val == null || val === '' || String(val) === '—') return null
                           return (
                             <span key={k} className="ph-delivery-info">
                               <span style={{ opacity: 0.5, fontSize: 10 }}>{col.label}: </span>
@@ -824,8 +933,33 @@ export default function PropertyViewerClient({ userId, companyId }: {
             <div className="ph-modal" onClick={e => e.stopPropagation()}>
               <button className="ph-modal-close" onClick={() => setSelectedIdx(null)}>✕</button>
               <div className="ph-modal-header">
-                {cfg.titleColumn && <div className="ph-modal-city">{String(selectedProperty[cfg.titleColumn] ?? '—')}</div>}
-                {cfg.subtitleColumn && <div className="ph-modal-project">{String(selectedProperty[cfg.subtitleColumn] ?? '—')}</div>}
+                <div>
+                  {cfg.titleColumn && (
+                    <div className="ph-modal-title">{String(selectedProperty[cfg.titleColumn] ?? '—')}</div>
+                  )}
+                  {cfg.subtitleColumn && (
+                    <div className="ph-modal-sub">{String(selectedProperty[cfg.subtitleColumn] ?? '—')}</div>
+                  )}
+                  {cfg.badgeColumn && (() => {
+                    const bv = String(selectedProperty[cfg.badgeColumn] ?? '')
+                    if (!bv || bv === '—') return null
+                    return (
+                      <span
+                        style={{
+                          ...badgeStyle(bv),
+                          display: 'inline-block',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: '3px 10px',
+                          borderRadius: 20,
+                          marginTop: 8,
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          textTransform: 'capitalize',
+                        }}
+                      >{bv}</span>
+                    )
+                  })()}
+                </div>
               </div>
               <div className="ph-modal-body">
                 <dl className="ph-modal-grid">
