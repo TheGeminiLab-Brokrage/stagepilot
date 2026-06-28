@@ -129,18 +129,8 @@ function ConfigPanel({
   onClose: () => void
 }) {
   const [draft, setDraft] = useState<ViewConfig>({ ...config })
-  const allKeys = columns.map(c => c.key)
   const filterableKeys = columns.filter(c => c.type !== 'text').map(c => c.key)
   const numericKeys = columns.filter(c => c.type === 'numeric').map(c => c.key)
-
-  function toggleCard(key: string) {
-    setDraft(d => ({
-      ...d,
-      cardColumns: d.cardColumns.includes(key)
-        ? d.cardColumns.filter(k => k !== key)
-        : [...d.cardColumns, key],
-    }))
-  }
 
   function toggleFilter(key: string) {
     setDraft(d => ({
@@ -254,28 +244,7 @@ function ConfigPanel({
           </div>
         </div>
 
-        {/* Section 2: Card Specs */}
-        <div>
-          <p style={sectionHeadStyle}>Columns shown on card</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {columns.map(col => (
-              <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '5px 0' }}>
-                <input
-                  type="checkbox"
-                  checked={draft.cardColumns.includes(col.key)}
-                  onChange={() => toggleCard(col.key)}
-                  style={{ accentColor: '#d7ff00', width: 15, height: 15, cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: 13, color: '#fff', fontFamily: "'Montserrat', sans-serif" }}>{col.label}</span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto', fontFamily: "'Space Grotesk', sans-serif" }}>
-                  {col.type}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Section 3: Filter Sidebar */}
+        {/* Section 2: Filter Sidebar */}
         <div>
           <p style={sectionHeadStyle}>Filter sidebar columns</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -636,11 +605,9 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const cfg = config!
   const colByKey = Object.fromEntries(columns.map(c => [c.key, c]))
 
-  // Card spec columns: cardColumns excluding title/subtitle/badge
-  const specCols = cfg.cardColumns
-    .filter(k => k !== cfg.titleColumn && k !== cfg.subtitleColumn && k !== cfg.badgeColumn)
-    .map(k => colByKey[k])
-    .filter(Boolean)
+  // All columns except the header slots — shown automatically based on data
+  const specCols = columns
+    .filter(c => c.key !== cfg.titleColumn && c.key !== cfg.subtitleColumn && c.key !== cfg.badgeColumn)
 
   // Separate the most price-like numeric column to render prominently (yellow, large)
   const priceSpecCol = specCols.find(c =>
@@ -930,15 +897,14 @@ export default function PropertyViewerClient({ userId, companyId }: {
                       })()}
                     </div>
                     <div className="ph-card-footer" style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {cfg.cardColumns
-                        .filter(k => !nonPriceSpecCols.find(c => c.key === k) && k !== priceSpecCol?.key && k !== cfg.titleColumn && k !== cfg.subtitleColumn && k !== cfg.badgeColumn)
+                      {columns
+                        .filter(c => !nonPriceSpecCols.find(s => s.key === c.key) && c.key !== priceSpecCol?.key && c.key !== cfg.titleColumn && c.key !== cfg.subtitleColumn && c.key !== cfg.badgeColumn)
                         .slice(0, 3)
-                        .map(k => {
-                          const col = colByKey[k]
-                          const val = row[k]
-                          if (!col || val == null || val === '' || String(val) === '—') return null
+                        .map(col => {
+                          const val = row[col.key]
+                          if (val == null || val === '' || String(val) === '—') return null
                           return (
-                            <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '2px 9px', fontSize: 11, fontFamily: "'Montserrat', sans-serif" }}>
+                            <span key={col.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '2px 9px', fontSize: 11, fontFamily: "'Montserrat', sans-serif" }}>
                               <span style={{ color: 'rgba(255,255,255,0.4)' }}>{col.label}</span>
                               <span style={{ color: 'rgba(255,255,255,0.85)' }}>{String(val)}</span>
                             </span>
@@ -952,7 +918,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
           ) : (
             // List view
             (() => {
-              const listCols = cfg.cardColumns.map(k => colByKey[k]).filter(Boolean).slice(0, 7)
+              const listCols = columns.slice(0, 7)
               return (
                 <div className="ph-list-view">
                   <div className="ph-list-row" style={{ cursor: 'default', opacity: 0.45, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '8px 16px', fontFamily: "'Space Grotesk', sans-serif" }}>
