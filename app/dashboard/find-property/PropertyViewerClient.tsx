@@ -227,7 +227,7 @@ function ConfigPanel({
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 4, fontFamily: "'Montserrat', sans-serif" }}>
-                Subtitle (below title)
+                Location / Context (small pill above title)
               </label>
               <select
                 style={inputStyle}
@@ -634,6 +634,12 @@ export default function PropertyViewerClient({ userId, companyId }: {
     .map(k => colByKey[k])
     .filter(Boolean)
 
+  // Separate the most price-like numeric column to render prominently (yellow, large)
+  const priceSpecCol = specCols.find(c =>
+    c.type === 'numeric' && /price|value|cost|total|amount/i.test(c.label)
+  ) ?? specCols.find(c => c.type === 'numeric') ?? null
+  const nonPriceSpecCols = specCols.filter(c => c !== priceSpecCol)
+
   const hasActiveFilters = activeFilterCols.some(col => {
     const f = filters[col.key]
     return f ? (Array.isArray(f) ? f.length > 0 : f.min !== '' || f.max !== '') : false
@@ -832,16 +838,16 @@ export default function PropertyViewerClient({ userId, companyId }: {
                       {showBadge && (
                         <div className="ph-type-badge" style={badgeStyle(badgeVal)}>{badgeVal}</div>
                       )}
-                      {titleVal && titleVal !== '—' && (
-                        <div className="ph-card-title">{titleVal}</div>
-                      )}
                       {subtitleVal && subtitleVal !== '—' && (
-                        <div className="ph-card-developer">{subtitleVal}</div>
+                        <div className="ph-city-badge">{subtitleVal}</div>
+                      )}
+                      {titleVal && titleVal !== '—' && (
+                        <div className="ph-card-project">{titleVal}</div>
                       )}
                     </div>
                     <div className="ph-card-body">
                       <div className="ph-card-specs">
-                        {specCols.slice(0, 5).map(col => {
+                        {nonPriceSpecCols.slice(0, 4).map(col => {
                           const val = row[col.key]
                           if (val == null || val === '') return null
                           return (
@@ -852,10 +858,20 @@ export default function PropertyViewerClient({ userId, companyId }: {
                           )
                         })}
                       </div>
+                      {priceSpecCol && (() => {
+                        const pv = row[priceSpecCol.key]
+                        if (pv == null || pv === '') return null
+                        return (
+                          <>
+                            <div className="ph-card-price">{fmt(pv)}</div>
+                            <div className="ph-card-price-sub">{priceSpecCol.label}</div>
+                          </>
+                        )
+                      })()}
                     </div>
                     <div className="ph-card-footer" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {cfg.cardColumns
-                        .filter(k => !specCols.find(c => c.key === k) && k !== cfg.titleColumn && k !== cfg.subtitleColumn && k !== cfg.badgeColumn)
+                        .filter(k => !nonPriceSpecCols.find(c => c.key === k) && k !== priceSpecCol?.key && k !== cfg.titleColumn && k !== cfg.subtitleColumn && k !== cfg.badgeColumn)
                         .slice(0, 2)
                         .map(k => {
                           const col = colByKey[k]
@@ -934,11 +950,17 @@ export default function PropertyViewerClient({ userId, companyId }: {
               <button className="ph-modal-close" onClick={() => setSelectedIdx(null)}>✕</button>
               <div className="ph-modal-header">
                 <div>
+                  {cfg.subtitleColumn && (() => {
+                    const sv = String(selectedProperty[cfg.subtitleColumn] ?? '')
+                    if (!sv || sv === '—') return null
+                    return (
+                      <div style={{ fontSize: 11, color: '#d7ff00', letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>
+                        {sv}
+                      </div>
+                    )
+                  })()}
                   {cfg.titleColumn && (
                     <div className="ph-modal-title">{String(selectedProperty[cfg.titleColumn] ?? '—')}</div>
-                  )}
-                  {cfg.subtitleColumn && (
-                    <div className="ph-modal-sub">{String(selectedProperty[cfg.subtitleColumn] ?? '—')}</div>
                   )}
                   {cfg.badgeColumn && (() => {
                     const bv = String(selectedProperty[cfg.badgeColumn] ?? '')
@@ -962,6 +984,16 @@ export default function PropertyViewerClient({ userId, companyId }: {
                 </div>
               </div>
               <div className="ph-modal-body">
+                {priceSpecCol && (() => {
+                  const pv = selectedProperty[priceSpecCol.key]
+                  if (pv == null || pv === '') return null
+                  return (
+                    <div style={{ marginBottom: 18 }}>
+                      <div className="ph-modal-price-big">{fmtFull(pv)}</div>
+                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', fontFamily: "'Montserrat', sans-serif" }}>{priceSpecCol.label}</div>
+                    </div>
+                  )
+                })()}
                 <dl className="ph-modal-grid">
                   {columns.map(col => {
                     const val = selectedProperty[col.key]
