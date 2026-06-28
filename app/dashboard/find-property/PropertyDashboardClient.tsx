@@ -321,6 +321,9 @@ export default function PropertyDashboardClient() {
   const [priceKpiState, setPriceKpiState] = useState(0)
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const [copiedModal, setCopiedModal] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState<number | null>(null)
+  const [pickerSelected, setPickerSelected] = useState<string[]>([])
+  const [modalPlanSelected, setModalPlanSelected] = useState<string[]>([])
 
   useEffect(() => {
     fetch('/property-data.json')
@@ -570,22 +573,47 @@ export default function PropertyDashboardClient() {
 
   useEffect(() => { setCopiedModal(false) }, [selectedIdx])
 
+  useEffect(() => {
+    if (selectedIdx === null) { setModalPlanSelected([]); return }
+    const prop = sorted[selectedIdx]
+    if (!prop) return
+    setModalPlanSelected((prop.plans || '').split('|').map(s => s.trim()).filter(Boolean))
+  }, [selectedIdx]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleCopy = useCallback((e: ReactMouseEvent, r: Property, idx: number) => {
     e.stopPropagation()
-    const msg = generatePropertyMessage(r)
+    const plans = (r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+    if (plans.length <= 1) {
+      const msg = generatePropertyMessage(r)
+      navigator.clipboard.writeText(msg).then(() => {
+        setCopiedIdx(idx)
+        setTimeout(() => setCopiedIdx(c => (c === idx ? null : c)), 2000)
+      })
+    } else if (pickerOpen === idx) {
+      setPickerOpen(null)
+    } else {
+      setPickerOpen(idx)
+      setPickerSelected(plans)
+    }
+  }, [pickerOpen])
+
+  const handlePickerCopy = useCallback((e: ReactMouseEvent, r: Property, idx: number) => {
+    e.stopPropagation()
+    const msg = generatePropertyMessage(r, pickerSelected)
     navigator.clipboard.writeText(msg).then(() => {
       setCopiedIdx(idx)
+      setPickerOpen(null)
       setTimeout(() => setCopiedIdx(c => (c === idx ? null : c)), 2000)
     })
-  }, [])
+  }, [pickerSelected])
 
   const handleCopyModal = useCallback((r: Property) => {
-    const msg = generatePropertyMessage(r)
+    const msg = generatePropertyMessage(r, modalPlanSelected)
     navigator.clipboard.writeText(msg).then(() => {
       setCopiedModal(true)
       setTimeout(() => setCopiedModal(false), 2000)
     })
-  }, [])
+  }, [modalPlanSelected])
 
   const handlePage = useCallback((p: number) => {
     if (p < 1 || p > totalPages) return
@@ -828,13 +856,41 @@ export default function PropertyDashboardClient() {
                     <span className={`ph-finish-badge ${finishClass(r.finish)}`}>{r.finish || '—'}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="ph-delivery-info">📅 <span>{r.delivery || '—'}</span></span>
-                      <button
-                        className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
-                        onClick={e => handleCopy(e, r, idx)}
-                        title="نسخ الرسالة التسويقية"
-                      >
-                        {copiedIdx === idx ? '✓' : '📋'}
-                      </button>
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
+                          onClick={e => handleCopy(e, r, idx)}
+                          title="نسخ الرسالة التسويقية"
+                        >
+                          {copiedIdx === idx ? '✓' : '📋'}
+                        </button>
+                        {pickerOpen === idx && (() => {
+                          const allPlans = (r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+                          return (
+                            <>
+                              <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
+                              <div className="ph-plan-picker" onClick={e => e.stopPropagation()}>
+                                <div className="ph-picker-title">أنظمة السداد</div>
+                                {allPlans.map((plan, pi) => (
+                                  <label key={pi} className="ph-picker-option">
+                                    <input
+                                      type="checkbox"
+                                      checked={pickerSelected.includes(plan)}
+                                      onChange={() => setPickerSelected(prev =>
+                                        prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
+                                      )}
+                                    />
+                                    <span>{plan}</span>
+                                  </label>
+                                ))}
+                                <button className="ph-picker-copy-btn" onClick={e => handlePickerCopy(e, r, idx)}>
+                                  نسخ
+                                </button>
+                              </div>
+                            </>
+                          )
+                        })()}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -870,13 +926,41 @@ export default function PropertyDashboardClient() {
                   </div>
                   <div className="ph-list-delivery">{r.delivery || '—'}</div>
                   <div className="ph-list-action">
-                    <button
-                      className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
-                      onClick={e => handleCopy(e, r, idx)}
-                      title="نسخ الرسالة التسويقية"
-                    >
-                      {copiedIdx === idx ? '✓' : '📋'}
-                    </button>
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
+                        onClick={e => handleCopy(e, r, idx)}
+                        title="نسخ الرسالة التسويقية"
+                      >
+                        {copiedIdx === idx ? '✓' : '📋'}
+                      </button>
+                      {pickerOpen === idx && (() => {
+                        const allPlans = (r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+                        return (
+                          <>
+                            <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
+                            <div className="ph-plan-picker" onClick={e => e.stopPropagation()}>
+                              <div className="ph-picker-title">أنظمة السداد</div>
+                              {allPlans.map((plan, pi) => (
+                                <label key={pi} className="ph-picker-option">
+                                  <input
+                                    type="checkbox"
+                                    checked={pickerSelected.includes(plan)}
+                                    onChange={() => setPickerSelected(prev =>
+                                      prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
+                                    )}
+                                  />
+                                  <span>{plan}</span>
+                                </label>
+                              ))}
+                              <button className="ph-picker-copy-btn" onClick={e => handlePickerCopy(e, r, idx)}>
+                                نسخ
+                              </button>
+                            </div>
+                          </>
+                        )
+                      })()}
+                    </div>
                     <span>›</span>
                   </div>
                 </div>
@@ -968,7 +1052,7 @@ export default function PropertyDashboardClient() {
                       <div className="ph-modal-field"><div className="f-label">Delivery</div><div className="f-value">{r.delivery || '—'}</div></div>
                       <div className="ph-modal-field">
                         <div className="f-label">Cash Discount</div>
-                        <div className="f-value" style={{ color: '#22c55e' }}>{r.discount ? r.discount + '%' : '—'}</div>
+                        <div className="f-value" style={{ color: '#22c55e' }}>{r.discount ? (parseFloat(String(r.discount)) > 99 ? 'EGP ' + fmt(r.discount) : r.discount + '%') : '—'}</div>
                       </div>
                       <div className="ph-modal-field"><div className="f-label">Maintenance</div><div className="f-value">{r.maint ? r.maint + '%' : '—'}</div></div>
                       <div className="ph-modal-field"><div className="f-label">Parking</div><div className="f-value">{r.parking || '—'}</div></div>
@@ -977,8 +1061,19 @@ export default function PropertyDashboardClient() {
                     {plans.length > 0 && (
                       <div className="ph-modal-section">
                         <h4>💳 Payment Plans</h4>
-                        <div className="ph-plans-list">
-                          {plans.map((p, i) => <div key={i} className="ph-plan-item">• {p}</div>)}
+                        <div className="ph-modal-plan-check">
+                          {plans.map((p, i) => (
+                            <label key={i} className="ph-modal-plan-option">
+                              <input
+                                type="checkbox"
+                                checked={modalPlanSelected.includes(p)}
+                                onChange={() => setModalPlanSelected(prev =>
+                                  prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]
+                                )}
+                              />
+                              <span>{p}</span>
+                            </label>
+                          ))}
                         </div>
                       </div>
                     )}

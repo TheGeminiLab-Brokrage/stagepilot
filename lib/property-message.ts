@@ -80,7 +80,7 @@ function cityCapitalize(s: string): string {
   return s.replace(/\b\w/g, c => c.toUpperCase())
 }
 
-export function generatePropertyMessage(r: PropertyInput): string {
+export function generatePropertyMessage(r: PropertyInput, selectedPlans?: string[]): string {
   const isStudio =
     parseInt(String(r.beds)) === 0 ||
     String(r.type).toLowerCase().includes('studio')
@@ -111,10 +111,13 @@ export function generatePropertyMessage(r: PropertyInput): string {
   lines.push(`💰 السعر: ${fmtPrice(r.price)} جنيه`)
 
   if (hasDiscount) {
-    lines.push(`💸 خصم كاش: ${r.discount}%`)
+    const discountNum = parseFloat(String(r.discount))
+    lines.push(discountNum > 99 ? `💸 خصم كاش: ${fmtPrice(r.discount)} جنيه` : `💸 خصم كاش: ${r.discount}%`)
   }
 
-  const plans = (r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+  const plans = selectedPlans !== undefined
+    ? selectedPlans
+    : (r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
   if (plans.length > 0) {
     lines.push('')
     lines.push('✅ أنظمة السداد:')
