@@ -66,16 +66,15 @@ function effectiveStage(call: Call): string {
   return (call.stage_corrected ?? call.stage ?? '').toLowerCase()
 }
 
-function CustomDonutLabel({ cx, cy, midAngle, outerRadius, value, percent }: {
-  cx: number; cy: number; midAngle: number; outerRadius: number; value: number; percent: number
-}) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function CustomDonutLabel({ cx, cy, midAngle, outerRadius, value, percent }: any) {
   if (!percent || percent < 0.02) return null
   const RADIAN = Math.PI / 180
-  const radius = outerRadius + 36
-  const x = cx + radius * Math.cos(-midAngle * RADIAN)
-  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+  const radius = (outerRadius ?? 0) + 36
+  const x = (cx ?? 0) + radius * Math.cos(-(midAngle ?? 0) * RADIAN)
+  const y = (cy ?? 0) + radius * Math.sin(-(midAngle ?? 0) * RADIAN)
   return (
-    <text x={x} y={y} fill="rgba(255,255,255,0.65)" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={10} fontFamily="'Space Grotesk', sans-serif">
+    <text x={x} y={y} fill="rgba(255,255,255,0.65)" textAnchor={x > (cx ?? 0) ? 'start' : 'end'} dominantBaseline="central" fontSize={10} fontFamily="'Space Grotesk', sans-serif">
       {value} ({(percent * 100).toFixed(2)}%)
     </text>
   )
