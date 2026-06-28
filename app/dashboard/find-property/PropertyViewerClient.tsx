@@ -212,7 +212,7 @@ function ConfigPanel({
                 onChange={e => setDraft(d => ({ ...d, titleColumn: e.target.value }))}
               >
                 <option value="">— None —</option>
-                {allKeys.map(k => <option key={k} value={k}>{colLabel(k)}</option>)}
+                {columns.map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
               </select>
             </div>
             <div>
@@ -225,7 +225,7 @@ function ConfigPanel({
                 onChange={e => setDraft(d => ({ ...d, subtitleColumn: e.target.value }))}
               >
                 <option value="">— None —</option>
-                {allKeys.map(k => <option key={k} value={k}>{colLabel(k)}</option>)}
+                {columns.map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
               </select>
             </div>
             <div>
@@ -238,7 +238,7 @@ function ConfigPanel({
                 onChange={e => setDraft(d => ({ ...d, badgeColumn: e.target.value }))}
               >
                 <option value="">— None —</option>
-                {allKeys.map(k => <option key={k} value={k}>{colLabel(k)}</option>)}
+                {columns.map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
               </select>
             </div>
           </div>
