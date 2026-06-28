@@ -476,7 +476,7 @@
 .ph-list-price    { flex: 1.2; font-size: 14px; font-weight: 800; color: #d7ff00; font-family: 'Space Grotesk', sans-serif; }
 .ph-list-finish   { flex: 1; }
 .ph-list-delivery { flex: 0.8; font-size: 11px; color: rgba(255, 255, 255, 0.35); font-family: 'Montserrat', sans-serif; }
-.ph-list-action   { flex: 0; width: 24px; text-align: right; color: rgba(255, 255, 255, 0.3); font-size: 18px; }
+.ph-list-action   { flex: 0; width: 60px; display: flex; align-items: center; justify-content: flex-end; gap: 6px; color: rgba(255, 255, 255, 0.3); font-size: 18px; }
 
 /* PAGINATION */
 .ph-pagination {
@@ -788,6 +788,60 @@
 }
 .ph-combo-list li.ph-combo-selected {
   color: #d7ff00;
+}
+
+/* COPY BUTTONS */
+.ph-copy-btn {
+  background: transparent;
+  border: 1px solid rgba(215, 255, 0, 0.18);
+  color: rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.ph-copy-btn:hover {
+  border-color: #d7ff00;
+  color: #d7ff00;
+}
+
+.ph-copy-btn.copied {
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #22c55e;
+}
+
+.ph-copy-modal-btn {
+  background: rgba(215, 255, 0, 0.07);
+  border: 1px solid rgba(215, 255, 0, 0.2);
+  color: rgba(215, 255, 0, 0.7);
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif;
+  transition: all 0.2s;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+
+.ph-copy-modal-btn:hover {
+  background: rgba(215, 255, 0, 0.12);
+  color: #d7ff00;
+  border-color: rgba(215, 255, 0, 0.4);
+}
+
+.ph-copy-modal-btn.copied {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #22c55e;
 }
 
 /* RESPONSIVE */

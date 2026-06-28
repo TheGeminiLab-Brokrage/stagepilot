@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent as ReactMouseEvent } from 'react'
 import './property.css'
+import { generatePropertyMessage } from '@/lib/property-message'
 
 type Property = {
   city: string
@@ -318,6 +319,8 @@ export default function PropertyDashboardClient() {
   const [page, setPage] = useState(1)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [priceKpiState, setPriceKpiState] = useState(0)
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+  const [copiedModal, setCopiedModal] = useState(false)
 
   useEffect(() => {
     fetch('/property-data.json')
@@ -565,6 +568,25 @@ export default function PropertyDashboardClient() {
     return () => window.removeEventListener('keydown', handler)
   }, [selectedIdx])
 
+  useEffect(() => { setCopiedModal(false) }, [selectedIdx])
+
+  const handleCopy = useCallback((e: ReactMouseEvent, r: Property, idx: number) => {
+    e.stopPropagation()
+    const msg = generatePropertyMessage(r)
+    navigator.clipboard.writeText(msg).then(() => {
+      setCopiedIdx(idx)
+      setTimeout(() => setCopiedIdx(c => (c === idx ? null : c)), 2000)
+    })
+  }, [])
+
+  const handleCopyModal = useCallback((r: Property) => {
+    const msg = generatePropertyMessage(r)
+    navigator.clipboard.writeText(msg).then(() => {
+      setCopiedModal(true)
+      setTimeout(() => setCopiedModal(false), 2000)
+    })
+  }, [])
+
   const handlePage = useCallback((p: number) => {
     if (p < 1 || p > totalPages) return
     setPage(p)
@@ -804,7 +826,16 @@ export default function PropertyDashboardClient() {
                   </div>
                   <div className="ph-card-footer">
                     <span className={`ph-finish-badge ${finishClass(r.finish)}`}>{r.finish || '—'}</span>
-                    <span className="ph-delivery-info">📅 <span>{r.delivery || '—'}</span></span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="ph-delivery-info">📅 <span>{r.delivery || '—'}</span></span>
+                      <button
+                        className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
+                        onClick={e => handleCopy(e, r, idx)}
+                        title="نسخ الرسالة التسويقية"
+                      >
+                        {copiedIdx === idx ? '✓' : '📋'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )
@@ -838,7 +869,16 @@ export default function PropertyDashboardClient() {
                     <span className={`ph-finish-badge ${finishClass(r.finish)}`}>{r.finish || '—'}</span>
                   </div>
                   <div className="ph-list-delivery">{r.delivery || '—'}</div>
-                  <div className="ph-list-action">›</div>
+                  <div className="ph-list-action">
+                    <button
+                      className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
+                      onClick={e => handleCopy(e, r, idx)}
+                      title="نسخ الرسالة التسويقية"
+                    >
+                      {copiedIdx === idx ? '✓' : '📋'}
+                    </button>
+                    <span>›</span>
+                  </div>
                 </div>
               )
             })}
@@ -892,7 +932,15 @@ export default function PropertyDashboardClient() {
                       <div className="ph-modal-title">{r.project}</div>
                       <div className="ph-modal-sub">{r.developer}</div>
                     </div>
-                    <button className="ph-modal-close" onClick={() => setSelectedIdx(null)}>×</button>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexShrink: 0 }}>
+                      <button
+                        className={`ph-copy-modal-btn${copiedModal ? ' copied' : ''}`}
+                        onClick={() => handleCopyModal(r)}
+                      >
+                        {copiedModal ? '✓ تم النسخ' : '📋 نسخ الرسالة'}
+                      </button>
+                      <button className="ph-modal-close" onClick={() => setSelectedIdx(null)}>×</button>
+                    </div>
                   </div>
 
                   <div className="ph-modal-body">
