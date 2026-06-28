@@ -166,9 +166,12 @@ export default function PerformanceDashboard({
   const chips = useMemo(() => {
     if (role === 'agent') return []
     if (isUsingCrm) {
+      const excluded = new Set(['omnia'])
       const seen = new Map<string, string>()
       for (const c of crmDerivedCalls ?? []) {
-        if (c.agent_id && !seen.has(c.agent_id)) seen.set(c.agent_id, c.agent_full_name ?? c.agent_id)
+        if (c.agent_id && !seen.has(c.agent_id) && !excluded.has(c.agent_id.toLowerCase())) {
+          seen.set(c.agent_id, c.agent_full_name ?? c.agent_id)
+        }
       }
       return [...seen.entries()].map(([id, name]) => ({ key: id, label: name }))
     }
