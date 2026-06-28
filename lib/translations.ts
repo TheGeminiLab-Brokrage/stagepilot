@@ -15,6 +15,7 @@ const en = {
   roleSuperAdmin: 'Super Admin',
   roleTrainee: 'Trainee',
   roleExam: 'Exam',
+  rolePropertyViewer: 'Property Viewer',
 
   // ── Dashboard page header ─────────────────────────────────────────────────
   headingMyCalls: 'My Calls',
@@ -313,6 +314,7 @@ const ar: typeof en = {
   roleSuperAdmin: 'مدير النظام',
   roleTrainee: 'متدرب',
   roleExam: 'امتحان',
+  rolePropertyViewer: 'مشاهد العقارات',
 
   // ── Dashboard page header ─────────────────────────────────────────────────
   headingMyCalls: 'مكالماتي',

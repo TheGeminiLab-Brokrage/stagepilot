@@ -32,6 +32,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (role === 'exam' && !pathname.startsWith('/dashboard/exam') && !pathname.startsWith('/dashboard/find-property')) {
     redirect('/dashboard/exam')
   }
+  if (role === 'property_viewer' && !pathname.startsWith('/dashboard/find-property')) {
+    redirect('/dashboard/find-property')
+  }
 
   return (
     <LanguageWrapper initialLang={initialLang}>

@@ -94,6 +94,7 @@ export default function CreateUserForm({ teamLeaders, onCreated }: { teamLeaders
             <option value="team_leader" style={{ background: '#0f0f0f', color: '#fff' }}>{t('roleTeamLeader')}</option>
             <option value="trainee" style={{ background: '#0f0f0f', color: '#fff' }}>{t('roleTrainee')}</option>
             <option value="exam" style={{ background: '#0f0f0f', color: '#fff' }}>{t('adminRoleExam')}</option>
+            <option value="property_viewer" style={{ background: '#0f0f0f', color: '#fff' }}>{t('rolePropertyViewer')}</option>
             <option value="super_admin" style={{ background: '#0f0f0f', color: '#fff' }}>{t('roleSuperAdmin')}</option>
           </select>
         </div>

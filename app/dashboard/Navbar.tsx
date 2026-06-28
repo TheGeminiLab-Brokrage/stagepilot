@@ -9,12 +9,13 @@ interface NavbarProps {
   rightSlot?: React.ReactNode
 }
 
-const ROLE_KEY_MAP: Record<string, 'roleAgent' | 'roleTeamLeader' | 'roleSuperAdmin' | 'roleTrainee' | 'roleExam'> = {
+const ROLE_KEY_MAP: Record<string, 'roleAgent' | 'roleTeamLeader' | 'roleSuperAdmin' | 'roleTrainee' | 'roleExam' | 'rolePropertyViewer'> = {
   agent: 'roleAgent',
   team_leader: 'roleTeamLeader',
   super_admin: 'roleSuperAdmin',
   trainee: 'roleTrainee',
   exam: 'roleExam',
+  property_viewer: 'rolePropertyViewer',
 }
 
 export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
@@ -27,6 +28,8 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
       ? [{ href: '/dashboard/practice', label: t('navAiPractice') }]
       : role === 'exam'
       ? [{ href: '/dashboard/exam', label: t('navExam') }]
+      : role === 'property_viewer'
+      ? []
       : [
           { href: '/dashboard', label: role === 'agent' ? t('navMyCalls') : t('navTeamCalls') },
           { href: '/dashboard/performance', label: 'Performance' },
