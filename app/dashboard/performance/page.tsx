@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import PerformanceDashboard from './PerformanceDashboard'
 
 export default async function PerformancePage() {
@@ -40,7 +41,20 @@ export default async function PerformancePage() {
     agent_full_name: agentMap[c.agent_id] ?? null,
   }))
 
+  // Load the most recently saved CRM export (for Leads Over Stages chart)
+  const admin = createAdminClient()
+  const { data: crmExportRow } = await admin
+    .from('crm_exports')
+    .select('date_from, date_to, data, saved_at')
+    .order('saved_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  const crmExport = crmExportRow
+    ? { data: crmExportRow.data as Record<string, unknown>[], dateFrom: crmExportRow.date_from, dateTo: crmExportRow.date_to }
+    : null
+
   return (
-    <PerformanceDashboard calls={calls} role={role} />
+    <PerformanceDashboard calls={calls} role={role} crmExport={crmExport} />
   )
 }
