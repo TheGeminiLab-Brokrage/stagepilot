@@ -331,6 +331,8 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [sheets, setSheets] = useState<SheetRecord[]>([])
   const [columns, setColumns] = useState<ColumnMeta[]>([])
   const [rows, setRows] = useState<RawRow[]>([])
+  const [rowSheetIds, setRowSheetIds] = useState<string[]>([])
+  const [selectedSheetIds, setSelectedSheetIds] = useState<Set<string>>(new Set())
   const [config, setConfig] = useState<ViewConfig | null>(null)
   const [filters, setFilters] = useState<FilterState>({})
   const [sort, setSort] = useState('')
@@ -365,17 +367,19 @@ export default function PropertyViewerClient({ userId, companyId }: {
 
       const { data: propRows } = await supabase
         .from('property_rows')
-        .select('data')
+        .select('sheet_id, data')
         .order('id', { ascending: true })
 
       const typedSheets = sheetRows as SheetRecord[]
       const merged = mergeColumnMeta(typedSheets.map(s => s.columns as ColumnMeta[]))
-      const allRows = (propRows ?? []).map((r: { data: RawRow }) => r.data)
+      const allRows = (propRows ?? []).map((r: { sheet_id: string; data: RawRow }) => r.data)
+      const allSheetIds = (propRows ?? []).map((r: { sheet_id: string; data: RawRow }) => r.sheet_id)
       const cfg = loadConfig(userId, merged)
 
       setSheets(typedSheets)
       setColumns(merged)
       setRows(allRows)
+      setRowSheetIds(allSheetIds)
       applyConfig(cfg, merged)
       setPhase('loaded')
     }
@@ -432,6 +436,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
           return next
         })
         setRows(prev => [...prev, ...allRows])
+        setRowSheetIds(prev => [...prev, ...Array(allRows.length).fill(sheetRecord.id)])
       }
       setPhase('loaded')
     } catch (err) {
@@ -443,19 +448,30 @@ export default function PropertyViewerClient({ userId, companyId }: {
     }
   }
 
+  function toggleSheet(sheetId: string) {
+    setSelectedSheetIds(prev => {
+      const next = new Set(prev)
+      if (next.has(sheetId)) next.delete(sheetId); else next.add(sheetId)
+      return next
+    })
+    setPage(1)
+  }
+
   async function deleteSheet(sheetId: string) {
     await supabase.from('property_sheets').delete().eq('id', sheetId)
     const nextSheets = sheets.filter(s => s.id !== sheetId)
     setSheets(nextSheets)
+    setSelectedSheetIds(prev => { const n = new Set(prev); n.delete(sheetId); return n })
     if (nextSheets.length === 0) {
-      setRows([]); setColumns([]); setConfig(null); setFilters({}); setPhase('empty')
+      setRows([]); setRowSheetIds([]); setColumns([]); setConfig(null); setFilters({}); setPhase('empty')
       return
     }
-    const { data: propRows } = await supabase.from('property_rows').select('data').order('id', { ascending: true })
-    const allRows = (propRows ?? []).map((r: { data: RawRow }) => r.data)
+    const { data: propRows } = await supabase.from('property_rows').select('sheet_id, data').order('id', { ascending: true })
+    const allRows = (propRows ?? []).map((r: { sheet_id: string; data: RawRow }) => r.data)
+    const allSheetIds = (propRows ?? []).map((r: { sheet_id: string; data: RawRow }) => r.sheet_id)
     const merged = mergeColumnMeta(nextSheets.map(s => s.columns as ColumnMeta[]))
     const cfg = loadConfig(userId, merged)
-    setRows(allRows); setColumns(merged); applyConfig(cfg, merged)
+    setRows(allRows); setRowSheetIds(allSheetIds); setColumns(merged); applyConfig(cfg, merged)
   }
 
   // Derived data
@@ -464,7 +480,12 @@ export default function PropertyViewerClient({ userId, companyId }: {
     [columns, config]
   )
 
-  const filtered = useMemo(() => filterRows(rows, filters, activeFilterCols), [rows, filters, activeFilterCols])
+  const visibleRows = useMemo(
+    () => selectedSheetIds.size === 0 ? rows : rows.filter((_, i) => selectedSheetIds.has(rowSheetIds[i])),
+    [rows, rowSheetIds, selectedSheetIds]
+  )
+
+  const filtered = useMemo(() => filterRows(visibleRows, filters, activeFilterCols), [visibleRows, filters, activeFilterCols])
 
   const sorted = useMemo(() => {
     if (!sort) return filtered
@@ -650,22 +671,39 @@ export default function PropertyViewerClient({ userId, companyId }: {
 
         {sheets.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', flex: 1, scrollbarWidth: 'none', msOverflowStyle: 'none', paddingLeft: 8, borderLeft: '1px solid rgba(255,255,255,0.08)', marginLeft: 4 }}>
-            {sheets.map(sheet => (
-              <span key={sheet.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '3px 8px 3px 10px', fontSize: 11, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', fontFamily: "'Space Grotesk', sans-serif" }}>
-                {sheet.file_name}
-                <button
-                  onClick={() => deleteSheet(sheet.id)}
-                  title={`Remove ${sheet.file_name}`}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 0, lineHeight: 1, display: 'inline-flex', alignItems: 'center', transition: 'color 0.15s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)' }}
+            {sheets.map(sheet => {
+              const isSelected = selectedSheetIds.has(sheet.id)
+              const hasSelection = selectedSheetIds.size > 0
+              return (
+                <span
+                  key={sheet.id}
+                  onClick={() => toggleSheet(sheet.id)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    background: isSelected ? 'rgba(215,255,0,0.06)' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${isSelected ? 'rgba(215,255,0,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: 20, padding: '3px 8px 3px 10px', fontSize: 11,
+                    color: isSelected ? 'rgba(215,255,0,0.9)' : 'rgba(255,255,255,0.6)',
+                    whiteSpace: 'nowrap', fontFamily: "'Space Grotesk', sans-serif",
+                    cursor: 'pointer', transition: 'all 0.15s',
+                    opacity: hasSelection && !isSelected ? 0.4 : 1,
+                  }}
                 >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </span>
-            ))}
+                  {sheet.file_name}
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteSheet(sheet.id) }}
+                    title={`Remove ${sheet.file_name}`}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSelected ? 'rgba(215,255,0,0.4)' : 'rgba(255,255,255,0.35)', padding: 0, lineHeight: 1, display: 'inline-flex', alignItems: 'center', transition: 'color 0.15s' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = isSelected ? 'rgba(215,255,0,0.4)' : 'rgba(255,255,255,0.35)' }}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </span>
+              )
+            })}
           </div>
         )}
 
