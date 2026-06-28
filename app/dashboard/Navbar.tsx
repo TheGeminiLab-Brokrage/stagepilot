@@ -30,6 +30,15 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
       ? [{ href: '/dashboard/exam', label: t('navExam') }]
       : role === 'property_viewer'
       ? []
+      : role === 'super_admin'
+      ? [
+          { href: '/dashboard/find-property', label: 'Find a Property' },
+          { href: '/dashboard/performance', label: 'Performance' },
+          { href: '/dashboard/admin/reports', label: t('navReports') },
+          { href: '/dashboard', label: t('navTeamCalls') },
+          { href: '/dashboard/admin', label: t('navAdmin') },
+          { href: '/dashboard/admin/knowledge-base', label: t('navKnowledgeBase') },
+        ]
       : [
           { href: '/dashboard/find-property', label: 'Find a Property' },
           ...(role === 'agent' ? [
@@ -40,11 +49,6 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
           { href: '/dashboard', label: role === 'agent' ? t('navMyCalls') : t('navTeamCalls') },
           ...(role === 'agent' ? [
             { href: '/dashboard/upload', label: t('navUploadCall') },
-          ] : []),
-          ...(role === 'super_admin' ? [
-            { href: '/dashboard/admin', label: t('navAdmin') },
-            { href: '/dashboard/admin/knowledge-base', label: t('navKnowledgeBase') },
-            { href: '/dashboard/admin/reports', label: t('navReports') },
           ] : []),
         ]
 
