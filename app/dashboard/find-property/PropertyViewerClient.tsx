@@ -6,6 +6,7 @@ import MultiCombobox from '@/app/dashboard/components/MultiCombobox'
 import { parseExcelFile, type RawRow } from '@/lib/excel-parser'
 import { analyzeColumns, mergeColumnMeta, type ColumnMeta } from '@/lib/column-analyzer'
 import { fmt, fmtFull } from '@/lib/property-utils'
+import { generatePropertyMessage } from '@/lib/property-message'
 import './property.css'
 
 const PAGE_SIZE = 24
@@ -31,6 +32,85 @@ interface ViewConfig {
 type NumericFilter = { min: string; max: string }
 type FilterValue = string[] | NumericFilter
 type FilterState = Record<string, FilterValue>
+
+const FIELD_LABELS: Record<string, string> = {
+  code: 'كود الوحدة', phase: 'المرحلة / المبنى', floor: 'الدور',
+  area: 'المساحة', price: 'السعر', discount: 'خصم الكاش',
+  delivery: 'التسليم', maint: 'الصيانة', parking: 'موقف السيارة',
+}
+
+const PROP_PATTERNS: Record<string, RegExp> = {
+  code:      /unit.?no|unit.?num|كود/i,
+  phase:     /phase|building|block|مرحلة|مبنى/i,
+  floor:     /^floor$|الدور/i,
+  area:      /^bua$|^area$|built.?up|مساحة/i,
+  garden:    /garden|حديقة/i,
+  roof:      /roof|روف/i,
+  price:     /price|nominal|سعر/i,
+  discount:  /discount|خصم/i,
+  delivery:  /delivery|تسليم/i,
+  maint:     /maint|صيانة/i,
+  parking:   /parking|موقف/i,
+  beds:      /bed|room|غرف/i,
+  type:      /type|usage|نوع/i,
+  project:   /project|مشروع/i,
+  developer: /developer|مطور/i,
+  city:      /city|location|مدينة/i,
+  finish:    /finish|تشطيب/i,
+  plans:     /plan|payment|خطة|دفع/i,
+}
+
+function detectColMap(columns: ColumnMeta[]): Partial<Record<string, string>> {
+  const map: Partial<Record<string, string>> = {}
+  for (const [propKey, pattern] of Object.entries(PROP_PATTERNS)) {
+    const col = columns.find(c => pattern.test(c.key) || pattern.test(c.label))
+    if (col) map[propKey] = col.key
+  }
+  return map
+}
+
+function buildPropInput(row: RawRow, m: Partial<Record<string, string>>) {
+  const g = (k: string) => (m[k] ? String(row[m[k]!] ?? '') : '')
+  return {
+    city: g('city'), project: g('project'), developer: g('developer'),
+    type: g('type'), beds: g('beds'), area: g('area'),
+    garden: g('garden'), roof: g('roof'), finish: g('finish'),
+    price: g('price'), discount: g('discount'), delivery: g('delivery'),
+    maint: g('maint'), plans: g('plans'),
+    code: g('code'), phase: g('phase'), floor: g('floor'), parking: g('parking'),
+  }
+}
+
+function getAvailablePropFields(p: ReturnType<typeof buildPropInput>): string[] {
+  const f: string[] = []
+  if (p.code) f.push('code')
+  if (p.phase) f.push('phase')
+  if (p.floor !== '' && p.floor !== undefined) f.push('floor')
+  if (p.area) f.push('area')
+  if (p.price) f.push('price')
+  if (parseFloat(String(p.discount)) > 0) f.push('discount')
+  if (p.delivery) f.push('delivery')
+  if (parseFloat(String(p.maint)) > 0) f.push('maint')
+  if (p.parking && p.parking !== '—') f.push('parking')
+  return f
+}
+
+function fieldValuePreview(p: ReturnType<typeof buildPropInput>, field: string): string {
+  switch (field) {
+    case 'code':     return String(p.code)
+    case 'phase':    return String(p.phase)
+    case 'floor':    return String(p.floor)
+    case 'area':     return `${p.area} م²`
+    case 'price':    return `${parseFloat(String(p.price)).toLocaleString('en-EG')} ج`
+    case 'discount': return parseFloat(String(p.discount)) > 99
+                       ? `${parseFloat(String(p.discount)).toLocaleString('en-EG')} ج`
+                       : `${p.discount}%`
+    case 'delivery': return String(p.delivery)
+    case 'maint':    return `${p.maint}%`
+    case 'parking':  return String(p.parking)
+    default:         return ''
+  }
+}
 
 // Returns inline styles for status badge based on value text
 function badgeStyle(value: string): React.CSSProperties {
@@ -333,6 +413,9 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [rows, setRows] = useState<RawRow[]>([])
   const [rowSheetIds, setRowSheetIds] = useState<string[]>([])
   const [selectedSheetIds, setSelectedSheetIds] = useState<Set<string>>(new Set())
+  const [tabsBySheetId, setTabsBySheetId] = useState<Record<string, string[]>>({})
+  const [selectedTabsBySheetId, setSelectedTabsBySheetId] = useState<Record<string, Set<string>>>({})
+  const [openTabDropdownId, setOpenTabDropdownId] = useState<string | null>(null)
   const [config, setConfig] = useState<ViewConfig | null>(null)
   const [filters, setFilters] = useState<FilterState>({})
   const [sort, setSort] = useState('')
@@ -342,6 +425,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [pickerOpen, setPickerOpen] = useState<number | null>(null)
   const [pickerFields, setPickerFields] = useState<string[]>([])
+  const [pickerPlans, setPickerPlans] = useState<string[]>([])
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const [showConfig, setShowConfig] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -379,10 +463,20 @@ export default function PropertyViewerClient({ userId, companyId }: {
       const allSheetIds = (propRows ?? []).map((r: { sheet_id: string; data: RawRow }) => r.sheet_id)
       const cfg = loadConfig(userId, merged)
 
+      const tabsMap: Record<string, string[]> = {}
+      ;(propRows ?? []).forEach((r: { sheet_id: string; data: RawRow }) => {
+        const tab = r.data?.__tab
+        if (tab && typeof tab === 'string') {
+          if (!tabsMap[r.sheet_id]) tabsMap[r.sheet_id] = []
+          if (!tabsMap[r.sheet_id].includes(tab)) tabsMap[r.sheet_id].push(tab)
+        }
+      })
+
       setSheets(typedSheets)
       setColumns(merged)
       setRows(allRows)
       setRowSheetIds(allSheetIds)
+      setTabsBySheetId(tabsMap)
       applyConfig(cfg, merged)
       setPhase('loaded')
     }
@@ -391,11 +485,20 @@ export default function PropertyViewerClient({ userId, companyId }: {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setSelectedIdx(null); setShowConfig(false) }
+      if (e.key === 'Escape') { setSelectedIdx(null); setShowConfig(false); setOpenTabDropdownId(null) }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [])
+
+  useEffect(() => {
+    if (!openTabDropdownId) return
+    function handleClick(e: MouseEvent) {
+      if (!(e.target as Element).closest('[data-tab-dropdown]')) setOpenTabDropdownId(null)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [openTabDropdownId])
 
   function handleSaveConfig(newConfig: ViewConfig) {
     saveConfig(userId, newConfig)
@@ -411,7 +514,10 @@ export default function PropertyViewerClient({ userId, companyId }: {
         const parsed = await parseExcelFile(file)
         // Merge all worksheet tabs into one combined record per file
         const allHeaders = Array.from(new Set(parsed.flatMap(s => s.headers)))
-        const allRows = parsed.flatMap(s => s.rows)
+        const hasMultipleTabs = parsed.length > 1
+        const allRows = parsed.flatMap(s =>
+          hasMultipleTabs ? s.rows.map(r => ({ ...r, __tab: s.sheetName })) : s.rows
+        )
         if (allRows.length === 0) continue
         const colMeta = analyzeColumns(allRows, allHeaders)
 
@@ -440,6 +546,9 @@ export default function PropertyViewerClient({ userId, companyId }: {
         })
         setRows(prev => [...prev, ...allRows])
         setRowSheetIds(prev => [...prev, ...Array(allRows.length).fill(sheetRecord.id)])
+        if (hasMultipleTabs) {
+          setTabsBySheetId(prev => ({ ...prev, [sheetRecord.id]: parsed.map(s => s.sheetName) }))
+        }
       }
       setPhase('loaded')
     } catch (err) {
@@ -451,30 +560,25 @@ export default function PropertyViewerClient({ userId, companyId }: {
     }
   }
 
-  function generateViewerMessage(row: RawRow, selectedFields: string[]): string {
-    const title = config?.titleColumn ? String(row[config.titleColumn] ?? '') : ''
-    const lines = selectedFields
-      .filter(k => k !== config?.titleColumn && row[k] != null && String(row[k]) !== '')
-      .map(k => {
-        const col = columns.find(c => c.key === k)
-        const label = col?.label ?? k
-        return `${label}: ${row[k]}`
-      })
-    return [title, ...lines].filter(Boolean).join('\n')
-  }
-
   function handleCopyOpen(e: ReactMouseEvent, row: RawRow, idx: number) {
     e.stopPropagation()
     if (pickerOpen === idx) { setPickerOpen(null); return }
-    const defaults = columns.filter(c => row[c.key] != null && String(row[c.key]) !== '').map(c => c.key)
-    setPickerFields(defaults)
+    const colMap = detectColMap(columns)
+    const propInput = buildPropInput(row, colMap)
+    setPickerFields(getAvailablePropFields(propInput))
+    setPickerPlans(String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean))
     setPickerOpen(idx)
   }
 
   function handlePickerCopy(e: ReactMouseEvent, row: RawRow, idx: number) {
     e.stopPropagation()
-    const text = generateViewerMessage(row, pickerFields)
-    navigator.clipboard.writeText(text)
+    const colMap = detectColMap(columns)
+    const propInput = buildPropInput(row, colMap)
+    const fields = Object.fromEntries(
+      ['code','phase','floor','area','price','discount','delivery','maint','parking'].map(k => [k, pickerFields.includes(k)])
+    ) as Record<string, boolean>
+    const msg = generatePropertyMessage(propInput as Parameters<typeof generatePropertyMessage>[0], pickerPlans, fields)
+    navigator.clipboard.writeText(msg)
     setCopiedIdx(idx)
     setPickerOpen(null)
     setTimeout(() => setCopiedIdx(null), 2000)
@@ -489,11 +593,23 @@ export default function PropertyViewerClient({ userId, companyId }: {
     setPage(1)
   }
 
+  function toggleTab(sheetId: string, tabName: string) {
+    setSelectedTabsBySheetId(prev => {
+      const current = new Set(prev[sheetId] ?? [])
+      if (current.has(tabName)) current.delete(tabName); else current.add(tabName)
+      return { ...prev, [sheetId]: current }
+    })
+    setPage(1)
+  }
+
   async function deleteSheet(sheetId: string) {
     await supabase.from('property_sheets').delete().eq('id', sheetId)
     const nextSheets = sheets.filter(s => s.id !== sheetId)
     setSheets(nextSheets)
     setSelectedSheetIds(prev => { const n = new Set(prev); n.delete(sheetId); return n })
+    setTabsBySheetId(prev => { const n = { ...prev }; delete n[sheetId]; return n })
+    setSelectedTabsBySheetId(prev => { const n = { ...prev }; delete n[sheetId]; return n })
+    if (openTabDropdownId === sheetId) setOpenTabDropdownId(null)
     if (nextSheets.length === 0) {
       setRows([]); setRowSheetIds([]); setColumns([]); setConfig(null); setFilters({}); setPhase('empty')
       return
@@ -512,10 +628,21 @@ export default function PropertyViewerClient({ userId, companyId }: {
     [columns, config]
   )
 
-  const visibleRows = useMemo(
-    () => selectedSheetIds.size === 0 ? rows : rows.filter((_, i) => selectedSheetIds.has(rowSheetIds[i])),
-    [rows, rowSheetIds, selectedSheetIds]
-  )
+  const visibleRows = useMemo(() => {
+    const hasSheetFilter = selectedSheetIds.size > 0
+    const hasTabFilter = Object.values(selectedTabsBySheetId).some(s => s.size > 0)
+    if (!hasSheetFilter && !hasTabFilter) return rows
+    return rows.filter((row, i) => {
+      const sheetId = rowSheetIds[i]
+      if (selectedSheetIds.has(sheetId)) return true
+      const selectedTabs = selectedTabsBySheetId[sheetId]
+      if (selectedTabs && selectedTabs.size > 0) {
+        const tab = row.__tab as string | undefined
+        return tab ? selectedTabs.has(tab) : true
+      }
+      return false
+    })
+  }, [rows, rowSheetIds, selectedSheetIds, selectedTabsBySheetId])
 
   const filtered = useMemo(() => filterRows(visibleRows, filters, activeFilterCols), [visibleRows, filters, activeFilterCols])
 
@@ -704,35 +831,107 @@ export default function PropertyViewerClient({ userId, companyId }: {
         {sheets.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', flex: 1, scrollbarWidth: 'none', msOverflowStyle: 'none', paddingLeft: 8, borderLeft: '1px solid rgba(255,255,255,0.08)', marginLeft: 4 }}>
             {sheets.map(sheet => {
-              const isSelected = selectedSheetIds.has(sheet.id)
-              const hasSelection = selectedSheetIds.size > 0
+              const tabs = tabsBySheetId[sheet.id] ?? []
+              const isMultiTab = tabs.length > 1
+              const selectedTabs = selectedTabsBySheetId[sheet.id]
+              const selectedTabCount = selectedTabs?.size ?? 0
+              // Multi-tab: highlighted when any tab selected. Single-tab: highlighted when file toggled.
+              const isActive = isMultiTab ? selectedTabCount > 0 : selectedSheetIds.has(sheet.id)
+              const hasAnyFilter = selectedSheetIds.size > 0 || Object.values(selectedTabsBySheetId).some(s => s.size > 0)
+              const isDropdownOpen = openTabDropdownId === sheet.id
+
               return (
                 <span
                   key={sheet.id}
-                  onClick={() => toggleSheet(sheet.id)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    background: isSelected ? 'rgba(215,255,0,0.06)' : 'rgba(255,255,255,0.06)',
-                    border: `1px solid ${isSelected ? 'rgba(215,255,0,0.5)' : 'rgba(255,255,255,0.1)'}`,
-                    borderRadius: 20, padding: '3px 8px 3px 10px', fontSize: 11,
-                    color: isSelected ? 'rgba(215,255,0,0.9)' : 'rgba(255,255,255,0.6)',
-                    whiteSpace: 'nowrap', fontFamily: "'Space Grotesk', sans-serif",
-                    cursor: 'pointer', transition: 'all 0.15s',
-                    opacity: hasSelection && !isSelected ? 0.4 : 1,
-                  }}
+                  data-tab-dropdown
+                  style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column' }}
                 >
-                  {sheet.file_name}
-                  <button
-                    onClick={e => { e.stopPropagation(); deleteSheet(sheet.id) }}
-                    title={`Remove ${sheet.file_name}`}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSelected ? 'rgba(215,255,0,0.4)' : 'rgba(255,255,255,0.35)', padding: 0, lineHeight: 1, display: 'inline-flex', alignItems: 'center', transition: 'color 0.15s' }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = isSelected ? 'rgba(215,255,0,0.4)' : 'rgba(255,255,255,0.35)' }}
+                  <span
+                    onClick={() => isMultiTab
+                      ? setOpenTabDropdownId(isDropdownOpen ? null : sheet.id)
+                      : toggleSheet(sheet.id)
+                    }
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      background: isActive ? 'rgba(215,255,0,0.06)' : 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${isActive ? 'rgba(215,255,0,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: 20, padding: '3px 8px 3px 10px', fontSize: 11,
+                      color: isActive ? 'rgba(215,255,0,0.9)' : 'rgba(255,255,255,0.6)',
+                      whiteSpace: 'nowrap', fontFamily: "'Space Grotesk', sans-serif",
+                      cursor: 'pointer', transition: 'all 0.15s',
+                      opacity: hasAnyFilter && !isActive ? 0.4 : 1,
+                    }}
                   >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
+                    {sheet.file_name}
+                    {isMultiTab && selectedTabCount > 0 && (
+                      <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 8, background: 'rgba(215,255,0,0.15)', color: 'rgba(215,255,0,0.9)', fontWeight: 700 }}>
+                        {selectedTabCount}/{tabs.length}
+                      </span>
+                    )}
+                    {isMultiTab && (
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                        style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', opacity: 0.6 }}>
+                        <polyline points="6 9 12 15 18 9"/>
+                      </svg>
+                    )}
+                    <button
+                      onClick={e => { e.stopPropagation(); deleteSheet(sheet.id) }}
+                      title={`Remove ${sheet.file_name}`}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: isActive ? 'rgba(215,255,0,0.4)' : 'rgba(255,255,255,0.35)', padding: 0, lineHeight: 1, display: 'inline-flex', alignItems: 'center', transition: 'color 0.15s' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = isActive ? 'rgba(215,255,0,0.4)' : 'rgba(255,255,255,0.35)' }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </span>
+
+                  {/* Tab dropdown — only for multi-tab files */}
+                  {isMultiTab && isDropdownOpen && (
+                    <div
+                      data-tab-dropdown
+                      style={{
+                        position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200,
+                        background: 'rgba(12,12,12,0.98)', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 8, padding: '4px 0', minWidth: 160,
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      {tabs.map(tab => {
+                        const checked = selectedTabs?.has(tab) ?? false
+                        return (
+                          <label
+                            key={tab}
+                            onClick={() => toggleTab(sheet.id, tab)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                              color: checked ? 'rgba(215,255,0,0.9)' : 'rgba(255,255,255,0.7)',
+                              transition: 'background 0.1s',
+                            }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLLabelElement).style.background = 'rgba(255,255,255,0.05)' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLLabelElement).style.background = 'transparent' }}
+                          >
+                            <span style={{
+                              width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                              border: `1px solid ${checked ? 'rgba(215,255,0,0.7)' : 'rgba(255,255,255,0.2)'}`,
+                              background: checked ? 'rgba(215,255,0,0.15)' : 'transparent',
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                              {checked && (
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="rgba(215,255,0,0.9)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                              )}
+                            </span>
+                            {tab}
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
                 </span>
               )
             })}
@@ -1002,33 +1201,62 @@ export default function PropertyViewerClient({ userId, companyId }: {
                         {copiedIdx === idx ? '✓' : '📋'}
                       </button>
                     </div>
-                    {pickerOpen === idx && (
-                      <>
-                        <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
-                        <div className="ph-plan-picker" style={{ right: 0, left: 'auto', bottom: '100%', top: 'auto', minWidth: 220 }}>
-                          <div className="ph-picker-title">Message Content</div>
-                          <div className="ph-picker-section" data-label="Fields">
-                            {columns.filter(c => row[c.key] != null && String(row[c.key]) !== '').map(col => (
-                              <label key={col.key} className="ph-picker-option">
-                                <input
-                                  type="checkbox"
-                                  checked={pickerFields.includes(col.key)}
-                                  onChange={ev => {
-                                    setPickerFields(prev =>
-                                      ev.target.checked ? [...prev, col.key] : prev.filter(k => k !== col.key)
-                                    )
-                                  }}
-                                />
-                                {col.label}
-                              </label>
-                            ))}
+                    {pickerOpen === idx && (() => {
+                      const colMap = detectColMap(columns)
+                      const propInput = buildPropInput(row, colMap)
+                      const avFields = getAvailablePropFields(propInput)
+                      const allPlans = String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+                      return (
+                        <>
+                          <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
+                          <div className="ph-plan-picker" onClick={e => e.stopPropagation()}>
+                            <div className="ph-picker-title">محتوى الرسالة</div>
+                            {avFields.length > 0 && (
+                              <>
+                                <div className="ph-picker-section">تفاصيل</div>
+                                {avFields.map(field => (
+                                  <label key={field} className="ph-picker-option">
+                                    <input
+                                      type="checkbox"
+                                      checked={pickerFields.includes(field)}
+                                      onChange={() => setPickerFields(prev =>
+                                        prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+                                      )}
+                                    />
+                                    <span>{FIELD_LABELS[field]}: {fieldValuePreview(propInput, field)}</span>
+                                  </label>
+                                ))}
+                              </>
+                            )}
+                            {allPlans.length > 0 && (
+                              <>
+                                <div className="ph-picker-section">أنظمة السداد</div>
+                                {allPlans.map((plan, pi) => (
+                                  <label key={pi} className="ph-picker-option">
+                                    <input
+                                      type="checkbox"
+                                      checked={pickerPlans.includes(plan)}
+                                      onChange={() => setPickerPlans(prev =>
+                                        prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
+                                      )}
+                                    />
+                                    <span>{plan}</span>
+                                  </label>
+                                ))}
+                              </>
+                            )}
+                            {avFields.length === 0 && allPlans.length === 0 && (
+                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: '8px 0' }}>
+                                No mapped fields detected
+                              </div>
+                            )}
+                            <button className="ph-picker-copy-btn" onClick={e => handlePickerCopy(e, row, idx)}>
+                              نسخ
+                            </button>
                           </div>
-                          <button className="ph-picker-copy-btn" onClick={e => handlePickerCopy(e, row, idx)}>
-                            Copy
-                          </button>
-                        </div>
-                      </>
-                    )}
+                        </>
+                      )
+                    })()}
                   </div>
                 )
               })}
