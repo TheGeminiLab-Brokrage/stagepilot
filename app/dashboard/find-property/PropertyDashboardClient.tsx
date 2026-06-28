@@ -1052,7 +1052,7 @@ export default function PropertyDashboardClient() {
                       <div className="ph-modal-field"><div className="f-label">Delivery</div><div className="f-value">{r.delivery || '—'}</div></div>
                       <div className="ph-modal-field">
                         <div className="f-label">Cash Discount</div>
-                        <div className="f-value" style={{ color: '#22c55e' }}>{r.discount ? (parseFloat(String(r.discount)) > 99 ? 'EGP ' + fmt(r.discount) : r.discount + '%') : '—'}</div>
+                        <div className="f-value" style={{ color: '#22c55e' }}>{r.discount ? (parseFloat(String(r.discount)) > 99 ? 'EGP ' + fmtFull(r.discount) : r.discount + '%') : '—'}</div>
                       </div>
                       <div className="ph-modal-field"><div className="f-label">Maintenance</div><div className="f-value">{r.maint ? r.maint + '%' : '—'}</div></div>
                       <div className="ph-modal-field"><div className="f-label">Parking</div><div className="f-value">{r.parking || '—'}</div></div>
