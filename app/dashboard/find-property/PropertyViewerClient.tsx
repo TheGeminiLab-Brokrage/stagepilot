@@ -18,14 +18,61 @@ interface SheetRecord {
   uploaded_at: string
 }
 
+interface ViewConfig {
+  titleColumn: string
+  subtitleColumn: string
+  badgeColumn: string
+  cardColumns: string[]
+  filterColumns: string[]
+  sortColumn: string
+  sortDir: 'asc' | 'desc'
+}
+
 type NumericFilter = { min: string; max: string }
 type FilterValue = string[] | NumericFilter
 type FilterState = Record<string, FilterValue>
 
-function emptyFilters(columns: ColumnMeta[]): FilterState {
+function buildDefaultConfig(columns: ColumnMeta[]): ViewConfig {
+  const categorical = columns.filter(c => c.type === 'categorical')
+  const numeric = columns.filter(c => c.type === 'numeric')
+  const year = columns.filter(c => c.type === 'year')
+  return {
+    titleColumn: categorical[0]?.key ?? columns[0]?.key ?? '',
+    subtitleColumn: categorical[1]?.key ?? '',
+    badgeColumn: categorical[2]?.key ?? '',
+    cardColumns: [
+      ...categorical.slice(0, 3).map(c => c.key),
+      ...numeric.slice(0, 4).map(c => c.key),
+      ...year.slice(0, 1).map(c => c.key),
+    ],
+    filterColumns: [
+      ...categorical.map(c => c.key),
+      ...year.map(c => c.key),
+      ...numeric.slice(0, 3).map(c => c.key),
+    ],
+    sortColumn: numeric[0]?.key ?? '',
+    sortDir: 'asc',
+  }
+}
+
+function loadConfig(userId: string, columns: ColumnMeta[]): ViewConfig {
+  try {
+    const raw = localStorage.getItem(`pv_config_${userId}`)
+    if (raw) return JSON.parse(raw) as ViewConfig
+  } catch { /* ignore */ }
+  return buildDefaultConfig(columns)
+}
+
+function saveConfig(userId: string, config: ViewConfig) {
+  try {
+    localStorage.setItem(`pv_config_${userId}`, JSON.stringify(config))
+  } catch { /* ignore */ }
+}
+
+function emptyFilters(columns: ColumnMeta[], filterColumns: string[]): FilterState {
   return Object.fromEntries(
     columns
-      .filter(c => c.type !== 'text')
+      .filter(c => c.type !== 'text' && filterColumns.includes(c.key))
       .map(c => [c.key, c.type === 'numeric' ? { min: '', max: '' } : []])
   )
 }
@@ -37,7 +84,6 @@ function filterRows(rows: RawRow[], filters: FilterState, columns: ColumnMeta[])
     return Array.isArray(f) ? f.length > 0 : f.min !== '' || f.max !== ''
   })
   if (active.length === 0) return rows
-
   return rows.filter(row => {
     for (const col of active) {
       const f = filters[col.key]
@@ -55,6 +101,244 @@ function filterRows(rows: RawRow[], filters: FilterState, columns: ColumnMeta[])
   })
 }
 
+// ── Config Panel ─────────────────────────────────────────────────────────────
+
+function ConfigPanel({
+  columns,
+  config,
+  onSave,
+  onClose,
+}: {
+  columns: ColumnMeta[]
+  config: ViewConfig
+  onSave: (c: ViewConfig) => void
+  onClose: () => void
+}) {
+  const [draft, setDraft] = useState<ViewConfig>({ ...config })
+  const allKeys = columns.map(c => c.key)
+  const filterableKeys = columns.filter(c => c.type !== 'text').map(c => c.key)
+  const numericKeys = columns.filter(c => c.type === 'numeric').map(c => c.key)
+
+  function toggleCard(key: string) {
+    setDraft(d => ({
+      ...d,
+      cardColumns: d.cardColumns.includes(key)
+        ? d.cardColumns.filter(k => k !== key)
+        : [...d.cardColumns, key],
+    }))
+  }
+
+  function toggleFilter(key: string) {
+    setDraft(d => ({
+      ...d,
+      filterColumns: d.filterColumns.includes(key)
+        ? d.filterColumns.filter(k => k !== key)
+        : [...d.filterColumns, key],
+    }))
+  }
+
+  const inputStyle = {
+    width: '100%',
+    background: '#1a1a1a',
+    border: '1px solid rgba(215,255,0,0.2)',
+    color: '#fff',
+    padding: '7px 10px',
+    borderRadius: 8,
+    fontSize: 13,
+    outline: 'none',
+    fontFamily: "'Montserrat', sans-serif",
+  }
+
+  const sectionHeadStyle = {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '1px',
+    color: '#d7ff00',
+    textTransform: 'uppercase' as const,
+    marginBottom: 10,
+    paddingBottom: 6,
+    borderBottom: '1px solid rgba(215,255,0,0.15)',
+    fontFamily: "'Space Grotesk', sans-serif",
+  }
+
+  const colLabel = (key: string) => columns.find(c => c.key === key)?.label ?? key
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end' }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: 480,
+          maxWidth: '95vw',
+          height: '100vh',
+          overflowY: 'auto',
+          background: '#0f0f0f',
+          borderLeft: '1px solid rgba(215,255,0,0.2)',
+          padding: 28,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 24,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ margin: 0, color: '#fff', fontSize: 18, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
+            Configure View
+          </h2>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}
+          >✕</button>
+        </div>
+
+        {/* Section 1: Card Header */}
+        <div>
+          <p style={sectionHeadStyle}>Card Header</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 4, fontFamily: "'Montserrat', sans-serif" }}>
+                Main Title (top of card)
+              </label>
+              <select
+                style={inputStyle}
+                value={draft.titleColumn}
+                onChange={e => setDraft(d => ({ ...d, titleColumn: e.target.value }))}
+              >
+                <option value="">— None —</option>
+                {allKeys.map(k => <option key={k} value={k}>{colLabel(k)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 4, fontFamily: "'Montserrat', sans-serif" }}>
+                Subtitle (below title)
+              </label>
+              <select
+                style={inputStyle}
+                value={draft.subtitleColumn}
+                onChange={e => setDraft(d => ({ ...d, subtitleColumn: e.target.value }))}
+              >
+                <option value="">— None —</option>
+                {allKeys.map(k => <option key={k} value={k}>{colLabel(k)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 4, fontFamily: "'Montserrat', sans-serif" }}>
+                Badge (small tag, top-right)
+              </label>
+              <select
+                style={inputStyle}
+                value={draft.badgeColumn}
+                onChange={e => setDraft(d => ({ ...d, badgeColumn: e.target.value }))}
+              >
+                <option value="">— None —</option>
+                {allKeys.map(k => <option key={k} value={k}>{colLabel(k)}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: Card Specs */}
+        <div>
+          <p style={sectionHeadStyle}>Columns shown on card</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {columns.map(col => (
+              <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '5px 0' }}>
+                <input
+                  type="checkbox"
+                  checked={draft.cardColumns.includes(col.key)}
+                  onChange={() => toggleCard(col.key)}
+                  style={{ accentColor: '#d7ff00', width: 15, height: 15, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 13, color: '#fff', fontFamily: "'Montserrat', sans-serif" }}>{col.label}</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto', fontFamily: "'Space Grotesk', sans-serif" }}>
+                  {col.type}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Section 3: Filter Sidebar */}
+        <div>
+          <p style={sectionHeadStyle}>Filter sidebar columns</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {filterableKeys.map(key => {
+              const col = columns.find(c => c.key === key)!
+              return (
+                <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '5px 0' }}>
+                  <input
+                    type="checkbox"
+                    checked={draft.filterColumns.includes(key)}
+                    onChange={() => toggleFilter(key)}
+                    style={{ accentColor: '#d7ff00', width: 15, height: 15, cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: 13, color: '#fff', fontFamily: "'Montserrat', sans-serif" }}>{col.label}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto', fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {col.type}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Section 4: Default Sort */}
+        <div>
+          <p style={sectionHeadStyle}>Default Sort</p>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <select
+              style={{ ...inputStyle, flex: 2 }}
+              value={draft.sortColumn}
+              onChange={e => setDraft(d => ({ ...d, sortColumn: e.target.value }))}
+            >
+              <option value="">— No sort —</option>
+              {numericKeys.map(k => <option key={k} value={k}>{colLabel(k)}</option>)}
+            </select>
+            <select
+              style={{ ...inputStyle, flex: 1 }}
+              value={draft.sortDir}
+              onChange={e => setDraft(d => ({ ...d, sortDir: e.target.value as 'asc' | 'desc' }))}
+            >
+              <option value="asc">↑ Low → High</option>
+              <option value="desc">↓ High → Low</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 8 }}>
+          <button
+            onClick={() => { onSave(draft); onClose() }}
+            style={{
+              flex: 1, background: '#d7ff00', color: '#000', border: 'none',
+              borderRadius: 10, padding: '10px 0', fontSize: 14, fontWeight: 700,
+              cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            Save & Apply
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)',
+              border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
+              padding: '10px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
 export default function PropertyViewerClient({ userId, companyId }: {
   userId: string
   companyId: string
@@ -64,15 +348,24 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [sheets, setSheets] = useState<SheetRecord[]>([])
   const [columns, setColumns] = useState<ColumnMeta[]>([])
   const [rows, setRows] = useState<RawRow[]>([])
+  const [config, setConfig] = useState<ViewConfig | null>(null)
   const [filters, setFilters] = useState<FilterState>({})
   const [sort, setSort] = useState('')
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [page, setPage] = useState(1)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
+  const [showConfig, setShowConfig] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function applyConfig(cfg: ViewConfig, cols: ColumnMeta[]) {
+    setConfig(cfg)
+    setFilters(emptyFilters(cols, cfg.filterColumns))
+    setSort(cfg.sortColumn ? `${cfg.sortColumn}-${cfg.sortDir}` : '')
+    setPage(1)
+  }
 
   useEffect(() => {
     async function load() {
@@ -94,31 +387,34 @@ export default function PropertyViewerClient({ userId, companyId }: {
       const typedSheets = sheetRows as SheetRecord[]
       const merged = mergeColumnMeta(typedSheets.map(s => s.columns as ColumnMeta[]))
       const allRows = (propRows ?? []).map((r: { data: RawRow }) => r.data)
-      const firstNumeric = merged.find(c => c.type === 'numeric')
+      const cfg = loadConfig(userId, merged)
 
       setSheets(typedSheets)
       setColumns(merged)
       setRows(allRows)
-      setFilters(emptyFilters(merged))
-      setSort(firstNumeric ? `${firstNumeric.key}-asc` : '')
+      applyConfig(cfg, merged)
       setPhase('loaded')
     }
     load()
-  }, [supabase])
+  }, [supabase, userId])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelectedIdx(null)
+      if (e.key === 'Escape') { setSelectedIdx(null); setShowConfig(false) }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  function handleSaveConfig(newConfig: ViewConfig) {
+    saveConfig(userId, newConfig)
+    applyConfig(newConfig, columns)
+  }
+
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
     setUploading(true)
     setUploadError('')
-
     try {
       for (const file of Array.from(files)) {
         const parsed = await parseExcelFile(file)
@@ -129,29 +425,15 @@ export default function PropertyViewerClient({ userId, companyId }: {
 
           const { data: sheetRecord, error: sheetErr } = await supabase
             .from('property_sheets')
-            .insert({
-              user_id: userId,
-              company_id: companyId,
-              file_name: displayName,
-              row_count: sheetRows.length,
-              columns: colMeta,
-            })
+            .insert({ user_id: userId, company_id: companyId, file_name: displayName, row_count: sheetRows.length, columns: colMeta })
             .select('id, file_name, row_count, columns, uploaded_at')
             .single()
 
-          if (sheetErr || !sheetRecord) {
-            setUploadError('Failed to save sheet. Check your connection and try again.')
-            continue
-          }
+          if (sheetErr || !sheetRecord) { setUploadError('Failed to save sheet.'); continue }
 
           const CHUNK = 500
           for (let i = 0; i < sheetRows.length; i += CHUNK) {
-            const chunk = sheetRows.slice(i, i + CHUNK).map(r => ({
-              sheet_id: sheetRecord.id,
-              user_id: userId,
-              company_id: companyId,
-              data: r,
-            }))
+            const chunk = sheetRows.slice(i, i + CHUNK).map(r => ({ sheet_id: sheetRecord.id, user_id: userId, company_id: companyId, data: r }))
             await supabase.from('property_rows').insert(chunk)
           }
 
@@ -159,15 +441,9 @@ export default function PropertyViewerClient({ userId, companyId }: {
           setSheets(prev => {
             const next = [...prev, newSheet]
             const merged = mergeColumnMeta(next.map(s => s.columns as ColumnMeta[]))
+            const cfg = loadConfig(userId, merged)
             setColumns(merged)
-            setFilters(f => {
-              const updated = emptyFilters(merged)
-              // Keep existing filter values where column still exists
-              for (const key of Object.keys(f)) {
-                if (key in updated) updated[key] = f[key]
-              }
-              return updated
-            })
+            applyConfig(cfg, merged)
             return next
           })
           setRows(prev => [...prev, ...sheetRows])
@@ -176,7 +452,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
       setPhase('loaded')
     } catch (err) {
       console.error(err)
-      setUploadError('Failed to parse file. Make sure it is a valid Excel (.xlsx / .xls) file.')
+      setUploadError('Failed to parse file. Make sure it is a valid .xlsx file.')
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -187,32 +463,30 @@ export default function PropertyViewerClient({ userId, companyId }: {
     await supabase.from('property_sheets').delete().eq('id', sheetId)
     const nextSheets = sheets.filter(s => s.id !== sheetId)
     setSheets(nextSheets)
-
     if (nextSheets.length === 0) {
-      setRows([])
-      setColumns([])
-      setFilters({})
-      setPhase('empty')
+      setRows([]); setColumns([]); setConfig(null); setFilters({}); setPhase('empty')
       return
     }
-
-    const { data: propRows } = await supabase
-      .from('property_rows')
-      .select('data')
-      .order('id', { ascending: true })
-
+    const { data: propRows } = await supabase.from('property_rows').select('data').order('id', { ascending: true })
     const allRows = (propRows ?? []).map((r: { data: RawRow }) => r.data)
     const merged = mergeColumnMeta(nextSheets.map(s => s.columns as ColumnMeta[]))
-    setRows(allRows)
-    setColumns(merged)
-    setFilters(emptyFilters(merged))
+    const cfg = loadConfig(userId, merged)
+    setRows(allRows); setColumns(merged); applyConfig(cfg, merged)
   }
 
-  const filtered = useMemo(() => filterRows(rows, filters, columns), [rows, filters, columns])
+  // Derived data
+  const activeFilterCols = useMemo(
+    () => columns.filter(c => c.type !== 'text' && (config?.filterColumns ?? []).includes(c.key)),
+    [columns, config]
+  )
+
+  const filtered = useMemo(() => filterRows(rows, filters, activeFilterCols), [rows, filters, activeFilterCols])
 
   const sorted = useMemo(() => {
     if (!sort) return filtered
-    const [key, dir] = sort.split('-')
+    const dashIdx = sort.lastIndexOf('-')
+    const key = sort.slice(0, dashIdx)
+    const dir = sort.slice(dashIdx + 1)
     return [...filtered].sort((a, b) => {
       const av = parseFloat(String(a[key] ?? '').replace(/,/g, '')) || 0
       const bv = parseFloat(String(b[key] ?? '').replace(/,/g, '')) || 0
@@ -231,12 +505,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [totalPages])
 
-  const categoricalCols = useMemo(() => columns.filter(c => c.type === 'categorical'), [columns])
   const numericCols = useMemo(() => columns.filter(c => c.type === 'numeric'), [columns])
-  const yearCols = useMemo(() => columns.filter(c => c.type === 'year'), [columns])
-  const titleCol = categoricalCols[0]
-  const subtitleCol = categoricalCols[1]
-
   const numericSortOptions = useMemo(() =>
     numericCols.flatMap(c => [
       { value: `${c.key}-asc`, label: `${c.label} ↑` },
@@ -244,7 +513,6 @@ export default function PropertyViewerClient({ userId, companyId }: {
     ]), [numericCols])
 
   const kpiNumerics = numericCols.slice(0, 3)
-
   const selectedProperty = selectedIdx !== null ? sorted[selectedIdx] : null
 
   // ── LOADING ──
@@ -259,7 +527,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
     )
   }
 
-  // ── EMPTY / UPLOAD ──
+  // ── EMPTY ──
   if (phase === 'empty') {
     return (
       <div className="ph-root">
@@ -271,62 +539,34 @@ export default function PropertyViewerClient({ userId, companyId }: {
         >
           <div style={{
             border: `2px dashed ${isDragging ? '#d7ff00' : 'rgba(215,255,0,0.3)'}`,
-            borderRadius: 20,
-            padding: '72px 80px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 18,
+            borderRadius: 20, padding: '72px 80px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18,
             background: isDragging ? 'rgba(215,255,0,0.04)' : 'rgba(255,255,255,0.02)',
-            transition: 'all 0.2s',
-            maxWidth: 520,
-            width: '100%',
+            transition: 'all 0.2s', maxWidth: 520, width: '100%',
           }}>
             <div style={{ fontSize: 60 }}>{uploading ? '⏳' : '📊'}</div>
             <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif", margin: 0, textAlign: 'center' }}>
-              {uploading ? 'Processing your file…' : 'Your Property Database'}
+              {uploading ? 'Processing…' : 'Your Property Database'}
             </h2>
             <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, fontFamily: "'Montserrat', sans-serif", margin: 0, textAlign: 'center', lineHeight: 1.7, whiteSpace: 'pre-line' }}>
               {uploading
-                ? 'Parsing and uploading rows to your account…'
-                : 'Drag & drop an Excel file here to get started.\nFilters and cards are generated automatically\nbased on your column headers.'}
+                ? 'Parsing and uploading rows…'
+                : 'Drag & drop an Excel file here to get started.\nFilters and card layout are fully configurable\nafter upload.'}
             </p>
             {!uploading && (
               <>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    marginTop: 8,
-                    background: '#d7ff00',
-                    color: '#000',
-                    border: 'none',
-                    borderRadius: 10,
-                    padding: '10px 32px',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    letterSpacing: '0.03em',
-                    transition: 'background 0.15s',
-                  }}
+                  style={{ marginTop: 8, background: '#d7ff00', color: '#000', border: 'none', borderRadius: 10, padding: '10px 32px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.03em', transition: 'background 0.15s' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#c8f000' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#d7ff00' }}
                 >
                   Browse Files
                 </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  multiple
-                  style={{ display: 'none' }}
-                  onChange={e => handleFiles(e.target.files)}
-                />
+                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" multiple style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
               </>
             )}
-            {uploadError && (
-              <p style={{ color: '#ef4444', fontSize: 13, margin: 0, textAlign: 'center' }}>{uploadError}</p>
-            )}
+            {uploadError && <p style={{ color: '#ef4444', fontSize: 13, margin: 0, textAlign: 'center' }}>{uploadError}</p>}
           </div>
         </div>
       </div>
@@ -334,63 +574,40 @@ export default function PropertyViewerClient({ userId, companyId }: {
   }
 
   // ── LOADED ──
+  const cfg = config!
+  const colByKey = Object.fromEntries(columns.map(c => [c.key, c]))
+
+  // Card spec columns: cardColumns excluding title/subtitle/badge
+  const specCols = cfg.cardColumns
+    .filter(k => k !== cfg.titleColumn && k !== cfg.subtitleColumn && k !== cfg.badgeColumn)
+    .map(k => colByKey[k])
+    .filter(Boolean)
+
   return (
-    <div
-      className="ph-root"
-      onDragOver={e => e.preventDefault()}
-      onDrop={e => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}
-    >
+    <div className="ph-root" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}>
       {/* Sheet manager bar */}
-      <div style={{
-        background: 'rgba(215,255,0,0.04)',
-        borderBottom: '1px solid rgba(215,255,0,0.12)',
-        padding: '8px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 8,
-      }}>
-        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.06em', textTransform: 'uppercase', marginRight: 4 }}>
-          Sheets:
-        </span>
+      <div style={{ background: 'rgba(215,255,0,0.04)', borderBottom: '1px solid rgba(215,255,0,0.12)', padding: '8px 16px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.06em', textTransform: 'uppercase', marginRight: 4 }}>Sheets:</span>
         {sheets.map(sheet => (
-          <span key={sheet.id} style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: 'rgba(215,255,0,0.1)', color: '#d7ff00',
-            border: '1px solid rgba(215,255,0,0.25)',
-            borderRadius: 20, padding: '3px 10px 3px 12px',
-            fontSize: 12, fontFamily: "'Montserrat', sans-serif",
-          }}>
+          <span key={sheet.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(215,255,0,0.1)', color: '#d7ff00', border: '1px solid rgba(215,255,0,0.25)', borderRadius: 20, padding: '3px 10px 3px 12px', fontSize: 12, fontFamily: "'Montserrat', sans-serif" }}>
             {sheet.file_name}
             <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10 }}>({sheet.row_count.toLocaleString()} rows)</span>
-            <button
-              onClick={() => deleteSheet(sheet.id)}
-              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0, lineHeight: 1, fontSize: 15, marginLeft: 2 }}
-              title="Remove this sheet"
-            >×</button>
+            <button onClick={() => deleteSheet(sheet.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0, lineHeight: 1, fontSize: 15, marginLeft: 2 }} title="Remove">×</button>
           </span>
         ))}
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          style={{
-            background: 'none',
-            border: '1px dashed rgba(215,255,0,0.3)',
-            color: 'rgba(215,255,0,0.7)',
-            borderRadius: 20, padding: '3px 12px',
-            fontSize: 12, cursor: 'pointer',
-            fontFamily: "'Space Grotesk', sans-serif",
-          }}
-        >
+        <button onClick={() => fileInputRef.current?.click()} style={{ background: 'none', border: '1px dashed rgba(215,255,0,0.3)', color: 'rgba(215,255,0,0.7)', borderRadius: 20, padding: '3px 12px', fontSize: 12, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif" }}>
           + Add more data
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".xlsx,.xls"
-          multiple
-          style={{ display: 'none' }}
-          onChange={e => handleFiles(e.target.files)}
-        />
+        <input ref={fileInputRef} type="file" accept=".xlsx,.xls" multiple style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
+
+        {/* Configure button */}
+        <button
+          onClick={() => setShowConfig(true)}
+          style={{ marginLeft: 'auto', background: 'rgba(215,255,0,0.1)', border: '1px solid rgba(215,255,0,0.3)', color: '#d7ff00', borderRadius: 8, padding: '4px 14px', fontSize: 12, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          ⚙ Configure View
+        </button>
+
         {uploading && <span style={{ color: 'rgba(215,255,0,0.6)', fontSize: 12 }}>Uploading…</span>}
         {uploadError && <span style={{ color: '#ef4444', fontSize: 12 }}>{uploadError}</span>}
       </div>
@@ -398,72 +615,60 @@ export default function PropertyViewerClient({ userId, companyId }: {
       <div className="ph-layout">
         {/* ── SIDEBAR ── */}
         <aside className="ph-sidebar">
-          {columns.filter(c => c.type !== 'text').map(col => {
-            if (col.type === 'categorical' || col.type === 'year') {
-              const options = col.type === 'year'
-                ? (col.years ?? []).map(y => ({ value: String(y), label: String(y) }))
-                : (col.uniqueValues ?? []).map(v => ({ value: v, label: v }))
-              const currentVal = (filters[col.key] ?? []) as string[]
-              return (
-                <div key={col.key} className="ph-filter-section">
-                  <h3>{col.label}</h3>
-                  <MultiCombobox
-                    value={currentVal}
-                    onChange={v => { setFilters(f => ({ ...f, [col.key]: v })); setPage(1) }}
-                    options={options}
-                    placeholder={`All (${options.length})`}
-                  />
-                </div>
-              )
-            }
-
-            if (col.type === 'numeric') {
-              const currentVal = (filters[col.key] ?? { min: '', max: '' }) as NumericFilter
-              return (
-                <div key={col.key} className="ph-filter-section">
-                  <h3>{col.label}</h3>
-                  <div className="ph-range-row">
-                    <div>
-                      <label className="ph-filter-label">Min</label>
-                      <input
-                        type="number"
-                        className="ph-input"
-                        placeholder={col.min != null ? String(Math.floor(col.min)) : '0'}
-                        value={currentVal.min}
-                        onChange={e => {
-                          setFilters(f => ({ ...f, [col.key]: { ...(f[col.key] as NumericFilter), min: e.target.value } }))
-                          setPage(1)
-                        }}
+          {activeFilterCols.length === 0 ? (
+            <div style={{ gridColumn: '1 / -1', padding: '20px 0', textAlign: 'center' }}>
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, fontFamily: "'Montserrat', sans-serif", margin: 0 }}>No filters selected.</p>
+              <button onClick={() => setShowConfig(true)} style={{ marginTop: 10, background: 'none', border: 'none', color: 'rgba(215,255,0,0.6)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', fontFamily: "'Montserrat', sans-serif" }}>
+                Configure View →
+              </button>
+            </div>
+          ) : (
+            <>
+              {activeFilterCols.map(col => {
+                if (col.type === 'categorical' || col.type === 'year') {
+                  const options = col.type === 'year'
+                    ? (col.years ?? []).map(y => ({ value: String(y), label: String(y) }))
+                    : (col.uniqueValues ?? []).map(v => ({ value: v, label: v }))
+                  const currentVal = (filters[col.key] ?? []) as string[]
+                  return (
+                    <div key={col.key} className="ph-filter-section">
+                      <h3>{col.label}</h3>
+                      <MultiCombobox
+                        value={currentVal}
+                        onChange={v => { setFilters(f => ({ ...f, [col.key]: v })); setPage(1) }}
+                        options={options}
+                        placeholder={`All (${options.length})`}
                       />
                     </div>
-                    <div>
-                      <label className="ph-filter-label">Max</label>
-                      <input
-                        type="number"
-                        className="ph-input"
-                        placeholder={col.max != null ? String(Math.ceil(col.max)) : ''}
-                        value={currentVal.max}
-                        onChange={e => {
-                          setFilters(f => ({ ...f, [col.key]: { ...(f[col.key] as NumericFilter), max: e.target.value } }))
-                          setPage(1)
-                        }}
-                      />
+                  )
+                }
+                if (col.type === 'numeric') {
+                  const currentVal = (filters[col.key] ?? { min: '', max: '' }) as NumericFilter
+                  return (
+                    <div key={col.key} className="ph-filter-section">
+                      <h3>{col.label}</h3>
+                      <div className="ph-range-row">
+                        <div>
+                          <label className="ph-filter-label">Min</label>
+                          <input type="number" className="ph-input" placeholder={col.min != null ? String(Math.floor(col.min)) : '0'} value={currentVal.min}
+                            onChange={e => { setFilters(f => ({ ...f, [col.key]: { ...(f[col.key] as NumericFilter), min: e.target.value } })); setPage(1) }} />
+                        </div>
+                        <div>
+                          <label className="ph-filter-label">Max</label>
+                          <input type="number" className="ph-input" placeholder={col.max != null ? String(Math.ceil(col.max)) : ''} value={currentVal.max}
+                            onChange={e => { setFilters(f => ({ ...f, [col.key]: { ...(f[col.key] as NumericFilter), max: e.target.value } })); setPage(1) }} />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )
-            }
-
-            return null
-          })}
-
-          <button
-            className="ph-btn-reset"
-            style={{ gridColumn: '1 / -1' }}
-            onClick={() => { setFilters(emptyFilters(columns)); setPage(1) }}
-          >
-            ↺ Reset All
-          </button>
+                  )
+                }
+                return null
+              })}
+              <button className="ph-btn-reset" style={{ gridColumn: '1 / -1' }} onClick={() => { setFilters(emptyFilters(columns, cfg.filterColumns)); setPage(1) }}>
+                ↺ Reset All
+              </button>
+            </>
+          )}
         </aside>
 
         {/* ── MAIN ── */}
@@ -476,9 +681,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
               <div className="ph-kpi-lbl">Total Units</div>
             </div>
             {kpiNumerics.map(col => {
-              const vals = filtered
-                .map(r => parseFloat(String(r[col.key] ?? '').replace(/,/g, '')))
-                .filter(n => !isNaN(n) && isFinite(n))
+              const vals = filtered.map(r => parseFloat(String(r[col.key] ?? '').replace(/,/g, ''))).filter(n => !isNaN(n) && isFinite(n))
               const minVal = vals.length ? Math.min(...vals) : null
               return (
                 <div key={col.key} className="ph-kpi ph-kpi-gold">
@@ -497,14 +700,8 @@ export default function PropertyViewerClient({ userId, companyId }: {
             </div>
             <div className="ph-view-controls">
               {numericSortOptions.length > 0 && (
-                <select
-                  className="ph-sort-select"
-                  value={sort}
-                  onChange={e => { setSort(e.target.value); setPage(1) }}
-                >
-                  {numericSortOptions.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
+                <select className="ph-sort-select" value={sort} onChange={e => { setSort(e.target.value); setPage(1) }}>
+                  {numericSortOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               )}
               <button className={`ph-view-btn${view === 'grid' ? ' active' : ''}`} onClick={() => setView('grid')} title="Grid view">⊞</button>
@@ -523,80 +720,76 @@ export default function PropertyViewerClient({ userId, companyId }: {
             <div className="ph-grid-view">
               {pageItems.map((row, i) => {
                 const idx = (page - 1) * PAGE_SIZE + i
+                const titleVal = cfg.titleColumn ? String(row[cfg.titleColumn] ?? '—') : null
+                const subtitleVal = cfg.subtitleColumn ? String(row[cfg.subtitleColumn] ?? '') : null
+                const badgeVal = cfg.badgeColumn ? String(row[cfg.badgeColumn] ?? '') : null
                 return (
                   <div key={idx} className="ph-property-card" onClick={() => setSelectedIdx(idx)}>
                     <div className="ph-card-top">
-                      {titleCol && (
-                        <div className="ph-city-badge">{String(row[titleCol.key] ?? '—')}</div>
-                      )}
-                      {subtitleCol && (
-                        <div className="ph-card-project">{String(row[subtitleCol.key] ?? '—')}</div>
-                      )}
-                      {categoricalCols[2] && (
-                        <div className="ph-type-badge">{String(row[categoricalCols[2].key] ?? '—')}</div>
-                      )}
+                      {titleVal && <div className="ph-city-badge">{titleVal}</div>}
+                      {subtitleVal && <div className="ph-card-project">{subtitleVal}</div>}
+                      {badgeVal && <div className="ph-type-badge">{badgeVal}</div>}
                     </div>
                     <div className="ph-card-body">
                       <div className="ph-card-specs">
-                        {numericCols.slice(0, 4).map(c => {
-                          const val = row[c.key]
+                        {specCols.slice(0, 5).map(col => {
+                          const val = row[col.key]
                           if (val == null || val === '') return null
                           return (
-                            <div key={c.key} className="ph-spec">
-                              <span className="ph-spec-icon">📊</span>
-                              <strong>{fmt(val)}</strong>
-                              <span>{c.label}</span>
+                            <div key={col.key} className="ph-spec">
+                              <strong>{col.type === 'numeric' ? fmt(val) : String(val)}</strong>
+                              <span>{col.label}</span>
                             </div>
                           )
                         })}
                       </div>
-                      {numericCols[0] && row[numericCols[0].key] != null && (
-                        <div className="ph-card-price">{fmt(row[numericCols[0].key])}</div>
-                      )}
                     </div>
-                    <div className="ph-card-footer">
-                      {yearCols[0] && row[yearCols[0].key] != null && (
-                        <span className="ph-delivery-info">📅 <span>{String(row[yearCols[0].key])}</span></span>
-                      )}
+                    <div className="ph-card-footer" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {cfg.cardColumns
+                        .filter(k => !specCols.find(c => c.key === k) && k !== cfg.titleColumn && k !== cfg.subtitleColumn && k !== cfg.badgeColumn)
+                        .slice(0, 2)
+                        .map(k => {
+                          const col = colByKey[k]
+                          const val = row[k]
+                          if (!col || val == null || val === '') return null
+                          return (
+                            <span key={k} className="ph-delivery-info">
+                              <span style={{ opacity: 0.5, fontSize: 10 }}>{col.label}: </span>
+                              <span>{String(val)}</span>
+                            </span>
+                          )
+                        })}
                     </div>
                   </div>
                 )
               })}
             </div>
           ) : (
-            <div className="ph-list-view">
-              {/* List header */}
-              {(() => {
-                const listCols = [
-                  ...categoricalCols.slice(0, 2),
-                  ...numericCols.slice(0, 3),
-                  ...yearCols.slice(0, 1),
-                ]
-                return (
-                  <>
-                    <div className="ph-list-row" style={{ cursor: 'default', opacity: 0.45, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '8px 16px', fontFamily: "'Space Grotesk', sans-serif" }}>
-                      {listCols.map(col => (
-                        <div key={col.key} style={{ flex: 1, minWidth: 80 }}>{col.label.toUpperCase()}</div>
-                      ))}
-                      <div style={{ width: 24 }} />
-                    </div>
-                    {pageItems.map((row, i) => {
-                      const idx = (page - 1) * PAGE_SIZE + i
-                      return (
-                        <div key={idx} className="ph-list-row" onClick={() => setSelectedIdx(idx)}>
-                          {listCols.map(col => (
-                            <div key={col.key} style={{ flex: 1, minWidth: 80 }}>
-                              {col.type === 'numeric' ? fmt(row[col.key]) : String(row[col.key] ?? '—')}
-                            </div>
-                          ))}
-                          <div style={{ width: 24, textAlign: 'right', color: 'rgba(255,255,255,0.3)' }}>›</div>
-                        </div>
-                      )
-                    })}
-                  </>
-                )
-              })()}
-            </div>
+            // List view
+            (() => {
+              const listCols = cfg.cardColumns.map(k => colByKey[k]).filter(Boolean).slice(0, 7)
+              return (
+                <div className="ph-list-view">
+                  <div className="ph-list-row" style={{ cursor: 'default', opacity: 0.45, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '8px 16px', fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {listCols.map(col => <div key={col.key} style={{ flex: 1, minWidth: 80 }}>{col.label.toUpperCase()}</div>)}
+                    <div style={{ width: 24 }} />
+                  </div>
+                  {pageItems.map((row, i) => {
+                    const idx = (page - 1) * PAGE_SIZE + i
+                    return (
+                      <div key={idx} className="ph-list-row" onClick={() => setSelectedIdx(idx)}>
+                        {listCols.map(col => (
+                          <div key={col.key} style={{ flex: 1, minWidth: 80 }}>
+                            {col.type === 'numeric' ? fmt(row[col.key]) : String(row[col.key] ?? '—')}
+                          </div>
+                        ))}
+                        <div style={{ width: 24, textAlign: 'right', color: 'rgba(255,255,255,0.3)' }}>›</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()
           )}
 
           {/* Pagination */}
@@ -612,9 +805,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                   btns.push(<span key="e1" style={{ color: 'rgba(255,255,255,0.3)', padding: '0 4px' }}>…</span>)
                 }
                 for (let ii = start; ii <= end; ii++) {
-                  btns.push(
-                    <button key={ii} className={`ph-page-btn${ii === page ? ' active' : ''}`} onClick={() => handlePage(ii)}>{ii}</button>
-                  )
+                  btns.push(<button key={ii} className={`ph-page-btn${ii === page ? ' active' : ''}`} onClick={() => handlePage(ii)}>{ii}</button>)
                 }
                 if (end < totalPages) {
                   btns.push(<span key="e2" style={{ color: 'rgba(255,255,255,0.3)', padding: '0 4px' }}>…</span>)
@@ -627,18 +818,14 @@ export default function PropertyViewerClient({ userId, companyId }: {
           )}
         </main>
 
-        {/* ── MODAL ── */}
+        {/* ── DETAIL MODAL ── */}
         {selectedIdx !== null && selectedProperty && (
           <div className="ph-modal-overlay" onClick={() => setSelectedIdx(null)}>
             <div className="ph-modal" onClick={e => e.stopPropagation()}>
               <button className="ph-modal-close" onClick={() => setSelectedIdx(null)}>✕</button>
               <div className="ph-modal-header">
-                {titleCol && (
-                  <div className="ph-modal-city">{String(selectedProperty[titleCol.key] ?? '—')}</div>
-                )}
-                {subtitleCol && (
-                  <div className="ph-modal-project">{String(selectedProperty[subtitleCol.key] ?? '—')}</div>
-                )}
+                {cfg.titleColumn && <div className="ph-modal-city">{String(selectedProperty[cfg.titleColumn] ?? '—')}</div>}
+                {cfg.subtitleColumn && <div className="ph-modal-project">{String(selectedProperty[cfg.subtitleColumn] ?? '—')}</div>}
               </div>
               <div className="ph-modal-body">
                 <dl className="ph-modal-grid">
@@ -658,6 +845,16 @@ export default function PropertyViewerClient({ userId, companyId }: {
           </div>
         )}
       </div>
+
+      {/* ── CONFIG PANEL ── */}
+      {showConfig && (
+        <ConfigPanel
+          columns={columns}
+          config={cfg}
+          onSave={handleSaveConfig}
+          onClose={() => setShowConfig(false)}
+        />
+      )}
     </div>
   )
 }
