@@ -150,7 +150,14 @@ export default function PerformanceDashboard({
   const effectiveCalls = isUsingCrm ? crmDerivedCalls! : calls
 
   const chips = useMemo(() => {
-    if (isUsingCrm || role === 'agent') return []
+    if (role === 'agent') return []
+    if (isUsingCrm) {
+      const seen = new Map<string, string>()
+      for (const c of crmDerivedCalls ?? []) {
+        if (c.agent_id && !seen.has(c.agent_id)) seen.set(c.agent_id, c.agent_full_name ?? c.agent_id)
+      }
+      return [...seen.entries()].map(([id, name]) => ({ key: id, label: name }))
+    }
     if (role === 'team_leader') {
       const seen = new Map<string, string>()
       for (const c of calls) {
@@ -160,18 +167,16 @@ export default function PerformanceDashboard({
     }
     const teams = [...new Set(calls.map(c => c.team_name).filter(Boolean))] as string[]
     return teams.map(t => ({ key: t, label: t }))
-  }, [calls, role, isUsingCrm])
+  }, [calls, role, isUsingCrm, crmDerivedCalls])
 
   const filtered = useMemo(() => {
     let result = effectiveCalls
-    if (!isUsingCrm) {
-      if (activeChip) {
-        result = role === 'team_leader'
-          ? result.filter(c => c.agent_id === activeChip)
-          : result.filter(c => c.team_name === activeChip)
-      }
-      if (activeCampaign) result = result.filter(c => c.campaign === activeCampaign)
+    if (activeChip) {
+      result = (isUsingCrm || role === 'team_leader')
+        ? result.filter(c => c.agent_id === activeChip)
+        : result.filter(c => c.team_name === activeChip)
     }
+    if (!isUsingCrm && activeCampaign) result = result.filter(c => c.campaign === activeCampaign)
     return result
   }, [effectiveCalls, activeChip, activeCampaign, role, isUsingCrm])
 
