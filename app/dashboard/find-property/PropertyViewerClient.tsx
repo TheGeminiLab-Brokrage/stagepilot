@@ -849,10 +849,11 @@ export default function PropertyViewerClient({ userId, companyId }: {
                       <div className="ph-card-specs">
                         {nonPriceSpecCols.slice(0, 4).map(col => {
                           const val = row[col.key]
-                          if (val == null || val === '') return null
+                          const display = col.type === 'numeric' ? fmt(val) : String(val ?? '')
+                          if (!display || display === '—') return null
                           return (
                             <div key={col.key} className="ph-spec">
-                              <strong>{col.type === 'numeric' ? fmt(val) : String(val)}</strong>
+                              <strong>{display}</strong>
                               <span>{col.label}</span>
                             </div>
                           )
@@ -947,7 +948,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
         {selectedIdx !== null && selectedProperty && (
           <div className="ph-modal-overlay" onClick={() => setSelectedIdx(null)}>
             <div className="ph-modal" onClick={e => e.stopPropagation()}>
-              <button className="ph-modal-close" onClick={() => setSelectedIdx(null)}>✕</button>
+              {/* Header: subtitle in yellow caps + title + badge on left, close on right */}
               <div className="ph-modal-header">
                 <div>
                   {cfg.subtitleColumn && (() => {
@@ -966,46 +967,45 @@ export default function PropertyViewerClient({ userId, companyId }: {
                     const bv = String(selectedProperty[cfg.badgeColumn] ?? '')
                     if (!bv || bv === '—') return null
                     return (
-                      <span
-                        style={{
-                          ...badgeStyle(bv),
-                          display: 'inline-block',
-                          fontSize: 11,
-                          fontWeight: 600,
-                          padding: '3px 10px',
-                          borderRadius: 20,
-                          marginTop: 8,
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          textTransform: 'capitalize',
-                        }}
-                      >{bv}</span>
+                      <span style={{ ...badgeStyle(bv), display: 'inline-block', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, marginTop: 8, fontFamily: "'Space Grotesk', sans-serif" }}>
+                        {bv}
+                      </span>
                     )
                   })()}
                 </div>
+                <button className="ph-modal-close" onClick={() => setSelectedIdx(null)}>×</button>
               </div>
+
               <div className="ph-modal-body">
+                {/* Price shown prominently at top */}
                 {priceSpecCol && (() => {
                   const pv = selectedProperty[priceSpecCol.key]
-                  if (pv == null || pv === '') return null
+                  const pf = fmtFull(pv)
+                  if (!pv || pf === '—') return null
                   return (
                     <div style={{ marginBottom: 18 }}>
-                      <div className="ph-modal-price-big">{fmtFull(pv)}</div>
+                      <div className="ph-modal-price-big">{pf}</div>
                       <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', fontFamily: "'Montserrat', sans-serif" }}>{priceSpecCol.label}</div>
                     </div>
                   )
                 })()}
-                <dl className="ph-modal-grid">
-                  {columns.map(col => {
-                    const val = selectedProperty[col.key]
-                    if (val === null || val === undefined || val === '') return null
-                    return (
-                      <div key={col.key} className="ph-modal-field">
-                        <dt>{col.label}</dt>
-                        <dd>{col.type === 'numeric' ? fmtFull(val) : String(val)}</dd>
-                      </div>
-                    )
-                  })}
-                </dl>
+
+                {/* All other fields — skip price col (already shown above) and skip blanks */}
+                <div className="ph-modal-grid">
+                  {columns
+                    .filter(col => col.key !== priceSpecCol?.key)
+                    .map(col => {
+                      const val = selectedProperty[col.key]
+                      const display = col.type === 'numeric' ? fmtFull(val) : String(val ?? '')
+                      if (!display || display === '—') return null
+                      return (
+                        <div key={col.key} className="ph-modal-field">
+                          <div className="f-label">{col.label}</div>
+                          <div className="f-value">{display}</div>
+                        </div>
+                      )
+                    })}
+                </div>
               </div>
             </div>
           </div>
