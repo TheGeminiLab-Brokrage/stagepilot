@@ -402,36 +402,36 @@ export default function PropertyViewerClient({ userId, companyId }: {
     try {
       for (const file of Array.from(files)) {
         const parsed = await parseExcelFile(file)
-        for (const { sheetName, rows: sheetRows, headers } of parsed) {
-          if (sheetRows.length === 0) continue
-          const colMeta = analyzeColumns(sheetRows, headers)
-          const displayName = parsed.length > 1 ? `${file.name} – ${sheetName}` : file.name
+        // Merge all worksheet tabs into one combined record per file
+        const allHeaders = Array.from(new Set(parsed.flatMap(s => s.headers)))
+        const allRows = parsed.flatMap(s => s.rows)
+        if (allRows.length === 0) continue
+        const colMeta = analyzeColumns(allRows, allHeaders)
 
-          const { data: sheetRecord, error: sheetErr } = await supabase
-            .from('property_sheets')
-            .insert({ user_id: userId, company_id: companyId, file_name: displayName, row_count: sheetRows.length, columns: colMeta })
-            .select('id, file_name, row_count, columns, uploaded_at')
-            .single()
+        const { data: sheetRecord, error: sheetErr } = await supabase
+          .from('property_sheets')
+          .insert({ user_id: userId, company_id: companyId, file_name: file.name, row_count: allRows.length, columns: colMeta })
+          .select('id, file_name, row_count, columns, uploaded_at')
+          .single()
 
-          if (sheetErr || !sheetRecord) { setUploadError('Failed to save sheet.'); continue }
+        if (sheetErr || !sheetRecord) { setUploadError('Failed to save sheet.'); continue }
 
-          const CHUNK = 500
-          for (let i = 0; i < sheetRows.length; i += CHUNK) {
-            const chunk = sheetRows.slice(i, i + CHUNK).map(r => ({ sheet_id: sheetRecord.id, user_id: userId, company_id: companyId, data: r }))
-            await supabase.from('property_rows').insert(chunk)
-          }
-
-          const newSheet = sheetRecord as SheetRecord
-          setSheets(prev => {
-            const next = [...prev, newSheet]
-            const merged = mergeColumnMeta(next.map(s => s.columns as ColumnMeta[]))
-            const cfg = loadConfig(userId, merged)
-            setColumns(merged)
-            applyConfig(cfg, merged)
-            return next
-          })
-          setRows(prev => [...prev, ...sheetRows])
+        const CHUNK = 500
+        for (let i = 0; i < allRows.length; i += CHUNK) {
+          const chunk = allRows.slice(i, i + CHUNK).map(r => ({ sheet_id: sheetRecord.id, user_id: userId, company_id: companyId, data: r }))
+          await supabase.from('property_rows').insert(chunk)
         }
+
+        const newSheet = sheetRecord as SheetRecord
+        setSheets(prev => {
+          const next = [...prev, newSheet]
+          const merged = mergeColumnMeta(next.map(s => s.columns as ColumnMeta[]))
+          const cfg = loadConfig(userId, merged)
+          setColumns(merged)
+          applyConfig(cfg, merged)
+          return next
+        })
+        setRows(prev => [...prev, ...allRows])
       }
       setPhase('loaded')
     } catch (err) {
