@@ -648,13 +648,36 @@ export default function PropertyViewerClient({ userId, companyId }: {
           Configure View
         </button>
 
-        {uploading && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'rgba(215,255,0,0.6)', fontSize: 12, fontFamily: "'Space Grotesk', sans-serif" }}>
-            <div style={{ width: 12, height: 12, border: '2px solid rgba(215,255,0,0.2)', borderTopColor: '#d7ff00', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-            Uploading…
+        {sheets.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', flex: 1, scrollbarWidth: 'none', msOverflowStyle: 'none', paddingLeft: 8, borderLeft: '1px solid rgba(255,255,255,0.08)', marginLeft: 4 }}>
+            {sheets.map(sheet => (
+              <span key={sheet.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '3px 8px 3px 10px', fontSize: 11, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', fontFamily: "'Space Grotesk', sans-serif" }}>
+                {sheet.file_name}
+                <button
+                  onClick={() => deleteSheet(sheet.id)}
+                  title={`Remove ${sheet.file_name}`}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 0, lineHeight: 1, display: 'inline-flex', alignItems: 'center', transition: 'color 0.15s' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)' }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {(uploading || uploadError) && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginLeft: 'auto', fontSize: 12, fontFamily: "'Space Grotesk', sans-serif" }}>
+            {uploading && <>
+              <div style={{ width: 12, height: 12, border: '2px solid rgba(215,255,0,0.2)', borderTopColor: '#d7ff00', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+              <span style={{ color: 'rgba(215,255,0,0.6)' }}>Uploading…</span>
+            </>}
+            {uploadError && <span style={{ color: '#ef4444' }}>{uploadError}</span>}
           </span>
         )}
-        {uploadError && <span style={{ color: '#ef4444', fontSize: 12 }}>{uploadError}</span>}
       </div>
 
       <div className="ph-layout">
