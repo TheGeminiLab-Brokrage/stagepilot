@@ -81,11 +81,11 @@ export async function POST(request: NextRequest) {
     const existingJobs = (preSnapshot?.data?.data ?? []) as Array<{ id: number; export_type?: string; status?: string }>
     const maxIdBefore = Math.max(0, ...existingJobs.map(j => j.id ?? 0))
 
-    // 4. Trigger the Status Changes export
+    // 4. Trigger the Status Changes export (date filters required by the CRM)
     const triggerData = await crmFetch(
       '/api/v2/exports/export-smart-status-changes',
       'POST', token,
-      {}
+      { date_from: dateFrom, date_to: dateTo }
     )
     const exportJobId = (triggerData?.data?.id ?? null) as number | null
 
@@ -105,7 +105,10 @@ export async function POST(request: NextRequest) {
       const job = exportJobId
         ? list.find(j => j.id === exportJobId)
         : list
-            .filter(j => j.export_type?.toLowerCase().includes('status') && j.id > maxIdBefore)
+            .filter(j =>
+              (j.export_type?.toLowerCase().includes('status') || j.export_type?.toLowerCase().includes('smart')) &&
+              j.id > maxIdBefore
+            )
             .sort((a, b) => b.id - a.id)[0]
 
       if (job) lastJob = job
