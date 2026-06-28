@@ -1003,7 +1003,7 @@ export default function PropertyDashboardClient() {
           <div className="ph-modal" onClick={e => e.stopPropagation()}>
             {(() => {
               const r = selectedProperty
-              const plans = StringString(r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+              const plans = String(r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
               const contacts = String(r.contact || '').split('|').map(s => s.trim()).filter(Boolean)
               const phones = String(r.phone || '').split('|').map(s => s.trim()).filter(Boolean)
               return (
