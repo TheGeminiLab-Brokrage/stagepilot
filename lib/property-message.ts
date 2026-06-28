@@ -117,7 +117,7 @@ export function generatePropertyMessage(r: PropertyInput, selectedPlans?: string
 
   const plans = selectedPlans !== undefined
     ? selectedPlans
-    : (r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+    : String(r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
   if (plans.length > 0) {
     lines.push('')
     lines.push('✅ أنظمة السداد:')

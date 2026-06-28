@@ -577,12 +577,12 @@ export default function PropertyDashboardClient() {
     if (selectedIdx === null) { setModalPlanSelected([]); return }
     const prop = sorted[selectedIdx]
     if (!prop) return
-    setModalPlanSelected((prop.plans || '').split('|').map(s => s.trim()).filter(Boolean))
+    setModalPlanSelected(String(prop.plans || '').split('|').map(s => s.trim()).filter(Boolean))
   }, [selectedIdx]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCopy = useCallback((e: ReactMouseEvent, r: Property, idx: number) => {
     e.stopPropagation()
-    const plans = (r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+    const plans = String(r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
     if (plans.length <= 1) {
       const msg = generatePropertyMessage(r)
       navigator.clipboard.writeText(msg).then(() => {
@@ -865,7 +865,7 @@ export default function PropertyDashboardClient() {
                           {copiedIdx === idx ? '✓' : '📋'}
                         </button>
                         {pickerOpen === idx && (() => {
-                          const allPlans = (r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+                          const allPlans = String(r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
                           return (
                             <>
                               <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
@@ -935,7 +935,7 @@ export default function PropertyDashboardClient() {
                         {copiedIdx === idx ? '✓' : '📋'}
                       </button>
                       {pickerOpen === idx && (() => {
-                        const allPlans = (r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+                        const allPlans = String(r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
                         return (
                           <>
                             <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
@@ -1003,9 +1003,9 @@ export default function PropertyDashboardClient() {
           <div className="ph-modal" onClick={e => e.stopPropagation()}>
             {(() => {
               const r = selectedProperty
-              const plans = (r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
-              const contacts = (r.contact || '').split('|').map(s => s.trim()).filter(Boolean)
-              const phones = (r.phone || '').split('|').map(s => s.trim()).filter(Boolean)
+              const plans = StringString(r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+              const contacts = String(r.contact || '').split('|').map(s => s.trim()).filter(Boolean)
+              const phones = String(r.phone || '').split('|').map(s => s.trim()).filter(Boolean)
               return (
                 <>
                   <div className="ph-modal-header">
