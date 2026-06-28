@@ -5,8 +5,9 @@ import * as XLSX from 'xlsx'
 // Allow up to 5 minutes — CRM exports can take ~90s
 export const maxDuration = 300
 
-const CRM_HOST = 'geminilab.8xcrm.com'
-const CRM_UI   = 'https://geminilab.8xcrm.net'
+const CRM_HOST         = 'geminilab.8xcrm.com'
+const CRM_TRIGGER_HOST = 'geminilab.8xcrm.net'  // export trigger lives on the UI domain
+const CRM_UI           = 'https://geminilab.8xcrm.net'
 const CRM_EMAIL    = process.env.CRM_EMAIL    ?? 'seifsameh@thegeminilab.com'
 const CRM_PASSWORD = process.env.CRM_PASSWORD ?? '1234567'
 
@@ -100,24 +101,17 @@ export async function POST(request: NextRequest) {
       await crmFetch(`/api/v2/exports/exports-requests/${j.id}`, 'DELETE', token)
     }
 
-    // 5. Trigger the Status Changes export — try POST with date params, then GET fallback
-    let triggerRes = await crmFetchRaw(
-      '/api/v2/exports/export-smart-status-changes',
-      'POST', token,
-      { date_from: dateFrom, date_to: dateTo }
+    // 5. Trigger the Status Changes export — endpoint lives on the UI domain (.net)
+    const triggerRes = await fetch(
+      `https://${CRM_TRIGGER_HOST}/api/v2/exports/export-smart-status-changes`,
+      {
+        method: 'POST',
+        headers: buildHeaders(token),
+        body: JSON.stringify({ date_from: dateFrom, date_to: dateTo }),
+      }
     )
-    let triggerStatus = triggerRes.status
-    let triggerData = await triggerRes.json().catch(() => null)
-
-    // Fallback: try GET if POST returned empty/no-job
-    if (!triggerData?.data?.id && triggerStatus !== 200) {
-      triggerRes = await crmFetchRaw(
-        `/api/v2/exports/export-smart-status-changes?date_from=${dateFrom}&date_to=${dateTo}`,
-        'GET', token
-      )
-      triggerStatus = triggerRes.status
-      triggerData = await triggerRes.json().catch(() => null)
-    }
+    const triggerStatus = triggerRes.status
+    const triggerData = await triggerRes.json().catch(() => null)
 
     const exportJobId = (triggerData?.data?.id ?? null) as number | null
 
