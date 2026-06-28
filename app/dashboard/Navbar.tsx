@@ -31,12 +31,15 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
       : role === 'property_viewer'
       ? []
       : [
-          { href: '/dashboard', label: role === 'agent' ? t('navMyCalls') : t('navTeamCalls') },
-          { href: '/dashboard/performance', label: 'Performance' },
+          { href: '/dashboard/find-property', label: 'Find a Property' },
           ...(role === 'agent' ? [
-            { href: '/dashboard/upload', label: t('navUploadCall') },
             { href: '/dashboard/practice', label: t('navAiPractice') },
             { href: '/dashboard/exam', label: t('navExam') },
+          ] : []),
+          { href: '/dashboard/performance', label: 'Performance' },
+          { href: '/dashboard', label: role === 'agent' ? t('navMyCalls') : t('navTeamCalls') },
+          ...(role === 'agent' ? [
+            { href: '/dashboard/upload', label: t('navUploadCall') },
           ] : []),
           ...(role === 'super_admin' ? [
             { href: '/dashboard/admin', label: t('navAdmin') },
@@ -47,7 +50,7 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
 
   const navLinks = [
     ...roleNavLinks,
-    { href: '/dashboard/find-property', label: 'Find a Property' },
+    ...(role === 'property_viewer' ? [{ href: '/dashboard/find-property', label: 'Find a Property' }] : []),
   ]
 
   const roleLabel = ROLE_KEY_MAP[role] ? t(ROLE_KEY_MAP[role]) : role.replace('_', ' ')
