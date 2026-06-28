@@ -18,6 +18,7 @@ export default function CrmStatusChanges() {
   const [dateTo, setDateTo]     = useState(todayStr)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState<string | null>(null)
+  const [debug, setDebug]       = useState<unknown>(null)
   const [result, setResult]     = useState<{ count: number; dateFrom: string; dateTo: string; data: Row[] } | null>(null)
 
   async function handleUpdate() {
@@ -32,6 +33,7 @@ export default function CrmStatusChanges() {
 
     setLoading(true)
     setError(null)
+    setDebug(null)
     setResult(null)
 
     try {
@@ -43,6 +45,7 @@ export default function CrmStatusChanges() {
       const json = await res.json()
       if (!res.ok || !json.ok) {
         setError(json.error ?? `Request failed (HTTP ${res.status})`)
+        if (json.debug) setDebug(json.debug)
         return
       }
       setResult(json)
@@ -158,12 +161,29 @@ export default function CrmStatusChanges() {
           border: '1px solid rgba(239,68,68,0.25)',
           borderRadius: 10,
           padding: '14px 18px',
-          marginBottom: 20,
+          marginBottom: debug ? 8 : 20,
           color: '#f87171',
           fontSize: 14,
         }}>
           {error}
         </div>
+      )}
+
+      {debug && (
+        <pre style={{
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 10,
+          padding: '14px 18px',
+          marginBottom: 20,
+          color: 'rgba(255,255,255,0.5)',
+          fontSize: 11,
+          overflowX: 'auto',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all',
+        }}>
+          {JSON.stringify(debug, null, 2)}
+        </pre>
       )}
 
       {/* Results */}

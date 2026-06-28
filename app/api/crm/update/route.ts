@@ -92,18 +92,23 @@ export async function POST(request: NextRequest) {
     // 5. Poll for completion (up to 4 minutes)
     const deadline = Date.now() + 240_000
     let downloadUrl: string | null = null
+    let lastJobList: unknown[] = []
+    let lastJob: unknown = null
 
     while (Date.now() < deadline) {
       await sleep(5000)
 
       const jobs = await crmFetch('/api/v2/exports/exports-requests', 'GET', token)
       const list = (jobs?.data?.data ?? []) as Array<{ id: number; status?: string; export_type?: string }>
+      lastJobList = list.slice(0, 5) // keep the 5 most recent for diagnostics
 
       const job = exportJobId
         ? list.find(j => j.id === exportJobId)
         : list
             .filter(j => j.export_type?.toLowerCase().includes('status') && j.id > maxIdBefore)
             .sort((a, b) => b.id - a.id)[0]
+
+      if (job) lastJob = job
 
       if (!job) continue
 
@@ -125,7 +130,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (!downloadUrl) {
-      return NextResponse.json({ error: 'Export did not complete within 4 minutes' }, { status: 504 })
+      return NextResponse.json({
+        error: 'Export did not complete within 4 minutes',
+        debug: {
+          triggerResponse: triggerData,
+          exportJobId,
+          maxIdBefore,
+          lastJob,
+          recentJobs: lastJobList,
+        }
+      }, { status: 504 })
     }
 
     // 6. Download the Excel file
