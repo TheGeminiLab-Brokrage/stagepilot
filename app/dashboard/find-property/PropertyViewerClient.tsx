@@ -589,13 +589,21 @@ export default function PropertyViewerClient({ userId, companyId }: {
           onDrop={e => { e.preventDefault(); setIsDragging(false); handleFiles(e.dataTransfer.files) }}
         >
           <div style={{
-            border: `2px dashed ${isDragging ? '#d7ff00' : 'rgba(215,255,0,0.3)'}`,
-            borderRadius: 20, padding: '72px 80px',
+            border: `2px dashed ${isDragging ? '#d7ff00' : 'rgba(215,255,0,0.25)'}`,
+            borderRadius: 20, padding: '64px 80px',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18,
             background: isDragging ? 'rgba(215,255,0,0.04)' : 'rgba(255,255,255,0.02)',
             transition: 'all 0.2s', maxWidth: 520, width: '100%',
           }}>
-            <div style={{ fontSize: 60 }}>{uploading ? '⏳' : '📊'}</div>
+            {uploading ? (
+              <div className="ph-spinner" style={{ marginBottom: 4 }} />
+            ) : (
+              <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="rgba(215,255,0,0.5)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            )}
             <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif", margin: 0, textAlign: 'center' }}>
               {uploading ? 'Processing…' : 'Your Property Database'}
             </h2>
@@ -648,29 +656,37 @@ export default function PropertyViewerClient({ userId, companyId }: {
   return (
     <div className="ph-root" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}>
       {/* Sheet manager bar */}
-      <div style={{ background: 'rgba(215,255,0,0.04)', borderBottom: '1px solid rgba(215,255,0,0.12)', padding: '8px 16px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.06em', textTransform: 'uppercase', marginRight: 4 }}>Sheets:</span>
+      <div style={{ background: 'rgba(255,255,255,0.025)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '8px 16px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.08em', textTransform: 'uppercase', marginRight: 4 }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+          </svg>
+          Data Sources
+        </span>
         {sheets.map(sheet => (
-          <span key={sheet.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(215,255,0,0.1)', color: '#d7ff00', border: '1px solid rgba(215,255,0,0.25)', borderRadius: 20, padding: '3px 10px 3px 12px', fontSize: 12, fontFamily: "'Montserrat', sans-serif" }}>
+          <span key={sheet.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '3px 10px 3px 12px', fontSize: 12, fontFamily: "'Montserrat', sans-serif" }}>
             {sheet.file_name}
-            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10 }}>({sheet.row_count.toLocaleString()} rows)</span>
-            <button onClick={() => deleteSheet(sheet.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0, lineHeight: 1, fontSize: 15, marginLeft: 2 }} title="Remove">×</button>
+            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>{sheet.row_count.toLocaleString()} rows</span>
+            <button onClick={() => deleteSheet(sheet.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, lineHeight: 1, fontSize: 14, marginLeft: 2, transition: 'color 0.15s' }} title="Remove" onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.3)' }}>×</button>
           </span>
         ))}
-        <button onClick={() => fileInputRef.current?.click()} style={{ background: 'none', border: '1px dashed rgba(215,255,0,0.3)', color: 'rgba(215,255,0,0.7)', borderRadius: 20, padding: '3px 12px', fontSize: 12, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif" }}>
-          + Add more data
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)', borderRadius: 20, padding: '3px 12px', fontSize: 12, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", transition: 'all 0.15s' }}
+          onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = 'rgba(215,255,0,0.35)'; b.style.color = 'rgba(215,255,0,0.8)' }}
+          onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = 'rgba(255,255,255,0.12)'; b.style.color = 'rgba(255,255,255,0.5)' }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Sheet
         </button>
         <input ref={fileInputRef} type="file" accept=".xlsx,.xls" multiple style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
 
-        {/* Configure button */}
-        <button
-          onClick={() => setShowConfig(true)}
-          style={{ marginLeft: 'auto', background: 'rgba(215,255,0,0.1)', border: '1px solid rgba(215,255,0,0.3)', color: '#d7ff00', borderRadius: 8, padding: '4px 14px', fontSize: 12, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6 }}
-        >
-          ⚙ Configure View
-        </button>
-
-        {uploading && <span style={{ color: 'rgba(215,255,0,0.6)', fontSize: 12 }}>Uploading…</span>}
+        {uploading && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'rgba(215,255,0,0.6)', fontSize: 12, fontFamily: "'Space Grotesk', sans-serif" }}>
+            <div style={{ width: 12, height: 12, border: '2px solid rgba(215,255,0,0.2)', borderTopColor: '#d7ff00', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+            Uploading…
+          </span>
+        )}
         {uploadError && <span style={{ color: '#ef4444', fontSize: 12 }}>{uploadError}</span>}
       </div>
 
@@ -761,14 +777,22 @@ export default function PropertyViewerClient({ userId, companyId }: {
           <div className="ph-kpi-row">
             {/* Total in dataset */}
             <div className="ph-kpi ph-kpi-energy">
-              <div className="ph-kpi-icon">🏢</div>
+              <div className="ph-kpi-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+                </svg>
+              </div>
               <div className="ph-kpi-val">{rows.length.toLocaleString()}</div>
               <div className="ph-kpi-lbl">Total Properties</div>
             </div>
 
             {/* Matching current filters */}
             <div className="ph-kpi ph-kpi-gold">
-              <div className="ph-kpi-icon">✓</div>
+              <div className="ph-kpi-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
               <div className="ph-kpi-val" style={{ color: hasActiveFilters || search ? '#d7ff00' : 'rgba(255,255,255,0.5)' }}>
                 {afterSearch.length.toLocaleString()}
               </div>
@@ -778,14 +802,22 @@ export default function PropertyViewerClient({ userId, companyId }: {
             {/* Key numeric range — only if column exists and has variance */}
             {kpiCol && kpiMin !== null && kpiMax !== null && kpiMin !== kpiMax && (
               <div className="ph-kpi ph-kpi-gold">
-                <div className="ph-kpi-icon">📐</div>
+                <div className="ph-kpi-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/>
+                  </svg>
+                </div>
                 <div className="ph-kpi-val">{fmt(kpiMin)}</div>
                 <div className="ph-kpi-lbl">From · {kpiCol.label}</div>
               </div>
             )}
             {kpiCol && kpiMin !== null && kpiMax !== null && kpiMin !== kpiMax && (
               <div className="ph-kpi ph-kpi-gold">
-                <div className="ph-kpi-icon">📐</div>
+                <div className="ph-kpi-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="4" x2="12" y2="20"/><polyline points="18 14 12 20 6 14"/>
+                  </svg>
+                </div>
                 <div className="ph-kpi-val">{fmt(kpiMax)}</div>
                 <div className="ph-kpi-lbl">Up to · {kpiCol.label}</div>
               </div>
@@ -803,6 +835,18 @@ export default function PropertyViewerClient({ userId, companyId }: {
                   {numericSortOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               )}
+              <button
+                className="ph-view-btn"
+                onClick={() => setShowConfig(true)}
+                title="Configure view"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 10px' }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="20" y2="12"/><line x1="12" y1="18" x2="20" y2="18"/>
+                  <circle cx="4" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="6" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>
+                </svg>
+                Configure
+              </button>
               <button className={`ph-view-btn${view === 'grid' ? ' active' : ''}`} onClick={() => setView('grid')} title="Grid view">⊞</button>
               <button className={`ph-view-btn${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')} title="List view">☰</button>
             </div>
@@ -834,7 +878,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                 const showBadge = badgeVal && badgeVal !== '—'
                 return (
                   <div key={idx} className="ph-property-card" onClick={() => setSelectedIdx(idx)}>
-                    <div className="ph-card-top">
+                    <div className="ph-card-top" style={{ background: 'linear-gradient(180deg, rgba(215,255,0,0.04) 0%, transparent 100%)' }}>
                       {showBadge && (
                         <div className="ph-type-badge" style={badgeStyle(badgeVal)}>{badgeVal}</div>
                       )}
@@ -853,6 +897,21 @@ export default function PropertyViewerClient({ userId, companyId }: {
                           if (!display || display === '—') return null
                           return (
                             <div key={col.key} className="ph-spec">
+                              <span className="ph-spec-icon">
+                                {col.type === 'numeric' ? (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                                  </svg>
+                                ) : col.type === 'year' ? (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                                  </svg>
+                                ) : (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+                                  </svg>
+                                )}
+                              </span>
                               <strong>{display}</strong>
                               <span>{col.label}</span>
                             </div>
@@ -870,18 +929,18 @@ export default function PropertyViewerClient({ userId, companyId }: {
                         )
                       })()}
                     </div>
-                    <div className="ph-card-footer" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    <div className="ph-card-footer" style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                       {cfg.cardColumns
                         .filter(k => !nonPriceSpecCols.find(c => c.key === k) && k !== priceSpecCol?.key && k !== cfg.titleColumn && k !== cfg.subtitleColumn && k !== cfg.badgeColumn)
-                        .slice(0, 2)
+                        .slice(0, 3)
                         .map(k => {
                           const col = colByKey[k]
                           const val = row[k]
                           if (!col || val == null || val === '' || String(val) === '—') return null
                           return (
-                            <span key={k} className="ph-delivery-info">
-                              <span style={{ opacity: 0.5, fontSize: 10 }}>{col.label}: </span>
-                              <span>{String(val)}</span>
+                            <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '2px 9px', fontSize: 11, fontFamily: "'Montserrat', sans-serif" }}>
+                              <span style={{ color: 'rgba(255,255,255,0.4)' }}>{col.label}</span>
+                              <span style={{ color: 'rgba(255,255,255,0.85)' }}>{String(val)}</span>
                             </span>
                           )
                         })}

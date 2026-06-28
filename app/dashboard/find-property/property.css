@@ -387,6 +387,14 @@
 
 .ph-spec-icon {
   font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  color: rgba(215, 255, 0, 0.45);
+  flex-shrink: 0;
+}
+.ph-spec-icon svg {
+  width: 12px;
+  height: 12px;
 }
 
 .ph-card-price {
