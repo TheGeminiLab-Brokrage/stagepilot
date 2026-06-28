@@ -18,7 +18,7 @@ export default function CrmStatusChanges() {
   const [dateTo, setDateTo]     = useState(todayStr)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState<string | null>(null)
-  const [debug, setDebug]       = useState<unknown>(null)
+  const [debug, setDebug]       = useState<Record<string, unknown> | null>(null)
   const [result, setResult]     = useState<{ count: number; dateFrom: string; dateTo: string; data: Row[] } | null>(null)
 
   async function handleUpdate() {
@@ -45,7 +45,7 @@ export default function CrmStatusChanges() {
       const json = await res.json()
       if (!res.ok || !json.ok) {
         setError(json.error ?? `Request failed (HTTP ${res.status})`)
-        if (json.debug) setDebug(json.debug)
+        if (json.debug) setDebug(json.debug as Record<string, unknown>)
         return
       }
       setResult(json)
