@@ -622,24 +622,11 @@ export default function PropertyViewerClient({ userId, companyId }: {
 
   return (
     <div className="ph-root" onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}>
-      {/* Sheet manager bar */}
-      <div style={{ background: 'rgba(255,255,255,0.025)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '8px 16px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(255,255,255,0.35)', fontSize: 10, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.08em', textTransform: 'uppercase', marginRight: 4 }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-          </svg>
-          Data Sources
-        </span>
-        {sheets.map(sheet => (
-          <span key={sheet.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '3px 10px 3px 12px', fontSize: 12, fontFamily: "'Montserrat', sans-serif" }}>
-            {sheet.file_name}
-            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>{sheet.row_count.toLocaleString()} rows</span>
-            <button onClick={() => deleteSheet(sheet.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, lineHeight: 1, fontSize: 14, marginLeft: 2, transition: 'color 0.15s' }} title="Remove" onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444' }} onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.3)' }}>×</button>
-          </span>
-        ))}
+      {/* Toolbar bar */}
+      <div style={{ background: 'rgba(255,255,255,0.025)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
         <button
           onClick={() => fileInputRef.current?.click()}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)', borderRadius: 20, padding: '3px 12px', fontSize: 12, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", transition: 'all 0.15s' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)', borderRadius: 20, padding: '4px 14px', fontSize: 12, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", transition: 'all 0.15s' }}
           onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = 'rgba(215,255,0,0.35)'; b.style.color = 'rgba(215,255,0,0.8)' }}
           onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = 'rgba(255,255,255,0.12)'; b.style.color = 'rgba(255,255,255,0.5)' }}
         >
@@ -647,6 +634,19 @@ export default function PropertyViewerClient({ userId, companyId }: {
           Add Sheet
         </button>
         <input ref={fileInputRef} type="file" accept=".xlsx,.xls" multiple style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
+
+        <button
+          onClick={() => setShowConfig(true)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: '1px solid rgba(215,255,0,0.25)', color: 'rgba(215,255,0,0.8)', borderRadius: 20, padding: '4px 14px', fontSize: 12, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, transition: 'all 0.15s' }}
+          onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = 'rgba(215,255,0,0.08)'; b.style.borderColor = 'rgba(215,255,0,0.5)' }}
+          onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = 'none'; b.style.borderColor = 'rgba(215,255,0,0.25)' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="20" y2="12"/><line x1="12" y1="18" x2="20" y2="18"/>
+            <circle cx="4" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="6" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>
+          </svg>
+          Configure View
+        </button>
 
         {uploading && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'rgba(215,255,0,0.6)', fontSize: 12, fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -802,19 +802,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                   {numericSortOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               )}
-              <button
-                className="ph-view-btn"
-                onClick={() => setShowConfig(true)}
-                title="Configure view"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 10px' }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="20" y2="12"/><line x1="12" y1="18" x2="20" y2="18"/>
-                  <circle cx="4" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="6" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>
-                </svg>
-                Configure
-              </button>
-              <button className={`ph-view-btn${view === 'grid' ? ' active' : ''}`} onClick={() => setView('grid')} title="Grid view">⊞</button>
+<button className={`ph-view-btn${view === 'grid' ? ' active' : ''}`} onClick={() => setView('grid')} title="Grid view">⊞</button>
               <button className={`ph-view-btn${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')} title="List view">☰</button>
             </div>
           </div>
