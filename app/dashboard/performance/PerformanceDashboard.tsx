@@ -66,6 +66,21 @@ function effectiveStage(call: Call): string {
   return (call.stage_corrected ?? call.stage ?? '').toLowerCase()
 }
 
+function CustomDonutLabel({ cx, cy, midAngle, outerRadius, value, percent }: {
+  cx: number; cy: number; midAngle: number; outerRadius: number; value: number; percent: number
+}) {
+  if (!percent || percent < 0.02) return null
+  const RADIAN = Math.PI / 180
+  const radius = outerRadius + 36
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+  return (
+    <text x={x} y={y} fill="rgba(255,255,255,0.65)" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={10} fontFamily="'Space Grotesk', sans-serif">
+      {value} ({(percent * 100).toFixed(2)}%)
+    </text>
+  )
+}
+
 // Semi-circle gauge
 function Gauge({ value, max }: { value: number; max: number }) {
   const size = 150, R = 52, cx = size / 2, cy = R + 10, height = cy + 22
@@ -357,12 +372,14 @@ export default function PerformanceDashboard({
               ))}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
               <div style={{ position: 'relative', flexShrink: 0 }}>
-                <PieChart width={240} height={240}>
+                <PieChart width={340} height={340}>
                   <Pie
                     data={donutData.length > 0 ? donutData : [{ name: 'empty', value: 1, color: 'rgba(255,255,255,0.06)', pct: '0' }]}
-                    cx={120} cy={120} innerRadius={72} outerRadius={112} dataKey="value" startAngle={90} endAngle={-270} strokeWidth={0}
+                    cx={170} cy={170} innerRadius={90} outerRadius={128} dataKey="value" startAngle={90} endAngle={-270} strokeWidth={0}
+                    label={donutData.length > 0 ? CustomDonutLabel : undefined}
+                    labelLine={donutData.length > 0 ? { stroke: 'rgba(255,255,255,0.18)', strokeWidth: 1 } : false}
                   >
                     {(donutData.length > 0 ? donutData : [{ color: 'rgba(255,255,255,0.06)' }]).map((entry, idx) => (
                       <Cell key={idx} fill={entry.color} />
@@ -377,22 +394,11 @@ export default function PerformanceDashboard({
                   )}
                 </PieChart>
                 <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
-                  <div style={{ fontSize: 30, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>{total}</div>
+                  <div style={{ fontSize: 36, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>{total}</div>
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>
                     {isUsingCrm ? 'unique leads' : 'total leads'}
                   </div>
                 </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {donutData.map(d => (
-                  <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: d.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', minWidth: 100 }}>{STAGE_LABELS[d.name] ?? d.name}</span>
-                    <span style={{ fontSize: 12, color: '#fff', fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{d.value}</span>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>({d.pct}%)</span>
-                  </div>
-                ))}
               </div>
             </div>
           </div>
