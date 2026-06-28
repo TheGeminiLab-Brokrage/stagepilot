@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent as ReactMouseEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import MultiCombobox from '@/app/dashboard/components/MultiCombobox'
 import { parseExcelFile, type RawRow } from '@/lib/excel-parser'
@@ -340,6 +340,9 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [page, setPage] = useState(1)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
+  const [pickerOpen, setPickerOpen] = useState<number | null>(null)
+  const [pickerFields, setPickerFields] = useState<string[]>([])
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const [showConfig, setShowConfig] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -446,6 +449,35 @@ export default function PropertyViewerClient({ userId, companyId }: {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  function generateViewerMessage(row: RawRow, selectedFields: string[]): string {
+    const title = config?.titleColumn ? String(row[config.titleColumn] ?? '') : ''
+    const lines = selectedFields
+      .filter(k => k !== config?.titleColumn && row[k] != null && String(row[k]) !== '')
+      .map(k => {
+        const col = columns.find(c => c.key === k)
+        const label = col?.label ?? k
+        return `${label}: ${row[k]}`
+      })
+    return [title, ...lines].filter(Boolean).join('\n')
+  }
+
+  function handleCopyOpen(e: ReactMouseEvent, row: RawRow, idx: number) {
+    e.stopPropagation()
+    if (pickerOpen === idx) { setPickerOpen(null); return }
+    const defaults = columns.filter(c => row[c.key] != null && String(row[c.key]) !== '').map(c => c.key)
+    setPickerFields(defaults)
+    setPickerOpen(idx)
+  }
+
+  function handlePickerCopy(e: ReactMouseEvent, row: RawRow, idx: number) {
+    e.stopPropagation()
+    const text = generateViewerMessage(row, pickerFields)
+    navigator.clipboard.writeText(text)
+    setCopiedIdx(idx)
+    setPickerOpen(null)
+    setTimeout(() => setCopiedIdx(null), 2000)
   }
 
   function toggleSheet(sheetId: string) {
@@ -893,73 +925,110 @@ export default function PropertyViewerClient({ userId, companyId }: {
                 const badgeVal = cfg.badgeColumn ? String(row[cfg.badgeColumn] ?? '') : ''
                 const showBadge = badgeVal && badgeVal !== '—'
                 return (
-                  <div key={idx} className="ph-property-card" onClick={() => setSelectedIdx(idx)}>
-                    <div className="ph-card-top" style={{ background: 'linear-gradient(180deg, rgba(215,255,0,0.04) 0%, transparent 100%)' }}>
-                      {showBadge && (
-                        <div className="ph-type-badge" style={badgeStyle(badgeVal)}>{badgeVal}</div>
-                      )}
-                      {subtitleVal && subtitleVal !== '—' && (
-                        <div className="ph-city-badge">{subtitleVal}</div>
-                      )}
-                      {titleVal && titleVal !== '—' && (
-                        <div className="ph-card-project">{titleVal}</div>
-                      )}
-                    </div>
-                    <div className="ph-card-body">
-                      <div className="ph-card-specs">
-                        {nonPriceSpecCols.slice(0, 4).map(col => {
-                          const val = row[col.key]
-                          const display = col.type === 'numeric' ? fmt(val) : String(val ?? '')
-                          if (!display || display === '—') return null
-                          return (
-                            <div key={col.key} className="ph-spec">
-                              <span className="ph-spec-icon">
-                                {col.type === 'numeric' ? (
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-                                  </svg>
-                                ) : col.type === 'year' ? (
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                                  </svg>
-                                ) : (
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
-                                  </svg>
-                                )}
-                              </span>
-                              <strong>{display}</strong>
-                              <span>{col.label}</span>
-                            </div>
-                          )
-                        })}
+                  <div key={idx} style={{ position: 'relative' }}>
+                    <div className="ph-property-card" onClick={() => setSelectedIdx(idx)} style={{ position: 'relative' }}>
+                      <div className="ph-card-top" style={{ background: 'linear-gradient(180deg, rgba(215,255,0,0.04) 0%, transparent 100%)' }}>
+                        {showBadge && (
+                          <div className="ph-type-badge" style={badgeStyle(badgeVal)}>{badgeVal}</div>
+                        )}
+                        {subtitleVal && subtitleVal !== '—' && (
+                          <div className="ph-city-badge">{subtitleVal}</div>
+                        )}
+                        {titleVal && titleVal !== '—' && (
+                          <div className="ph-card-project">{titleVal}</div>
+                        )}
                       </div>
-                      {priceSpecCol && (() => {
-                        const pv = row[priceSpecCol.key]
-                        if (pv == null || pv === '') return null
-                        return (
-                          <>
-                            <div className="ph-card-price">{fmt(pv)}</div>
-                            <div className="ph-card-price-sub">{priceSpecCol.label}</div>
-                          </>
-                        )
-                      })()}
-                    </div>
-                    <div className="ph-card-footer" style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {columns
-                        .filter(c => !nonPriceSpecCols.find(s => s.key === c.key) && c.key !== priceSpecCol?.key && c.key !== cfg.titleColumn && c.key !== cfg.subtitleColumn && c.key !== cfg.badgeColumn)
-                        .slice(0, 3)
-                        .map(col => {
-                          const val = row[col.key]
-                          if (val == null || val === '' || String(val) === '—') return null
+                      <div className="ph-card-body">
+                        <div className="ph-card-specs">
+                          {nonPriceSpecCols.slice(0, 4).map(col => {
+                            const val = row[col.key]
+                            const display = col.type === 'numeric' ? fmt(val) : String(val ?? '')
+                            if (!display || display === '—') return null
+                            return (
+                              <div key={col.key} className="ph-spec">
+                                <span className="ph-spec-icon">
+                                  {col.type === 'numeric' ? (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                                    </svg>
+                                  ) : col.type === 'year' ? (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                                    </svg>
+                                  ) : (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+                                    </svg>
+                                  )}
+                                </span>
+                                <strong>{display}</strong>
+                                <span>{col.label}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {priceSpecCol && (() => {
+                          const pv = row[priceSpecCol.key]
+                          if (pv == null || pv === '') return null
                           return (
-                            <span key={col.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '2px 9px', fontSize: 11, fontFamily: "'Montserrat', sans-serif" }}>
-                              <span style={{ color: 'rgba(255,255,255,0.4)' }}>{col.label}</span>
-                              <span style={{ color: 'rgba(255,255,255,0.85)' }}>{String(val)}</span>
-                            </span>
+                            <>
+                              <div className="ph-card-price">{fmt(pv)}</div>
+                              <div className="ph-card-price-sub">{priceSpecCol.label}</div>
+                            </>
                           )
-                        })}
+                        })()}
+                      </div>
+                      <div className="ph-card-footer" style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                        {columns
+                          .filter(c => !nonPriceSpecCols.find(s => s.key === c.key) && c.key !== priceSpecCol?.key && c.key !== cfg.titleColumn && c.key !== cfg.subtitleColumn && c.key !== cfg.badgeColumn)
+                          .slice(0, 3)
+                          .map(col => {
+                            const val = row[col.key]
+                            if (val == null || val === '' || String(val) === '—') return null
+                            return (
+                              <span key={col.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '2px 9px', fontSize: 11, fontFamily: "'Montserrat', sans-serif" }}>
+                                <span style={{ color: 'rgba(255,255,255,0.4)' }}>{col.label}</span>
+                                <span style={{ color: 'rgba(255,255,255,0.85)' }}>{String(val)}</span>
+                              </span>
+                            )
+                          })}
+                      </div>
+                      <button
+                        className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
+                        style={{ position: 'absolute', bottom: 10, right: 10, zIndex: 2 }}
+                        onClick={e => handleCopyOpen(e, row, idx)}
+                        title="Copy message"
+                      >
+                        {copiedIdx === idx ? '✓' : '📋'}
+                      </button>
                     </div>
+                    {pickerOpen === idx && (
+                      <>
+                        <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
+                        <div className="ph-plan-picker" style={{ right: 0, left: 'auto', bottom: '100%', top: 'auto', minWidth: 220 }}>
+                          <div className="ph-picker-title">Message Content</div>
+                          <div className="ph-picker-section" data-label="Fields">
+                            {columns.filter(c => row[c.key] != null && String(row[c.key]) !== '').map(col => (
+                              <label key={col.key} className="ph-picker-option">
+                                <input
+                                  type="checkbox"
+                                  checked={pickerFields.includes(col.key)}
+                                  onChange={ev => {
+                                    setPickerFields(prev =>
+                                      ev.target.checked ? [...prev, col.key] : prev.filter(k => k !== col.key)
+                                    )
+                                  }}
+                                />
+                                {col.label}
+                              </label>
+                            ))}
+                          </div>
+                          <button className="ph-picker-copy-btn" onClick={e => handlePickerCopy(e, row, idx)}>
+                            Copy
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )
               })}
