@@ -13,7 +13,16 @@ type PropertyInput = {
   delivery: string
   maint: number | string
   plans: string
+  code?: string
+  phase?: string
+  floor?: string | number
+  parking?: string | number
 }
+
+type MessageFields = Partial<Record<
+  'code' | 'phase' | 'floor' | 'area' | 'price' | 'discount' | 'delivery' | 'maint' | 'parking',
+  boolean
+>>
 
 function bedsAr(beds: string | number): string {
   const b = parseInt(String(beds))
@@ -80,7 +89,11 @@ function cityCapitalize(s: string): string {
   return s.replace(/\b\w/g, c => c.toUpperCase())
 }
 
-export function generatePropertyMessage(r: PropertyInput, selectedPlans?: string[]): string {
+export function generatePropertyMessage(
+  r: PropertyInput,
+  selectedPlans?: string[],
+  fields?: MessageFields
+): string {
   const isStudio =
     parseInt(String(r.beds)) === 0 ||
     String(r.type).toLowerCase().includes('studio')
@@ -103,14 +116,30 @@ export function generatePropertyMessage(r: PropertyInput, selectedPlans?: string
   lines.push('')
   lines.push(`📍 ${cityCapitalize(r.city)}${r.developer ? ' | ' + r.developer : ''}`)
 
-  let areaLine = `📐 المساحة: ${r.area} متر`
-  if (hasGarden) areaLine += ` + ${r.garden} م حديقة`
-  if (hasRoof) areaLine += ` + ${r.roof} م روف`
-  lines.push(areaLine)
+  if (fields?.code !== false && r.code) {
+    lines.push(`🏷️ كود الوحدة: ${r.code}`)
+  }
 
-  lines.push(`💰 السعر: ${fmtPrice(r.price)} جنيه`)
+  if (fields?.phase !== false && r.phase) {
+    lines.push(`🏗️ المرحلة / المبنى: ${r.phase}`)
+  }
 
-  if (hasDiscount) {
+  if (fields?.floor !== false && r.floor !== '' && r.floor !== undefined && r.floor !== null) {
+    lines.push(`🏢 الدور: ${r.floor}`)
+  }
+
+  if (fields?.area !== false && r.area) {
+    let areaLine = `📐 المساحة: ${r.area} متر`
+    if (hasGarden) areaLine += ` + ${r.garden} م حديقة`
+    if (hasRoof) areaLine += ` + ${r.roof} م روف`
+    lines.push(areaLine)
+  }
+
+  if (fields?.price !== false) {
+    lines.push(`💰 السعر: ${fmtPrice(r.price)} جنيه`)
+  }
+
+  if (fields?.discount !== false && hasDiscount) {
     const discountNum = parseFloat(String(r.discount))
     lines.push(discountNum > 99 ? `💸 خصم كاش: ${fmtPrice(r.discount)} جنيه` : `💸 خصم كاش: ${r.discount}%`)
   }
@@ -124,13 +153,17 @@ export function generatePropertyMessage(r: PropertyInput, selectedPlans?: string
     plans.forEach(p => lines.push(`• ${p}`))
   }
 
-  if (r.delivery) {
+  if (fields?.delivery !== false && r.delivery) {
     lines.push('')
     lines.push(`⏳ التسليم: ${r.delivery}`)
   }
 
-  if (hasMaint) {
+  if (fields?.maint !== false && hasMaint) {
     lines.push(`🔧 صيانة: ${r.maint}%`)
+  }
+
+  if (fields?.parking !== false && r.parking && String(r.parking) !== '—') {
+    lines.push(`🚗 موقف السيارة: ${r.parking}`)
   }
 
   return lines.join('\n')

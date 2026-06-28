@@ -965,3 +965,43 @@
   cursor: pointer;
   flex-shrink: 0;
 }
+
+/* PICKER SECTION DIVIDER */
+.ph-picker-section {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(215, 255, 0, 0.5);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 8px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+/* MODAL FIELD CHECKBOXES */
+.ph-modal-field {
+  position: relative;
+}
+
+.ph-modal-field-selectable {
+  padding-left: 28px;
+  cursor: default;
+}
+
+.ph-modal-field-check {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+  accent-color: #d7ff00;
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.ph-modal-field-fixed {
+  opacity: 0.6;
+}

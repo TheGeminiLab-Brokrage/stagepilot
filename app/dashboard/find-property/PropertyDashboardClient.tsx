@@ -103,6 +103,49 @@ function capitalize(s: string): string {
   return s.replace(/\b\w/g, c => c.toUpperCase())
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  code: 'كود الوحدة',
+  phase: 'المرحلة / المبنى',
+  floor: 'الدور',
+  area: 'المساحة',
+  price: 'السعر',
+  discount: 'خصم الكاش',
+  delivery: 'التسليم',
+  maint: 'الصيانة',
+  parking: 'موقف السيارة',
+}
+
+function getAvailableFields(r: Property): string[] {
+  const f: string[] = []
+  if (r.code) f.push('code')
+  if (r.phase) f.push('phase')
+  if (r.floor !== '' && r.floor !== undefined) f.push('floor')
+  if (r.area) f.push('area')
+  if (r.price) f.push('price')
+  if (parseFloat(String(r.discount)) > 0) f.push('discount')
+  if (r.delivery) f.push('delivery')
+  if (parseFloat(String(r.maint)) > 0) f.push('maint')
+  if (r.parking && String(r.parking) !== '—') f.push('parking')
+  return f
+}
+
+function fieldValueLabel(r: Property, field: string): string {
+  switch (field) {
+    case 'code':     return String(r.code)
+    case 'phase':    return String(r.phase)
+    case 'floor':    return String(r.floor)
+    case 'area':     return `${r.area} م²`
+    case 'price':    return `${parseFloat(String(r.price)).toLocaleString('en-EG')} ج`
+    case 'discount': return parseFloat(String(r.discount)) > 99
+                       ? `${parseFloat(String(r.discount)).toLocaleString('en-EG')} ج`
+                       : `${r.discount}%`
+    case 'delivery': return String(r.delivery)
+    case 'maint':    return `${r.maint}%`
+    case 'parking':  return String(r.parking)
+    default:         return ''
+  }
+}
+
 function safeMin(arr: number[]): number {
   return arr.reduce((m, v) => (v < m ? v : m), arr[0])
 }
@@ -322,8 +365,10 @@ export default function PropertyDashboardClient() {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const [copiedModal, setCopiedModal] = useState(false)
   const [pickerOpen, setPickerOpen] = useState<number | null>(null)
-  const [pickerSelected, setPickerSelected] = useState<string[]>([])
+  const [pickerPlans, setPickerPlans] = useState<string[]>([])
+  const [pickerFields, setPickerFields] = useState<string[]>([])
   const [modalPlanSelected, setModalPlanSelected] = useState<string[]>([])
+  const [modalFields, setModalFields] = useState<string[]>([])
 
   useEffect(() => {
     fetch('/property-data.json')
@@ -574,46 +619,47 @@ export default function PropertyDashboardClient() {
   useEffect(() => { setCopiedModal(false) }, [selectedIdx])
 
   useEffect(() => {
-    if (selectedIdx === null) { setModalPlanSelected([]); return }
+    if (selectedIdx === null) { setModalPlanSelected([]); setModalFields([]); return }
     const prop = sorted[selectedIdx]
     if (!prop) return
     setModalPlanSelected(String(prop.plans || '').split('|').map(s => s.trim()).filter(Boolean))
+    setModalFields(getAvailableFields(prop))
   }, [selectedIdx]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCopy = useCallback((e: ReactMouseEvent, r: Property, idx: number) => {
     e.stopPropagation()
-    const plans = String(r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
-    if (plans.length <= 1) {
-      const msg = generatePropertyMessage(r)
-      navigator.clipboard.writeText(msg).then(() => {
-        setCopiedIdx(idx)
-        setTimeout(() => setCopiedIdx(c => (c === idx ? null : c)), 2000)
-      })
-    } else if (pickerOpen === idx) {
+    if (pickerOpen === idx) {
       setPickerOpen(null)
     } else {
       setPickerOpen(idx)
-      setPickerSelected(plans)
+      setPickerPlans(String(r.plans || '').split('|').map(s => s.trim()).filter(Boolean))
+      setPickerFields(getAvailableFields(r))
     }
   }, [pickerOpen])
 
   const handlePickerCopy = useCallback((e: ReactMouseEvent, r: Property, idx: number) => {
     e.stopPropagation()
-    const msg = generatePropertyMessage(r, pickerSelected)
+    const fields = Object.fromEntries(
+      ['code','phase','floor','area','price','discount','delivery','maint','parking'].map(k => [k, pickerFields.includes(k)])
+    ) as Record<string, boolean>
+    const msg = generatePropertyMessage(r, pickerPlans, fields)
     navigator.clipboard.writeText(msg).then(() => {
       setCopiedIdx(idx)
       setPickerOpen(null)
       setTimeout(() => setCopiedIdx(c => (c === idx ? null : c)), 2000)
     })
-  }, [pickerSelected])
+  }, [pickerPlans, pickerFields])
 
   const handleCopyModal = useCallback((r: Property) => {
-    const msg = generatePropertyMessage(r, modalPlanSelected)
+    const fields = Object.fromEntries(
+      ['code','phase','floor','area','price','discount','delivery','maint','parking'].map(k => [k, modalFields.includes(k)])
+    ) as Record<string, boolean>
+    const msg = generatePropertyMessage(r, modalPlanSelected, fields)
     navigator.clipboard.writeText(msg).then(() => {
       setCopiedModal(true)
       setTimeout(() => setCopiedModal(false), 2000)
     })
-  }, [modalPlanSelected])
+  }, [modalPlanSelected, modalFields])
 
   const handlePage = useCallback((p: number) => {
     if (p < 1 || p > totalPages) return
@@ -866,23 +912,46 @@ export default function PropertyDashboardClient() {
                         </button>
                         {pickerOpen === idx && (() => {
                           const allPlans = String(r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+                          const avFields = getAvailableFields(r)
                           return (
                             <>
                               <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
                               <div className="ph-plan-picker" onClick={e => e.stopPropagation()}>
-                                <div className="ph-picker-title">أنظمة السداد</div>
-                                {allPlans.map((plan, pi) => (
-                                  <label key={pi} className="ph-picker-option">
-                                    <input
-                                      type="checkbox"
-                                      checked={pickerSelected.includes(plan)}
-                                      onChange={() => setPickerSelected(prev =>
-                                        prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
-                                      )}
-                                    />
-                                    <span>{plan}</span>
-                                  </label>
-                                ))}
+                                <div className="ph-picker-title">محتوى الرسالة</div>
+                                {avFields.length > 0 && (
+                                  <>
+                                    <div className="ph-picker-section">تفاصيل</div>
+                                    {avFields.map(field => (
+                                      <label key={field} className="ph-picker-option">
+                                        <input
+                                          type="checkbox"
+                                          checked={pickerFields.includes(field)}
+                                          onChange={() => setPickerFields(prev =>
+                                            prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+                                          )}
+                                        />
+                                        <span>{FIELD_LABELS[field]}: {fieldValueLabel(r, field)}</span>
+                                      </label>
+                                    ))}
+                                  </>
+                                )}
+                                {allPlans.length > 0 && (
+                                  <>
+                                    <div className="ph-picker-section">أنظمة السداد</div>
+                                    {allPlans.map((plan, pi) => (
+                                      <label key={pi} className="ph-picker-option">
+                                        <input
+                                          type="checkbox"
+                                          checked={pickerPlans.includes(plan)}
+                                          onChange={() => setPickerPlans(prev =>
+                                            prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
+                                          )}
+                                        />
+                                        <span>{plan}</span>
+                                      </label>
+                                    ))}
+                                  </>
+                                )}
                                 <button className="ph-picker-copy-btn" onClick={e => handlePickerCopy(e, r, idx)}>
                                   نسخ
                                 </button>
@@ -936,23 +1005,46 @@ export default function PropertyDashboardClient() {
                       </button>
                       {pickerOpen === idx && (() => {
                         const allPlans = String(r.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+                        const avFields = getAvailableFields(r)
                         return (
                           <>
                             <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
                             <div className="ph-plan-picker" onClick={e => e.stopPropagation()}>
-                              <div className="ph-picker-title">أنظمة السداد</div>
-                              {allPlans.map((plan, pi) => (
-                                <label key={pi} className="ph-picker-option">
-                                  <input
-                                    type="checkbox"
-                                    checked={pickerSelected.includes(plan)}
-                                    onChange={() => setPickerSelected(prev =>
-                                      prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
-                                    )}
-                                  />
-                                  <span>{plan}</span>
-                                </label>
-                              ))}
+                              <div className="ph-picker-title">محتوى الرسالة</div>
+                              {avFields.length > 0 && (
+                                <>
+                                  <div className="ph-picker-section">تفاصيل</div>
+                                  {avFields.map(field => (
+                                    <label key={field} className="ph-picker-option">
+                                      <input
+                                        type="checkbox"
+                                        checked={pickerFields.includes(field)}
+                                        onChange={() => setPickerFields(prev =>
+                                          prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+                                        )}
+                                      />
+                                      <span>{FIELD_LABELS[field]}: {fieldValueLabel(r, field)}</span>
+                                    </label>
+                                  ))}
+                                </>
+                              )}
+                              {allPlans.length > 0 && (
+                                <>
+                                  <div className="ph-picker-section">أنظمة السداد</div>
+                                  {allPlans.map((plan, pi) => (
+                                    <label key={pi} className="ph-picker-option">
+                                      <input
+                                        type="checkbox"
+                                        checked={pickerPlans.includes(plan)}
+                                        onChange={() => setPickerPlans(prev =>
+                                          prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
+                                        )}
+                                      />
+                                      <span>{plan}</span>
+                                    </label>
+                                  ))}
+                                </>
+                              )}
                               <button className="ph-picker-copy-btn" onClick={e => handlePickerCopy(e, r, idx)}>
                                 نسخ
                               </button>
@@ -1034,28 +1126,86 @@ export default function PropertyDashboardClient() {
                     </div>
 
                     <div className="ph-modal-grid">
-                      <div className="ph-modal-field"><div className="f-label">Unit Code</div><div className="f-value">{r.code || '—'}</div></div>
-                      <div className="ph-modal-field"><div className="f-label">Phase / Building</div><div className="f-value">{r.phase || '—'}</div></div>
-                      <div className="ph-modal-field"><div className="f-label">Floor</div><div className="f-value">{r.floor !== '' && r.floor !== undefined ? r.floor : '—'}</div></div>
-                      <div className="ph-modal-field"><div className="f-label">Bedrooms</div><div className="f-value">{r.beds || '—'}</div></div>
-                      <div className="ph-modal-field"><div className="f-label">Area</div><div className="f-value">{r.area ? r.area + ' m²' : '—'}</div></div>
+                      {/* Checkable fields */}
+                      {(['code','phase','floor'] as const).map(field => {
+                        const val = field === 'floor'
+                          ? (r.floor !== '' && r.floor !== undefined ? r.floor : null)
+                          : r[field]
+                        if (!val) return null
+                        const label = field === 'code' ? 'Unit Code' : field === 'phase' ? 'Phase / Building' : 'Floor'
+                        return (
+                          <div key={field} className="ph-modal-field ph-modal-field-selectable">
+                            <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes(field)}
+                              onChange={() => setModalFields(prev => prev.includes(field) ? prev.filter(x => x !== field) : [...prev, field])} />
+                            <div className="f-label">{label}</div>
+                            <div className="f-value">{val}</div>
+                          </div>
+                        )
+                      })}
+                      {/* Always-in-header fields — no checkbox */}
+                      <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Bedrooms</div><div className="f-value">{r.beds || '—'}</div></div>
+                      {/* Area */}
+                      {r.area ? (
+                        <div className="ph-modal-field ph-modal-field-selectable">
+                          <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('area')}
+                            onChange={() => setModalFields(prev => prev.includes('area') ? prev.filter(x => x !== 'area') : [...prev, 'area'])} />
+                          <div className="f-label">Area</div>
+                          <div className="f-value">{r.area} m²</div>
+                        </div>
+                      ) : null}
                       {parseFloat(String(r.garden)) > 0 && (
-                        <div className="ph-modal-field"><div className="f-label">Garden Area</div><div className="f-value">{r.garden} m²</div></div>
+                        <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Garden Area</div><div className="f-value">{r.garden} m²</div></div>
                       )}
                       {parseFloat(String(r.roof)) > 0 && (
-                        <div className="ph-modal-field"><div className="f-label">Roof Area</div><div className="f-value">{r.roof} m²</div></div>
+                        <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Roof Area</div><div className="f-value">{r.roof} m²</div></div>
                       )}
-                      <div className="ph-modal-field">
+                      {/* Always-in-header — no checkbox */}
+                      <div className="ph-modal-field ph-modal-field-fixed">
                         <div className="f-label">Finishing</div>
                         <div className="f-value"><span className={`ph-finish-badge ${finishClass(r.finish)}`}>{r.finish || '—'}</span></div>
                       </div>
-                      <div className="ph-modal-field"><div className="f-label">Delivery</div><div className="f-value">{r.delivery || '—'}</div></div>
-                      <div className="ph-modal-field">
-                        <div className="f-label">Cash Discount</div>
-                        <div className="f-value" style={{ color: '#22c55e' }}>{r.discount ? (parseFloat(String(r.discount)) > 99 ? 'EGP ' + fmtFull(r.discount) : r.discount + '%') : '—'}</div>
-                      </div>
-                      <div className="ph-modal-field"><div className="f-label">Maintenance</div><div className="f-value">{r.maint ? r.maint + '%' : '—'}</div></div>
-                      <div className="ph-modal-field"><div className="f-label">Parking</div><div className="f-value">{r.parking || '—'}</div></div>
+                      {/* Checkable detail fields */}
+                      {r.delivery ? (
+                        <div className="ph-modal-field ph-modal-field-selectable">
+                          <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('delivery')}
+                            onChange={() => setModalFields(prev => prev.includes('delivery') ? prev.filter(x => x !== 'delivery') : [...prev, 'delivery'])} />
+                          <div className="f-label">Delivery</div>
+                          <div className="f-value">{r.delivery}</div>
+                        </div>
+                      ) : <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Delivery</div><div className="f-value">—</div></div>}
+                      {parseFloat(String(r.discount)) > 0 ? (
+                        <div className="ph-modal-field ph-modal-field-selectable">
+                          <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('discount')}
+                            onChange={() => setModalFields(prev => prev.includes('discount') ? prev.filter(x => x !== 'discount') : [...prev, 'discount'])} />
+                          <div className="f-label">Cash Discount</div>
+                          <div className="f-value" style={{ color: '#22c55e' }}>{parseFloat(String(r.discount)) > 99 ? 'EGP ' + fmtFull(r.discount) : r.discount + '%'}</div>
+                        </div>
+                      ) : <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Cash Discount</div><div className="f-value" style={{ color: '#22c55e' }}>—</div></div>}
+                      {parseFloat(String(r.maint)) > 0 ? (
+                        <div className="ph-modal-field ph-modal-field-selectable">
+                          <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('maint')}
+                            onChange={() => setModalFields(prev => prev.includes('maint') ? prev.filter(x => x !== 'maint') : [...prev, 'maint'])} />
+                          <div className="f-label">Maintenance</div>
+                          <div className="f-value">{r.maint}%</div>
+                        </div>
+                      ) : <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Maintenance</div><div className="f-value">—</div></div>}
+                      {r.parking && String(r.parking) !== '—' ? (
+                        <div className="ph-modal-field ph-modal-field-selectable">
+                          <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('parking')}
+                            onChange={() => setModalFields(prev => prev.includes('parking') ? prev.filter(x => x !== 'parking') : [...prev, 'parking'])} />
+                          <div className="f-label">Parking</div>
+                          <div className="f-value">{r.parking}</div>
+                        </div>
+                      ) : <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Parking</div><div className="f-value">—</div></div>}
+                      {/* Price — checkable, shown in grid for completeness */}
+                      {r.price ? (
+                        <div className="ph-modal-field ph-modal-field-selectable">
+                          <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('price')}
+                            onChange={() => setModalFields(prev => prev.includes('price') ? prev.filter(x => x !== 'price') : [...prev, 'price'])} />
+                          <div className="f-label">Price (EGP)</div>
+                          <div className="f-value">{fmtFull(r.price)}</div>
+                        </div>
+                      ) : null}
                     </div>
 
                     {plans.length > 0 && (
