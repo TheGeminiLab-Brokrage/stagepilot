@@ -12,8 +12,8 @@ const CRM_PASSWORD = process.env.CRM_PASSWORD ?? '1234567'
 
 // ── Direct CRM API helper ─────────────────────────────────────────────────────
 
-async function crmFetch(path: string, method: string, token: string | null, body?: object) {
-  const headers: Record<string, string> = {
+function buildHeaders(token: string | null): Record<string, string> {
+  const h: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept':       'application/json',
     'x-localization': 'en',
@@ -21,15 +21,25 @@ async function crmFetch(path: string, method: string, token: string | null, body
     'Referer':      `${CRM_UI}/`,
     'Connection':   'close',
   }
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  if (token) h['Authorization'] = `Bearer ${token}`
+  return h
+}
 
+async function crmFetch(path: string, method: string, token: string | null, body?: object) {
   const res = await fetch(`https://${CRM_HOST}${path}`, {
     method,
-    headers,
+    headers: buildHeaders(token),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
-
   return res.json().catch(() => null)
+}
+
+async function crmFetchRaw(path: string, method: string, token: string | null, body?: object) {
+  return fetch(`https://${CRM_HOST}${path}`, {
+    method,
+    headers: buildHeaders(token),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
 }
 
 function sleep(ms: number) {
@@ -81,12 +91,34 @@ export async function POST(request: NextRequest) {
     const existingJobs = (preSnapshot?.data?.data ?? []) as Array<{ id: number; export_type?: string; status?: string }>
     const maxIdBefore = Math.max(0, ...existingJobs.map(j => j.id ?? 0))
 
-    // 4. Trigger the Status Changes export (date filters required by the CRM)
-    const triggerData = await crmFetch(
+    // 4. Cancel any stuck running jobs before triggering (CRM blocks new exports if one is active)
+    const stuckJobs = existingJobs.filter(j =>
+      (j as { is_active?: number }).is_active === 1 &&
+      j.status?.toLowerCase() === 'running'
+    )
+    for (const j of stuckJobs) {
+      await crmFetch(`/api/v2/exports/exports-requests/${j.id}`, 'DELETE', token)
+    }
+
+    // 5. Trigger the Status Changes export — try POST with date params, then GET fallback
+    let triggerRes = await crmFetchRaw(
       '/api/v2/exports/export-smart-status-changes',
       'POST', token,
       { date_from: dateFrom, date_to: dateTo }
     )
+    let triggerStatus = triggerRes.status
+    let triggerData = await triggerRes.json().catch(() => null)
+
+    // Fallback: try GET if POST returned empty/no-job
+    if (!triggerData?.data?.id && triggerStatus !== 200) {
+      triggerRes = await crmFetchRaw(
+        `/api/v2/exports/export-smart-status-changes?date_from=${dateFrom}&date_to=${dateTo}`,
+        'GET', token
+      )
+      triggerStatus = triggerRes.status
+      triggerData = await triggerRes.json().catch(() => null)
+    }
+
     const exportJobId = (triggerData?.data?.id ?? null) as number | null
 
     // 5. Poll for completion (up to 4 minutes)
@@ -136,9 +168,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         error: 'Export did not complete within 4 minutes',
         debug: {
+          triggerStatus,
           triggerResponse: triggerData,
           exportJobId,
           maxIdBefore,
+          stuckJobsCancelled: stuckJobs.map(j => j.id),
           lastJob,
           recentJobs: lastJobList,
         }
