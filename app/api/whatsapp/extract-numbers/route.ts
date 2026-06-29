@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import OpenAI from 'openai'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -23,32 +24,32 @@ export async function POST(req: NextRequest) {
     'Include the country code. If a number has no country code, prefix it with +971. ' +
     'No explanation, no markdown fences, just the raw JSON array.'
 
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: base64 } },
-          ],
-        }],
-        generationConfig: { temperature: 0, maxOutputTokens: 512 },
-      }),
-    }
-  )
+  // Use the openai package pointed at Google's OpenAI-compatible endpoint.
+  // This works with the existing GEMINI_API_KEY without needing a separate key.
+  const client = new OpenAI({
+    apiKey,
+    baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+  })
 
-  if (!geminiRes.ok) {
-    const err = await geminiRes.text()
-    return NextResponse.json({ error: `Gemini error: ${err}` }, { status: 502 })
+  let rawText = '[]'
+  try {
+    const response = await client.chat.completions.create({
+      model: 'gemini-1.5-flash',
+      max_tokens: 512,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+        ],
+      }],
+    })
+    rawText = response.choices[0]?.message?.content ?? '[]'
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: `AI error: ${msg}` }, { status: 502 })
   }
 
-  const geminiJson = await geminiRes.json()
-  const rawText: string = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? '[]'
-
-  // Strip markdown fences if Gemini wraps with ```json
   const cleaned = rawText.replace(/```[a-z]*\n?/gi, '').trim()
 
   let numbers: string[] = []
