@@ -12,6 +12,39 @@ const MUTED = 'rgba(255,255,255,0.35)'
 const font = { fontFamily: "'Montserrat', sans-serif" }
 const fontDisplay = { fontFamily: "'Space Grotesk', sans-serif" }
 
+function parsePhoneNumbers(text: string): string[] {
+  const seen = new Set<string>()
+  const results: string[] = []
+
+  // Split into lines and try to extract one number per line
+  for (const line of text.split('\n')) {
+    // Keep only digits and leading +
+    const raw = line.trim()
+    const digitsOnly = raw.replace(/[^\d+]/g, '')
+    if (digitsOnly.length >= 7 && digitsOnly.length <= 16) {
+      const key = digitsOnly.replace(/\D/g, '')
+      if (!seen.has(key)) {
+        seen.add(key)
+        results.push(digitsOnly)
+      }
+    }
+  }
+
+  // Fallback: scan entire text for digit runs (catches numbers on same line)
+  const regex = /\+?\d[\d\s\-().]{6,18}\d/g
+  const matches = text.match(regex) ?? []
+  for (const m of matches) {
+    const clean = m.replace(/[\s\-().]/g, '')
+    const key = clean.replace(/\D/g, '')
+    if (key.length >= 7 && key.length <= 16 && !seen.has(key)) {
+      seen.add(key)
+      results.push(clean)
+    }
+  }
+
+  return results
+}
+
 export default function WhatsAppClient() {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -22,6 +55,7 @@ export default function WhatsAppClient() {
   const [mediaFile, setMediaFile] = useState<File | null>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -61,19 +95,30 @@ export default function WhatsAppClient() {
   async function extractNumbers() {
     if (!imageFile) return
     setLoading(true)
+    setProgress(0)
     setError(null)
     try {
-      const fd = new FormData()
-      fd.append('image', imageFile)
-      const res = await fetch('/api/whatsapp/extract-numbers', { method: 'POST', body: fd })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Failed to extract numbers')
-      setNumbers(json.numbers ?? [])
+      // Dynamic import keeps Tesseract out of the initial bundle
+      const Tesseract = (await import('tesseract.js')).default
+      const result = await Tesseract.recognize(imageFile, 'eng', {
+        logger: (m: { status: string; progress: number }) => {
+          if (m.status === 'recognizing text') {
+            setProgress(Math.round(m.progress * 100))
+          }
+        },
+      })
+      const found = parsePhoneNumbers(result.data.text)
+      if (found.length === 0) {
+        setError('No phone numbers detected. Try a clearer or higher-resolution photo.')
+        return
+      }
+      setNumbers(found)
       setStep(2)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'OCR failed')
     } finally {
       setLoading(false)
+      setProgress(0)
     }
   }
 
@@ -120,8 +165,7 @@ export default function WhatsAppClient() {
         background: step >= n ? NEON : 'transparent',
         border: `1.5px solid ${step >= n ? NEON : BORDER}`,
         color: step >= n ? '#000' : MUTED,
-        fontSize: 11, fontWeight: 700, ...fontDisplay,
-        flexShrink: 0,
+        fontSize: 11, fontWeight: 700, ...fontDisplay, flexShrink: 0,
       }}>{n}</span>
       <span style={{ fontSize: 12, fontWeight: 600, color: step >= n ? '#fff' : MUTED, ...fontDisplay, letterSpacing: '0.05em' }}>
         {label}
@@ -159,36 +203,28 @@ export default function WhatsAppClient() {
           </div>
         )}
 
-        {/* ── STEP 1: Upload numbers image ── */}
+        {/* ── STEP 1 ── */}
         {step === 1 && (
           <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 28 }}>
             <p style={{ color: MUTED, fontSize: 13, marginBottom: 20 }}>
-              Upload a screenshot or photo that contains client phone numbers. AI will extract them automatically.
+              Upload a screenshot or photo containing client phone numbers. OCR runs in your browser — no data leaves your device.
             </p>
 
-            {/* Drop zone */}
             <div
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => !loading && fileInputRef.current?.click()}
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               style={{
                 border: `2px dashed ${dragOver ? NEON : imageFile ? NEON_BORDER : BORDER}`,
-                borderRadius: 10,
-                padding: 28,
-                textAlign: 'center',
-                cursor: 'pointer',
+                borderRadius: 10, padding: 28, textAlign: 'center',
+                cursor: loading ? 'default' : 'pointer',
                 background: dragOver ? NEON_DIM : imageFile ? 'rgba(215,255,0,0.04)' : 'transparent',
-                transition: 'all 0.2s',
-                marginBottom: 20,
+                transition: 'all 0.2s', marginBottom: 20,
               }}
             >
               {imagePreview ? (
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  style={{ maxHeight: 220, maxWidth: '100%', borderRadius: 8, objectFit: 'contain' }}
-                />
+                <img src={imagePreview} alt="Preview" style={{ maxHeight: 220, maxWidth: '100%', borderRadius: 8, objectFit: 'contain' }} />
               ) : (
                 <>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
@@ -206,15 +242,26 @@ export default function WhatsAppClient() {
               onChange={e => { const f = e.target.files?.[0]; if (f) handleImageSelect(f) }}
             />
 
-            {imageFile && (
+            {imageFile && !loading && (
               <div style={{ marginBottom: 16, fontSize: 12, color: MUTED }}>
                 {imageFile.name}
-                <button
-                  onClick={() => { setImageFile(null); setImagePreview(null) }}
-                  style={{ marginLeft: 10, color: 'rgba(255,80,80,0.7)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}
-                >
+                <button onClick={() => { setImageFile(null); setImagePreview(null) }}
+                  style={{ marginLeft: 10, color: 'rgba(255,80,80,0.7)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>
                   Remove
                 </button>
+              </div>
+            )}
+
+            {/* Progress bar */}
+            {loading && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ color: MUTED, fontSize: 12 }}>Reading image…</span>
+                  <span style={{ color: NEON, fontSize: 12, ...fontDisplay }}>{progress}%</span>
+                </div>
+                <div style={{ height: 4, background: BORDER, borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${progress}%`, background: NEON, borderRadius: 2, transition: 'width 0.2s' }} />
+                </div>
               </div>
             )}
 
@@ -222,32 +269,30 @@ export default function WhatsAppClient() {
               onClick={extractNumbers}
               disabled={!imageFile || loading}
               style={{
-                width: '100%', padding: '12px', borderRadius: 8, border: 'none', cursor: imageFile && !loading ? 'pointer' : 'not-allowed',
+                width: '100%', padding: '12px', borderRadius: 8, border: 'none',
+                cursor: imageFile && !loading ? 'pointer' : 'not-allowed',
                 background: imageFile && !loading ? NEON : 'rgba(215,255,0,0.25)',
                 color: '#000', fontWeight: 700, fontSize: 14, ...fontDisplay, letterSpacing: '0.04em',
                 transition: 'all 0.2s',
               }}
             >
-              {loading ? 'Extracting numbers…' : 'Extract Numbers with AI'}
+              {loading ? `Scanning… ${progress}%` : 'Extract Numbers'}
             </button>
           </div>
         )}
 
-        {/* ── STEP 2: Review numbers ── */}
+        {/* ── STEP 2 ── */}
         {step === 2 && (
           <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 28 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div>
                 <h2 style={{ fontSize: 16, fontWeight: 700, color: '#fff', margin: 0, ...fontDisplay }}>Extracted Numbers</h2>
-                <p style={{ color: MUTED, fontSize: 12, margin: '4px 0 0' }}>{numbers.length} number{numbers.length !== 1 ? 's' : ''} found</p>
+                <p style={{ color: MUTED, fontSize: 12, margin: '4px 0 0' }}>{numbers.length} number{numbers.length !== 1 ? 's' : ''} found — edit as needed</p>
               </div>
             </div>
 
-            {/* Number chips */}
             {numbers.length === 0 ? (
-              <p style={{ color: MUTED, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
-                No numbers detected. Add them manually below.
-              </p>
+              <p style={{ color: MUTED, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No numbers detected. Add them manually below.</p>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
                 {numbers.map(n => (
@@ -257,10 +302,8 @@ export default function WhatsAppClient() {
                     borderRadius: 6, padding: '5px 10px', fontSize: 13, color: '#fff', ...fontDisplay,
                   }}>
                     {n}
-                    <button
-                      onClick={() => removeNumber(n)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 14, lineHeight: 1, padding: 0 }}
-                    >
+                    <button onClick={() => removeNumber(n)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 14, lineHeight: 1, padding: 0 }}>
                       ✕
                     </button>
                   </div>
@@ -268,11 +311,9 @@ export default function WhatsAppClient() {
               </div>
             )}
 
-            {/* Manual add */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
               <input
-                type="text"
-                value={newNumber}
+                type="text" value={newNumber}
                 onChange={e => setNewNumber(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addNumber()}
                 placeholder="+971501234567"
@@ -281,47 +322,37 @@ export default function WhatsAppClient() {
                   borderRadius: 8, padding: '9px 12px', color: '#fff', fontSize: 13, ...font, outline: 'none',
                 }}
               />
-              <button
-                onClick={addNumber}
-                style={{
-                  padding: '9px 16px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
-                  background: NEON_DIM, color: NEON, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...fontDisplay,
-                }}
-              >
+              <button onClick={addNumber} style={{
+                padding: '9px 16px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
+                background: NEON_DIM, color: NEON, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...fontDisplay,
+              }}>
                 + Add
               </button>
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => setStep(1)}
-                style={{
-                  flex: 1, padding: '11px', borderRadius: 8, border: `1px solid ${BORDER}`,
-                  background: 'transparent', color: MUTED, fontSize: 13, cursor: 'pointer', ...fontDisplay,
-                }}
-              >
+              <button onClick={() => setStep(1)} style={{
+                flex: 1, padding: '11px', borderRadius: 8, border: `1px solid ${BORDER}`,
+                background: 'transparent', color: MUTED, fontSize: 13, cursor: 'pointer', ...fontDisplay,
+              }}>
                 ← Back
               </button>
-              <button
-                onClick={() => setStep(3)}
-                disabled={numbers.length === 0}
-                style={{
-                  flex: 2, padding: '11px', borderRadius: 8, border: 'none',
-                  background: numbers.length > 0 ? NEON : 'rgba(215,255,0,0.25)',
-                  color: '#000', fontWeight: 700, fontSize: 14, cursor: numbers.length > 0 ? 'pointer' : 'not-allowed', ...fontDisplay,
-                }}
-              >
+              <button onClick={() => setStep(3)} disabled={numbers.length === 0} style={{
+                flex: 2, padding: '11px', borderRadius: 8, border: 'none',
+                background: numbers.length > 0 ? NEON : 'rgba(215,255,0,0.25)',
+                color: '#000', fontWeight: 700, fontSize: 14,
+                cursor: numbers.length > 0 ? 'pointer' : 'not-allowed', ...fontDisplay,
+              }}>
                 Continue →
               </button>
             </div>
           </div>
         )}
 
-        {/* ── STEP 3: Compose & Export ── */}
+        {/* ── STEP 3 ── */}
         {step === 3 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {/* Message box */}
             <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24 }}>
               <label style={{ fontSize: 13, fontWeight: 600, color: '#fff', ...fontDisplay, display: 'block', marginBottom: 10 }}>
                 Message Text
@@ -339,21 +370,17 @@ export default function WhatsAppClient() {
               />
             </div>
 
-            {/* Media attachment */}
             <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24 }}>
               <label style={{ fontSize: 13, fontWeight: 600, color: '#fff', ...fontDisplay, display: 'block', marginBottom: 10 }}>
                 Attach Photo <span style={{ color: MUTED, fontWeight: 400 }}>(optional)</span>
               </label>
-
               {mediaPreview ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                   <img src={mediaPreview} alt="Media" style={{ height: 80, width: 80, objectFit: 'cover', borderRadius: 8, border: `1px solid ${BORDER}` }} />
                   <div>
                     <div style={{ color: '#fff', fontSize: 13 }}>{mediaFile?.name}</div>
-                    <button
-                      onClick={() => { setMediaFile(null); setMediaPreview(null) }}
-                      style={{ color: 'rgba(255,80,80,0.7)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0, marginTop: 4 }}
-                    >
+                    <button onClick={() => { setMediaFile(null); setMediaPreview(null) }}
+                      style={{ color: 'rgba(255,80,80,0.7)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0, marginTop: 4 }}>
                       Remove
                     </button>
                   </div>
@@ -373,16 +400,10 @@ export default function WhatsAppClient() {
                   <div style={{ color: MUTED, fontSize: 13 }}>Drop image or <span style={{ color: NEON, textDecoration: 'underline' }}>browse</span></div>
                 </div>
               )}
-              <input
-                ref={mediaInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleMediaSelect(f) }}
-              />
+              <input ref={mediaInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleMediaSelect(f) }} />
             </div>
 
-            {/* Export buttons */}
             <div style={{ background: CARD, border: `1px solid ${NEON_BORDER}`, borderRadius: 12, padding: 24 }}>
               <h3 style={{ fontSize: 14, fontWeight: 700, color: NEON, margin: '0 0 6px', ...fontDisplay }}>
                 Export for Prime Sender
@@ -390,54 +411,36 @@ export default function WhatsAppClient() {
               <p style={{ fontSize: 12, color: MUTED, margin: '0 0 18px' }}>
                 {numbers.length} number{numbers.length !== 1 ? 's' : ''} ready to send.
               </p>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button
-                  onClick={downloadCSV}
-                  style={{
-                    padding: '12px', borderRadius: 8, border: 'none',
-                    background: NEON, color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer', ...fontDisplay,
-                  }}
-                >
+                <button onClick={downloadCSV} style={{
+                  padding: '12px', borderRadius: 8, border: 'none',
+                  background: NEON, color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer', ...fontDisplay,
+                }}>
                   ↓ Download Numbers CSV
                 </button>
-
-                <button
-                  onClick={copyMessage}
-                  disabled={!messageText.trim()}
-                  style={{
-                    padding: '12px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
-                    background: NEON_DIM, color: copied ? NEON : '#fff', fontWeight: 600,
-                    fontSize: 14, cursor: messageText.trim() ? 'pointer' : 'not-allowed', ...fontDisplay,
-                    transition: 'color 0.2s',
-                  }}
-                >
+                <button onClick={copyMessage} disabled={!messageText.trim()} style={{
+                  padding: '12px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
+                  background: NEON_DIM, color: copied ? NEON : '#fff', fontWeight: 600,
+                  fontSize: 14, cursor: messageText.trim() ? 'pointer' : 'not-allowed', ...fontDisplay, transition: 'color 0.2s',
+                }}>
                   {copied ? '✓ Copied!' : '⎘ Copy Message Text'}
                 </button>
-
                 {mediaFile && (
-                  <button
-                    onClick={downloadMedia}
-                    style={{
-                      padding: '12px', borderRadius: 8, border: `1px solid ${BORDER}`,
-                      background: 'transparent', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer', ...fontDisplay,
-                    }}
-                  >
+                  <button onClick={downloadMedia} style={{
+                    padding: '12px', borderRadius: 8, border: `1px solid ${BORDER}`,
+                    background: 'transparent', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer', ...fontDisplay,
+                  }}>
                     ↓ Download Media Photo
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Prime Sender instructions */}
             <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
-              <button
-                onClick={() => setShowInstructions(v => !v)}
-                style={{
-                  width: '100%', padding: '14px 20px', background: 'none', border: 'none',
-                  cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                }}
-              >
+              <button onClick={() => setShowInstructions(v => !v)} style={{
+                width: '100%', padding: '14px 20px', background: 'none', border: 'none',
+                cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', ...fontDisplay }}>How to use with Prime Sender</span>
                 <span style={{ color: MUTED, fontSize: 14 }}>{showInstructions ? '▲' : '▼'}</span>
               </button>
@@ -454,9 +457,9 @@ export default function WhatsAppClient() {
                       'Paste your message in the Prime Sender message field.',
                       'If sending media, attach the downloaded photo in Prime Sender.',
                       'Start sending!',
-                    ].map((step, i) => (
+                    ].map((s, i) => (
                       <li key={i} style={{ color: MUTED, fontSize: 13, lineHeight: 1.5 }}>
-                        <span style={{ color: NEON, fontWeight: 700 }}>{i + 1}.</span> {step}
+                        <span style={{ color: NEON, fontWeight: 700 }}>{i + 1}.</span> {s}
                       </li>
                     ))}
                   </ol>
@@ -464,13 +467,10 @@ export default function WhatsAppClient() {
               )}
             </div>
 
-            <button
-              onClick={() => setStep(2)}
-              style={{
-                padding: '10px', borderRadius: 8, border: `1px solid ${BORDER}`,
-                background: 'transparent', color: MUTED, fontSize: 13, cursor: 'pointer', ...fontDisplay,
-              }}
-            >
+            <button onClick={() => setStep(2)} style={{
+              padding: '10px', borderRadius: 8, border: `1px solid ${BORDER}`,
+              background: 'transparent', color: MUTED, fontSize: 13, cursor: 'pointer', ...fontDisplay,
+            }}>
               ← Back to Numbers
             </button>
           </div>
