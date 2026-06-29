@@ -42,6 +42,7 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
       : [
           { href: '/dashboard/find-property', label: 'Find a Property' },
           ...(role === 'agent' ? [{ href: '/dashboard/daily-report', label: 'Daily Report' }] : []),
+          ...(role === 'agent' ? [{ href: '/dashboard/whatsapp', label: 'WhatsApp' }] : []),
           ...(role === 'agent' ? [
             { href: '/dashboard/practice', label: t('navAiPractice') },
             { href: '/dashboard/exam', label: t('navExam') },
