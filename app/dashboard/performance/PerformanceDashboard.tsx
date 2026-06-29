@@ -129,17 +129,18 @@ export default function PerformanceDashboard({
   const crmDerivedCalls = useMemo((): Call[] | null => {
     if (!crmData?.data?.length) return null
 
-    const latest = new Map<string, { status: string; createdAt: number; changedBy: string }>()
+    const latest = new Map<string, { status: string; createdAt: number; changedBy: string; entityName: string }>()
     for (const row of crmData.data) {
-      const entityId  = String(row['ENTITY ID'] ?? row['ENTITY_ID'] ?? row['entity_id'] ?? row['ID'] ?? '').trim()
-      const toStatus  = String(row['TO STATUS']  ?? row['TO_STATUS']  ?? row['to_status']  ?? '').trim()
-      const createdAt = new Date(String(row['CREATED AT'] ?? row['CREATED_AT'] ?? row['created_at'] ?? '')).getTime()
-      const changedBy = String(row['CHANGED BY'] ?? row['CHANGED_BY'] ?? row['changed_by'] ?? '')
+      const entityId   = String(row['ENTITY ID'] ?? row['ENTITY_ID'] ?? row['entity_id'] ?? row['ID'] ?? '').trim()
+      const toStatus   = String(row['TO STATUS']  ?? row['TO_STATUS']  ?? row['to_status']  ?? '').trim()
+      const createdAt  = new Date(String(row['CREATED AT'] ?? row['CREATED_AT'] ?? row['created_at'] ?? '')).getTime()
+      const changedBy  = String(row['CHANGED BY'] ?? row['CHANGED_BY'] ?? row['changed_by'] ?? '')
+      const entityName = String(row['ENTITY NAME'] ?? row['ENTITY_NAME'] ?? row['entity_name'] ?? '').trim()
 
       if (!entityId || !toStatus) continue
       const existing = latest.get(entityId)
       if (!existing || (!isNaN(createdAt) && createdAt > existing.createdAt)) {
-        latest.set(entityId, { status: toStatus, createdAt, changedBy })
+        latest.set(entityId, { status: toStatus, createdAt, changedBy, entityName })
       }
     }
 
@@ -147,9 +148,9 @@ export default function PerformanceDashboard({
       console.log('[CRM debug] 0 leads derived — first row keys:', Object.keys(crmData.data[0]))
     }
 
-    return [...latest.entries()].map(([entityId, { status, changedBy }]) => ({
+    return [...latest.entries()].map(([entityId, { status, changedBy, entityName }]) => ({
       id:             entityId,
-      client_name:    null,
+      client_name:    entityName || null,
       campaign:       null,
       stage:          CRM_STATUS_MAP[status.toLowerCase()] ?? status.toLowerCase(),
       stage_corrected:null,
@@ -468,7 +469,8 @@ export default function PerformanceDashboard({
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                      <th style={{ padding: '8px 24px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{isUsingCrm ? 'Entity ID' : 'Client'}</th>
+                      <th style={{ padding: '8px 16px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>ID</th>
+                      {isUsingCrm && <th style={{ padding: '8px 12px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</th>}
                       <th style={{ padding: '8px 12px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Agent</th>
                       <th style={{ padding: '8px 12px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Stage</th>
                     </tr>
@@ -476,10 +478,15 @@ export default function PerformanceDashboard({
                   <tbody>
                     {drawer.leads.map((c, i) => (
                       <tr key={c.id + i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                        <td style={{ padding: '10px 24px', color: '#fff', fontWeight: 600, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '10px 16px', color: '#fff', fontWeight: 600, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {isUsingCrm ? c.id : (c.client_name ?? c.id)}
                         </td>
-                        <td style={{ padding: '10px 12px', color: 'rgba(255,255,255,0.6)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {isUsingCrm && (
+                          <td style={{ padding: '10px 12px', color: 'rgba(255,255,255,0.85)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {c.client_name ?? '—'}
+                          </td>
+                        )}
+                        <td style={{ padding: '10px 12px', color: 'rgba(255,255,255,0.6)', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {c.agent_full_name ?? c.agent_id ?? '—'}
                         </td>
                         <td style={{ padding: '10px 12px' }}>
