@@ -118,6 +118,7 @@ export default function PerformanceDashboard({
   const [hiddenStages, setHiddenStages]       = useState<Set<string>>(new Set())
   const [stageDropdownOpen, setStageDropdownOpen] = useState(false)
   const [crmData, setCrmData]                 = useState<CrmDataState>(crmExport ?? null)
+  const [drawer, setDrawer]                   = useState<{ title: string; leads: Call[] } | null>(null)
 
   // Called by CrmStatusChanges whenever data is parsed (drop, upload, or loaded from DB)
   function handleCrmDataChange(data: CrmRow[], dateFrom: string, dateTo: string) {
@@ -257,12 +258,23 @@ export default function PerformanceDashboard({
 
   const toggleStage = (stage: string) => setHiddenStages(prev => { const next = new Set(prev); next.has(stage) ? next.delete(stage) : next.add(stage); return next })
 
+  function openDrawer(title: string, stages: string[]) {
+    setDrawer({ title, leads: filtered.filter(c => stages.includes(effectiveStage(c))) })
+  }
+
   const kpiCards = [
-    { label: 'GAP(A)%',        value: `${metrics.gapA}%`, note: 'Interested → beyond' },
-    { label: 'GAP(B)%',        value: `${metrics.gapB}%`, note: 'Potential → Meeting' },
-    { label: 'GAP(C)%',        value: `${metrics.gapC}%`, note: 'Meeting Sched → Done' },
-    { label: 'GAP(D)%',        value: `${metrics.gapD}%`, note: 'Done → Closed Deal' },
-    { label: 'Direct to Meeting', value: String(metrics.directToMeeting), note: 'no prior follow-up' },
+    { label: 'GAP(A)%',          value: `${metrics.gapA}%`,              note: 'Interested → beyond',      onClick: () => openDrawer('GAP(A) — Stuck at Interested', ['interested / follow up']) },
+    { label: 'GAP(B)%',          value: `${metrics.gapB}%`,              note: 'Potential → Meeting',       onClick: () => openDrawer('GAP(B) — Stuck at Potential', ['potential to close']) },
+    { label: 'GAP(C)%',          value: `${metrics.gapC}%`,              note: 'Meeting Sched → Done',      onClick: () => openDrawer('GAP(C) — Meeting Not Done', ['meeting scheduled']) },
+    { label: 'GAP(D)%',          value: `${metrics.gapD}%`,              note: 'Done → Closed Deal',        onClick: () => openDrawer('GAP(D) — Meeting Done, No Deal', ['meeting done']) },
+    {
+      label: 'Direct to Meeting', value: String(metrics.directToMeeting), note: 'no prior follow-up',
+      onClick: isUsingCrm ? undefined : () => setDrawer({ title: 'Direct to Meeting', leads: filtered.filter(c => {
+        const agSt = (c.agent_stage ?? '').toLowerCase()
+        const effSt = effectiveStage(c)
+        return ['meeting scheduled', 'meeting done'].includes(agSt) && ['meeting scheduled', 'meeting done'].includes(effSt)
+      }) }),
+    },
   ]
 
   const tabs: { key: PerfTab; label: string }[] = [
@@ -317,8 +329,10 @@ export default function PerformanceDashboard({
 
         {/* KPI cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
-          {kpiCards.map(({ label, value, note }) => (
-            <div key={label} style={{ ...cardStyle, padding: '14px 16px', textAlign: 'center' }}>
+          {kpiCards.map(({ label, value, note, onClick }) => (
+            <div key={label} onClick={onClick} style={{ ...cardStyle, padding: '14px 16px', textAlign: 'center', cursor: onClick ? 'pointer' : 'default', transition: 'border-color 0.15s' }}
+              onMouseEnter={e => { if (onClick) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(215,255,0,0.4)' }}
+              onMouseLeave={e => { if (onClick) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(215,255,0,0.12)' }}>
               <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 6, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif" }}>{label}</p>
               <p style={{ fontSize: label === 'Direct to Meeting' ? 32 : 28, fontWeight: 700, color: label === 'Direct to Meeting' ? '#fff' : '#D7FF00', lineHeight: 1, fontFamily: "'Space Grotesk', sans-serif" }}>{value}</p>
               <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 5 }}>{note}</p>
@@ -329,7 +343,7 @@ export default function PerformanceDashboard({
         {/* Main 3-column layout */}
         <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 260px', gap: 16 }}>
           {/* Left: Lost Leads */}
-          <div style={{ ...cardStyle, padding: '16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <div onClick={() => openDrawer('Lost Leads — Not Reachable', ['not reachable'])} style={{ ...cardStyle, padding: '16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.3 }}>Lost<br />Leads</p>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', minHeight: 140 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{metrics.lostLeads}</span>
@@ -407,7 +421,7 @@ export default function PerformanceDashboard({
           {/* Right: Leads Dropped */}
           <div style={{ ...cardStyle, padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <p style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif" }}>Leads Dropped</p>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div onClick={() => openDrawer('Leads Dropped', ['not interested', 'low budget'])} style={{ display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
               <Gauge value={metrics.dropped} max={total} />
             </div>
             {campaigns.length > 0 && (
@@ -431,6 +445,57 @@ export default function PerformanceDashboard({
           </div>
         )}
       </>}
+
+      {/* ── Drill-down drawer ── */}
+      {drawer && (
+        <>
+          <div onClick={() => setDrawer(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 60 }} />
+          <div style={{ position: 'fixed', right: 0, top: 0, height: '100%', width: 440, background: '#0e0e0e', borderLeft: '1px solid rgba(215,255,0,0.15)', zIndex: 61, display: 'flex', flexDirection: 'column', fontFamily: "'Montserrat', sans-serif" }}>
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif", marginBottom: 4 }}>{drawer.title}</p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{drawer.leads.length} lead{drawer.leads.length !== 1 ? 's' : ''}</p>
+              </div>
+              <button onClick={() => setDrawer(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4, flexShrink: 0 }}>✕</button>
+            </div>
+
+            {/* Lead list */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
+              {drawer.leads.length === 0 ? (
+                <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 13, marginTop: 40 }}>No leads in this category</p>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                      <th style={{ padding: '8px 24px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{isUsingCrm ? 'Entity ID' : 'Client'}</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Agent</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Stage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drawer.leads.map((c, i) => (
+                      <tr key={c.id + i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '10px 24px', color: '#fff', fontWeight: 600, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {isUsingCrm ? c.id : (c.client_name ?? c.id)}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: 'rgba(255,255,255,0.6)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {c.agent_full_name ?? c.agent_id ?? '—'}
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{ background: STAGE_COLORS[effectiveStage(c)] ? STAGE_COLORS[effectiveStage(c)] + '22' : 'rgba(255,255,255,0.06)', color: STAGE_COLORS[effectiveStage(c)] ?? 'rgba(255,255,255,0.5)', border: `1px solid ${STAGE_COLORS[effectiveStage(c)] ?? 'rgba(255,255,255,0.1)'}44`, borderRadius: 5, padding: '2px 8px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            {STAGE_LABELS[effectiveStage(c)] ?? effectiveStage(c)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
