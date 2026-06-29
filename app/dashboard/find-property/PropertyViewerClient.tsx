@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent as ReactMouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import MultiCombobox from '@/app/dashboard/components/MultiCombobox'
 import { parseExcelFile, type RawRow } from '@/lib/excel-parser'
@@ -416,6 +417,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [tabsBySheetId, setTabsBySheetId] = useState<Record<string, string[]>>({})
   const [selectedTabsBySheetId, setSelectedTabsBySheetId] = useState<Record<string, Set<string>>>({})
   const [openTabDropdownId, setOpenTabDropdownId] = useState<string | null>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null)
   const [config, setConfig] = useState<ViewConfig | null>(null)
   const [filters, setFilters] = useState<FilterState>({})
   const [sort, setSort] = useState('')
@@ -494,7 +496,10 @@ export default function PropertyViewerClient({ userId, companyId }: {
   useEffect(() => {
     if (!openTabDropdownId) return
     function handleClick(e: MouseEvent) {
-      if (!(e.target as Element).closest('[data-tab-dropdown]')) setOpenTabDropdownId(null)
+      if (!(e.target as Element).closest('[data-tab-dropdown]')) {
+        setOpenTabDropdownId(null)
+        setDropdownPos(null)
+      }
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
@@ -609,7 +614,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
     setSelectedSheetIds(prev => { const n = new Set(prev); n.delete(sheetId); return n })
     setTabsBySheetId(prev => { const n = { ...prev }; delete n[sheetId]; return n })
     setSelectedTabsBySheetId(prev => { const n = { ...prev }; delete n[sheetId]; return n })
-    if (openTabDropdownId === sheetId) setOpenTabDropdownId(null)
+    if (openTabDropdownId === sheetId) { setOpenTabDropdownId(null); setDropdownPos(null) }
     if (nextSheets.length === 0) {
       setRows([]); setRowSheetIds([]); setColumns([]); setConfig(null); setFilters({}); setPhase('empty')
       return
@@ -868,7 +873,18 @@ export default function PropertyViewerClient({ userId, companyId }: {
                     )}
                     {isMultiTab && (
                       <button
-                        onClick={e => { e.stopPropagation(); setOpenTabDropdownId(isDropdownOpen ? null : sheet.id) }}
+                        data-tab-dropdown
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (isDropdownOpen) {
+                            setOpenTabDropdownId(null)
+                            setDropdownPos(null)
+                          } else {
+                            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+                            setDropdownPos({ top: rect.bottom + 6, left: rect.left })
+                            setOpenTabDropdownId(sheet.id)
+                          }
+                        }}
                         title="Filter by sheet tab"
                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 1px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', color: isActive ? 'rgba(215,255,0,0.6)' : 'rgba(255,255,255,0.4)', transition: 'color 0.15s' }}
                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = isActive ? 'rgba(215,255,0,0.9)' : 'rgba(255,255,255,0.7)' }}
@@ -893,51 +909,6 @@ export default function PropertyViewerClient({ userId, companyId }: {
                     </button>
                   </span>
 
-                  {/* Tab dropdown — only for multi-tab files */}
-                  {isMultiTab && isDropdownOpen && (
-                    <div
-                      data-tab-dropdown
-                      style={{
-                        position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200,
-                        background: 'rgba(12,12,12,0.98)', border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: 8, padding: '4px 0', minWidth: 160,
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-                        fontFamily: "'Space Grotesk', sans-serif",
-                      }}
-                    >
-                      {tabs.map(tab => {
-                        const checked = selectedTabs?.has(tab) ?? false
-                        return (
-                          <label
-                            key={tab}
-                            onClick={() => toggleTab(sheet.id, tab)}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 8,
-                              padding: '6px 12px', cursor: 'pointer', fontSize: 12,
-                              color: checked ? 'rgba(215,255,0,0.9)' : 'rgba(255,255,255,0.7)',
-                              transition: 'background 0.1s',
-                            }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLLabelElement).style.background = 'rgba(255,255,255,0.05)' }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLLabelElement).style.background = 'transparent' }}
-                          >
-                            <span style={{
-                              width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                              border: `1px solid ${checked ? 'rgba(215,255,0,0.7)' : 'rgba(255,255,255,0.2)'}`,
-                              background: checked ? 'rgba(215,255,0,0.15)' : 'transparent',
-                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                              {checked && (
-                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="rgba(215,255,0,0.9)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="20 6 9 17 4 12"/>
-                                </svg>
-                              )}
-                            </span>
-                            {tab}
-                          </label>
-                        )
-                      })}
-                    </div>
-                  )}
                 </span>
               )
             })}
@@ -1400,6 +1371,54 @@ export default function PropertyViewerClient({ userId, companyId }: {
           onSave={handleSaveConfig}
           onClose={() => setShowConfig(false)}
         />
+      )}
+
+      {/* ── TAB DROPDOWN PORTAL — rendered at body level to escape overflow:auto clipping ── */}
+      {openTabDropdownId && dropdownPos && typeof document !== 'undefined' && createPortal(
+        <div
+          data-tab-dropdown
+          style={{
+            position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999,
+            background: 'rgba(12,12,12,0.98)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 8, padding: '4px 0', minWidth: 160,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
+        >
+          {(tabsBySheetId[openTabDropdownId] ?? []).map(tab => {
+            const checked = selectedTabsBySheetId[openTabDropdownId]?.has(tab) ?? false
+            return (
+              <label
+                key={tab}
+                data-tab-dropdown
+                onClick={() => toggleTab(openTabDropdownId, tab)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                  color: checked ? 'rgba(215,255,0,0.9)' : 'rgba(255,255,255,0.7)',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLLabelElement).style.background = 'rgba(255,255,255,0.05)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLLabelElement).style.background = 'transparent' }}
+              >
+                <span style={{
+                  width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                  border: `1px solid ${checked ? 'rgba(215,255,0,0.7)' : 'rgba(255,255,255,0.2)'}`,
+                  background: checked ? 'rgba(215,255,0,0.15)' : 'transparent',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {checked && (
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="rgba(215,255,0,0.9)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  )}
+                </span>
+                {tab}
+              </label>
+            )
+          })}
+        </div>,
+        document.body
       )}
     </div>
   )
