@@ -1130,7 +1130,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                 const badgeVal = cfg.badgeColumn ? String(row[cfg.badgeColumn] ?? '') : ''
                 const showBadge = badgeVal && badgeVal !== '—'
                 return (
-                  <div key={idx} style={{ position: 'relative' }}>
+                  <div key={idx}>
                     <div className="ph-property-card" onClick={() => setSelectedIdx(idx)} style={{ position: 'relative' }}>
                       <div className="ph-card-top" style={{ background: 'linear-gradient(180deg, rgba(215,255,0,0.04) 0%, transparent 100%)' }}>
                         {showBadge && (
@@ -1183,86 +1183,89 @@ export default function PropertyViewerClient({ userId, companyId }: {
                           )
                         })()}
                       </div>
-                      <div className="ph-card-footer" style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                        {columns
-                          .filter(c => !nonPriceSpecCols.find(s => s.key === c.key) && c.key !== priceSpecCol?.key && c.key !== cfg.titleColumn && c.key !== cfg.subtitleColumn && c.key !== cfg.badgeColumn)
-                          .slice(0, 3)
-                          .map(col => {
-                            const val = row[col.key]
-                            if (val == null || val === '' || String(val) === '—') return null
+                      <div className="ph-card-footer">
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          {columns
+                            .filter(c => !nonPriceSpecCols.find(s => s.key === c.key) && c.key !== priceSpecCol?.key && c.key !== cfg.titleColumn && c.key !== cfg.subtitleColumn && c.key !== cfg.badgeColumn)
+                            .slice(0, 3)
+                            .map(col => {
+                              const val = row[col.key]
+                              if (val == null || val === '' || String(val) === '—') return null
+                              return (
+                                <span key={col.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '2px 9px', fontSize: 11, fontFamily: "'Montserrat', sans-serif" }}>
+                                  <span style={{ color: 'rgba(255,255,255,0.4)' }}>{col.label}</span>
+                                  <span style={{ color: 'rgba(255,255,255,0.85)' }}>{String(val)}</span>
+                                </span>
+                              )
+                            })}
+                        </div>
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
+                            onClick={e => handleCopyOpen(e, row, idx)}
+                            title="نسخ الرسالة التسويقية"
+                          >
+                            {copiedIdx === idx ? '✓' : '📋'}
+                          </button>
+                          {pickerOpen === idx && (() => {
+                            const colMap = detectColMap(columns)
+                            const propInput = buildPropInput(row, colMap)
+                            const avFields = getAvailablePropFields(propInput)
+                            const allPlans = String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean)
                             return (
-                              <span key={col.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '2px 9px', fontSize: 11, fontFamily: "'Montserrat', sans-serif" }}>
-                                <span style={{ color: 'rgba(255,255,255,0.4)' }}>{col.label}</span>
-                                <span style={{ color: 'rgba(255,255,255,0.85)' }}>{String(val)}</span>
-                              </span>
+                              <>
+                                <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
+                                <div className="ph-plan-picker" onClick={e => e.stopPropagation()}>
+                                  <div className="ph-picker-title">محتوى الرسالة</div>
+                                  {avFields.length > 0 && (
+                                    <>
+                                      <div className="ph-picker-section">تفاصيل</div>
+                                      {avFields.map(field => (
+                                        <label key={field} className="ph-picker-option">
+                                          <input
+                                            type="checkbox"
+                                            checked={pickerFields.includes(field)}
+                                            onChange={() => setPickerFields(prev =>
+                                              prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+                                            )}
+                                          />
+                                          <span>{FIELD_LABELS[field]}: {fieldValuePreview(propInput, field)}</span>
+                                        </label>
+                                      ))}
+                                    </>
+                                  )}
+                                  {allPlans.length > 0 && (
+                                    <>
+                                      <div className="ph-picker-section">أنظمة السداد</div>
+                                      {allPlans.map((plan, pi) => (
+                                        <label key={pi} className="ph-picker-option">
+                                          <input
+                                            type="checkbox"
+                                            checked={pickerPlans.includes(plan)}
+                                            onChange={() => setPickerPlans(prev =>
+                                              prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
+                                            )}
+                                          />
+                                          <span>{plan}</span>
+                                        </label>
+                                      ))}
+                                    </>
+                                  )}
+                                  {avFields.length === 0 && allPlans.length === 0 && (
+                                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: '8px 0' }}>
+                                      No mapped fields detected
+                                    </div>
+                                  )}
+                                  <button className="ph-picker-copy-btn" onClick={e => handlePickerCopy(e, row, idx)}>
+                                    نسخ
+                                  </button>
+                                </div>
+                              </>
                             )
-                          })}
+                          })()}
+                        </div>
                       </div>
-                      <button
-                        className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
-                        style={{ position: 'absolute', bottom: 10, right: 10, zIndex: 2 }}
-                        onClick={e => handleCopyOpen(e, row, idx)}
-                        title="Copy message"
-                      >
-                        {copiedIdx === idx ? '✓' : '📋'}
-                      </button>
                     </div>
-                    {pickerOpen === idx && (() => {
-                      const colMap = detectColMap(columns)
-                      const propInput = buildPropInput(row, colMap)
-                      const avFields = getAvailablePropFields(propInput)
-                      const allPlans = String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean)
-                      return (
-                        <>
-                          <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
-                          <div className="ph-plan-picker" onClick={e => e.stopPropagation()}>
-                            <div className="ph-picker-title">محتوى الرسالة</div>
-                            {avFields.length > 0 && (
-                              <>
-                                <div className="ph-picker-section">تفاصيل</div>
-                                {avFields.map(field => (
-                                  <label key={field} className="ph-picker-option">
-                                    <input
-                                      type="checkbox"
-                                      checked={pickerFields.includes(field)}
-                                      onChange={() => setPickerFields(prev =>
-                                        prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
-                                      )}
-                                    />
-                                    <span>{FIELD_LABELS[field]}: {fieldValuePreview(propInput, field)}</span>
-                                  </label>
-                                ))}
-                              </>
-                            )}
-                            {allPlans.length > 0 && (
-                              <>
-                                <div className="ph-picker-section">أنظمة السداد</div>
-                                {allPlans.map((plan, pi) => (
-                                  <label key={pi} className="ph-picker-option">
-                                    <input
-                                      type="checkbox"
-                                      checked={pickerPlans.includes(plan)}
-                                      onChange={() => setPickerPlans(prev =>
-                                        prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
-                                      )}
-                                    />
-                                    <span>{plan}</span>
-                                  </label>
-                                ))}
-                              </>
-                            )}
-                            {avFields.length === 0 && allPlans.length === 0 && (
-                              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: '8px 0' }}>
-                                No mapped fields detected
-                              </div>
-                            )}
-                            <button className="ph-picker-copy-btn" onClick={e => handlePickerCopy(e, row, idx)}>
-                              نسخ
-                            </button>
-                          </div>
-                        </>
-                      )
-                    })()}
                   </div>
                 )
               })}
