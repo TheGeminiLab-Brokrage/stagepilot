@@ -500,7 +500,10 @@ export default function PropertyViewerClient({ userId, companyId }: {
         const allRows = parsed.flatMap(s =>
           hasMultipleTabs ? s.rows.map(r => ({ ...r, __tab: s.sheetName })) : s.rows
         )
-        if (allRows.length === 0) continue
+        if (allRows.length === 0) {
+          setUploadError(`"${file.name}" has no readable rows. Make sure headers are in the first row of the sheet.`)
+          continue
+        }
         const colMeta = analyzeColumns(allRows, allHeaders)
 
         const { data: sheetRecord, error: sheetErr } = await supabase
