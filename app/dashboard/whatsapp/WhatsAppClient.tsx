@@ -110,8 +110,18 @@ export default function WhatsAppClient() {
 
   function openWhatsApp(idx: number) {
     const num = toWaNumber(numbers[idx])
-    const text = encodeURIComponent(messageText)
-    window.open(`https://wa.me/${num}?text=${text}`, '_blank')
+    // Copy message to clipboard so emojis arrive perfectly — no URL encoding issues
+    navigator.clipboard.writeText(messageText).catch(() => {})
+    // Open WhatsApp without pre-filling text to avoid emoji stripping
+    window.open(`https://wa.me/${num}`, '_blank')
+  }
+
+  function downloadMedia() {
+    if (!mediaFile || !mediaPreview) return
+    const a = document.createElement('a')
+    a.href = mediaPreview
+    a.download = mediaFile.name
+    a.click()
   }
 
   function markSentAndNext(idx: number) {
@@ -348,15 +358,19 @@ export default function WhatsAppClient() {
                 <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', ...fontDisplay, marginBottom: 4 }}>{numbers[currentIdx]}</div>
                 <div style={{ fontSize: 12, color: MUTED, marginBottom: 24 }}>Contact {currentIdx + 1} of {numbers.length}</div>
 
-                {mediaFile && mediaPreview && (
-                  <div style={{ background: 'rgba(215,255,0,0.06)', border: `1px solid ${NEON_BORDER}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: NEON }}>
-                    📎 Remember to attach <strong>{mediaFile.name}</strong> in the WhatsApp chat
-                  </div>
-                )}
+                {/* Instructions banner */}
+                <div style={{ background: 'rgba(215,255,0,0.06)', border: `1px solid ${NEON_BORDER}`, borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: NEON, fontWeight: 600, marginBottom: 6 }}>How to send:</div>
+                  <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <li style={{ fontSize: 12, color: MUTED }}>Click <strong style={{ color: '#fff' }}>Open in WhatsApp</strong> — message is auto-copied to clipboard</li>
+                    <li style={{ fontSize: 12, color: MUTED }}>In WhatsApp paste with <strong style={{ color: '#fff' }}>Ctrl+V</strong> (emojis included ✓)</li>
+                    {mediaFile && <li style={{ fontSize: 12, color: MUTED }}>Click the 📎 icon to attach the photo, then send</li>}
+                  </ol>
+                </div>
 
-                <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
                   <button
-                    onClick={() => { openWhatsApp(currentIdx); }}
+                    onClick={() => openWhatsApp(currentIdx)}
                     style={{
                       flex: 2, padding: '14px', borderRadius: 8, border: 'none',
                       background: NEON, color: '#000', fontWeight: 700, fontSize: 15, cursor: 'pointer', ...fontDisplay,
@@ -369,8 +383,18 @@ export default function WhatsAppClient() {
                   }}>Skip</button>
                 </div>
 
+                {mediaFile && mediaPreview && (
+                  <button onClick={downloadMedia} style={{
+                    width: '100%', marginBottom: 10, padding: '11px', borderRadius: 8,
+                    border: `1px solid ${BORDER}`, background: 'transparent',
+                    color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer', ...fontDisplay,
+                  }}>
+                    ↓ Download Photo to Attach
+                  </button>
+                )}
+
                 <button onClick={() => markSentAndNext(currentIdx)} style={{
-                  width: '100%', marginTop: 10, padding: '12px', borderRadius: 8,
+                  width: '100%', padding: '12px', borderRadius: 8,
                   border: `1px solid ${NEON_BORDER}`, background: NEON_DIM,
                   color: NEON, fontWeight: 600, fontSize: 14, cursor: 'pointer', ...fontDisplay,
                 }}>
