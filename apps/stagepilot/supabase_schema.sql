@@ -156,3 +156,50 @@ create index on public.call_records (company_id, agent_id);
 create index on public.call_records (company_id, team_name);
 create index on public.call_records (status);
 create index on public.profiles (company_id, role);
+
+-- =============================================
+-- BAY REPORTS (agent daily self-submitted reports)
+-- =============================================
+
+create table public.bay_reports (
+  id              uuid primary key default uuid_generate_v4(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  company_id      uuid not null references public.companies(id) on delete cascade,
+  full_name       text not null,
+  report_date     date not null,
+  -- Numeric metrics (matching Google Form fields 1–10)
+  sheets          int not null default 0,
+  posts           int not null default 0,
+  requests        int not null default 0,
+  followups       int not null default 0,
+  total_leads     int not null default 0,
+  reached         int not null default 0,
+  not_reached     int not null default 0,
+  crm_actions     int not null default 0,
+  uploaded        int not null default 0,
+  not_uploaded    int not null default 0,
+  -- CRM confirm checkbox (field 11)
+  crm_confirm     boolean not null default false,
+  -- Missed uploads (fields 12–13); missed_calls = [{name,phone,reason},...]
+  has_missed_uploads boolean not null default false,
+  missed_calls    jsonb not null default '[]',
+  -- Daily summary (field 14)
+  summary         text not null default '',
+  created_at      timestamptz default now(),
+  unique (user_id, report_date)
+);
+
+alter table public.bay_reports enable row level security;
+
+-- Agents: full access to their own rows only
+create policy "agents own bay reports"
+  on public.bay_reports for all
+  using  (user_id = auth.uid())
+  with check (user_id = auth.uid() and company_id = public.my_company_id());
+
+-- Super admin: read all bay reports within their company
+create policy "admin sees company bay reports"
+  on public.bay_reports for select
+  using (company_id = public.my_company_id() and public.my_role() = 'super_admin');
+
+create index on public.bay_reports (user_id, report_date);
