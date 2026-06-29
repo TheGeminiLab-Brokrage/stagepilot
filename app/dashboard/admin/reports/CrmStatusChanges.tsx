@@ -173,6 +173,9 @@ export default function CrmStatusChanges({
 
   return (
     <div style={{ fontFamily: "'Montserrat', sans-serif" }}>
+      {/* Single shared hidden file input — used by both the drop zone and the Replace button */}
+      <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) parseExcel(f); e.target.value = '' }} />
 
       {/* ── Controls bar ── */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 16, padding: '20px 24px', background: 'rgba(215,255,0,0.02)', border: '1px solid rgba(215,255,0,0.12)', borderRadius: 14 }}>
@@ -214,8 +217,6 @@ export default function CrmStatusChanges({
           </svg>
           <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: dragOver ? '#D7FF00' : 'rgba(255,255,255,0.4)' }}>Drag &amp; drop a CRM export here</p>
           <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>or <span style={{ color: dragOver ? '#D7FF00' : 'rgba(215,255,0,0.6)', textDecoration: 'underline' }}>click to browse</span> — accepts .xlsx / .xls</p>
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
-            onChange={e => { const f = e.target.files?.[0]; if (f) parseExcel(f); e.target.value = '' }} />
         </div>
       )}
 
@@ -289,8 +290,6 @@ export default function CrmStatusChanges({
               </svg>
               Replace
             </button>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) parseExcel(f); e.target.value = '' }} />
 
             {/* Delete button */}
             <button onClick={handleDelete} disabled={deleting}

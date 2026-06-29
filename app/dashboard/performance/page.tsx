@@ -54,7 +54,17 @@ export default async function PerformancePage() {
     ? { data: crmExportRow.data as Record<string, unknown>[], dateFrom: crmExportRow.date_from, dateTo: crmExportRow.date_to }
     : null
 
+  // All agents/team-leaders with webapp accounts — used to filter CRM export data
+  const { data: agentProfileRows } = await admin
+    .from('profiles')
+    .select('full_name')
+    .in('role', ['agent', 'team_leader'])
+
+  const registeredAgentNames = (agentProfileRows ?? [])
+    .map((p: { full_name: string | null }) => p.full_name?.toLowerCase().trim())
+    .filter(Boolean) as string[]
+
   return (
-    <PerformanceDashboard calls={calls} role={role} crmExport={crmExport} fullName={profile?.full_name ?? null} />
+    <PerformanceDashboard calls={calls} role={role} crmExport={crmExport} fullName={profile?.full_name ?? null} registeredAgentNames={registeredAgentNames} />
   )
 }

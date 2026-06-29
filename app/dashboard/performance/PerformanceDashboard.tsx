@@ -27,9 +27,11 @@ const STAGE_COLORS: Record<string, string> = {
   'meeting scheduled':     '#E07B54',
   'meeting done':          '#1F6B75',
   'done deal':             '#D7FF00',
+  'direct to meeting':     '#F5A623',
   'low budget':            '#9B72CF',
   'not reachable':         '#888888',
   'not interested':        '#444444',
+  'lost deal':             '#C0392B',
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -39,24 +41,42 @@ const STAGE_LABELS: Record<string, string> = {
   'meeting scheduled':     'Meeting Sched.',
   'meeting done':          'Meeting Done',
   'done deal':             'Done Deal',
+  'direct to meeting':     'Direct to Mtg.',
   'low budget':            'Low Budget',
   'not reachable':         'Not Reachable',
   'not interested':        'Not Interested',
+  'lost deal':             'Lost Deal',
 }
 
-// CRM "TO STATUS" text → chart stage key (case-insensitive)
+// Decode HTML entities that CRM sometimes embeds in status strings.
+// Handle both single-encoded (&#039;) and double-encoded (&amp;#039;) forms.
+function decodeStatus(s: string): string {
+  return s
+    .replace(/&amp;#0*39;/g, "'")  // double-encoded apostrophe first
+    .replace(/&#0*39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+}
+
+// CRM "TO STATUS" text → chart stage key (case-insensitive, after decodeStatus)
 const CRM_STATUS_MAP: Record<string, string> = {
-  'fresh leads':           'fresh leads',
-  'interested/follow up':  'interested / follow up',
-  'interested / follow up':'interested / follow up',
-  'potential to close':    'potential to close',
-  'meeting scheduled':     'meeting scheduled',
-  'meeting done':          'meeting done',
-  'done deal':             'done deal',
-  'low budget':            'low budget',
-  'not reached':           'not reachable',
-  'not reachable':         'not reachable',
-  'not interested':        'not interested',
+  'fresh leads':                    'fresh leads',
+  'interested/follow up':           'interested / follow up',
+  'interested / follow up':         'interested / follow up',
+  'rotation interested / follow up':'interested / follow up',
+  'potential to close':             'potential to close',
+  'reassign potential':             'potential to close',
+  'meeting scheduled':              'meeting scheduled',
+  'rotation meetings':              'meeting scheduled',
+  'direct to meeting':              'direct to meeting',
+  'meeting done':                   'meeting done',
+  'done deal':                      'done deal',
+  'low budget':                     'low budget',
+  'not reached':                    'not reachable',
+  'not reachable':                  'not reachable',
+  'not interested':                 'not interested',
+  'lost deal':                      'lost deal',
 }
 
 const ALL_STAGES = Object.keys(STAGE_COLORS)
@@ -108,11 +128,13 @@ export default function PerformanceDashboard({
   role,
   crmExport,
   fullName,
+  registeredAgentNames,
 }: {
   calls: Call[]
   role: string
   crmExport?: CrmDataState
   fullName?: string | null
+  registeredAgentNames?: string[]
 }) {
   const [activeTab, setActiveTab]             = useState<PerfTab>('leads')
   const [activeChip, setActiveChip]           = useState<string | null>(null)
@@ -134,10 +156,10 @@ export default function PerformanceDashboard({
     const latest = new Map<string, { status: string; createdAt: number; changedBy: string; entityName: string }>()
     for (const row of crmData.data) {
       const entityId   = String(row['ENTITY ID'] ?? row['ENTITY_ID'] ?? row['entity_id'] ?? row['ID'] ?? '').trim()
-      const toStatus   = String(row['TO STATUS']  ?? row['TO_STATUS']  ?? row['to_status']  ?? '').trim()
+      const toStatus   = decodeStatus(String(row['TO STATUS']  ?? row['TO_STATUS']  ?? row['to_status']  ?? '').trim())
       const createdAt  = new Date(String(row['CREATED AT'] ?? row['CREATED_AT'] ?? row['created_at'] ?? '')).getTime()
       const changedBy  = String(row['CHANGED BY'] ?? row['CHANGED_BY'] ?? row['changed_by'] ?? '')
-      const entityName = String(row['ENTITY NAME'] ?? row['ENTITY_NAME'] ?? row['entity_name'] ?? '').trim()
+      const entityName = decodeStatus(String(row['ENTITY NAME'] ?? row['ENTITY_NAME'] ?? row['entity_name'] ?? '').trim())
 
       if (!entityId || !toStatus) continue
       const existing = latest.get(entityId)
@@ -167,11 +189,19 @@ export default function PerformanceDashboard({
   const isUsingCrm  = crmDerivedCalls !== null
   const effectiveCalls = useMemo(() => {
     const base = isUsingCrm ? crmDerivedCalls! : calls
-    if (role === 'agent' && isUsingCrm && fullName) {
-      return base.filter(c => c.agent_id.toLowerCase() === fullName.toLowerCase())
+    let result = base
+
+    // CRM mode: restrict to agents who have a webapp account
+    if (isUsingCrm && registeredAgentNames?.length) {
+      const nameSet = new Set(registeredAgentNames)
+      result = result.filter(c => nameSet.has(c.agent_id.toLowerCase().trim()))
     }
-    return base
-  }, [isUsingCrm, crmDerivedCalls, calls, role, fullName])
+
+    if (role === 'agent' && isUsingCrm && fullName) {
+      return result.filter(c => c.agent_id.toLowerCase() === fullName.toLowerCase())
+    }
+    return result
+  }, [isUsingCrm, crmDerivedCalls, calls, role, fullName, registeredAgentNames])
 
   const chips = useMemo(() => {
     if (role === 'agent') return []
@@ -219,26 +249,37 @@ export default function PerformanceDashboard({
 
   const metrics = useMemo(() => {
     const inStage = (stages: string[]) => stages.reduce((sum, s) => sum + (stageCounts[s] ?? 0), 0)
-    const dropped            = inStage(DROPPED_STAGES)
-    const totalActive        = total - dropped
+    const dropped             = inStage(DROPPED_STAGES)
     const atPotentialOrBeyond = inStage(['potential to close', 'meeting scheduled', 'meeting done', 'done deal'])
-    const atMeetingOrBeyond  = inStage(['meeting scheduled', 'meeting done', 'done deal'])
-    const atMeetingDoneOrDeal= inStage(['meeting done', 'done deal'])
-    const atDoneDeal         = inStage(['done deal'])
-    const lostLeads          = inStage(['not reachable'])
-    const gapA = totalActive > 0        ? Math.round(atPotentialOrBeyond  / totalActive        * 100) : 0
-    const gapB = atPotentialOrBeyond > 0 ? Math.round(atMeetingOrBeyond   / atPotentialOrBeyond * 100) : 0
-    const gapC = atMeetingOrBeyond > 0  ? Math.round(atMeetingDoneOrDeal  / atMeetingOrBeyond  * 100) : 0
-    const gapD = atMeetingDoneOrDeal > 0 ? Math.round(atDoneDeal          / atMeetingDoneOrDeal* 100) : 0
+    const atInterested        = stageCounts['interested / follow up'] ?? 0
+    const atInterestedOrBeyond= atInterested + atPotentialOrBeyond
+    const atMeetingOrBeyond   = inStage(['meeting scheduled', 'meeting done', 'done deal'])
+    const atMeetingDoneOrDeal = inStage(['meeting done', 'done deal'])
+    const atDoneDeal          = inStage(['done deal'])
+    const lostLeads           = inStage(['lost deal'])
 
-    const directToMeeting = isUsingCrm ? 0 : filtered.filter(c => {
-      const agSt  = (c.agent_stage ?? '').toLowerCase()
-      const effSt = effectiveStage(c)
-      return ['meeting scheduled', 'meeting done'].includes(agSt) && ['meeting scheduled', 'meeting done'].includes(effSt)
-    }).length
+    // GAP(A) = Interested → Potential to Close conversion rate
+    const gapA = atInterestedOrBeyond > 0 ? Math.round(atPotentialOrBeyond  / atInterestedOrBeyond * 100) : 0
+    // GAP(B) = Potential → Meeting Scheduled conversion rate
+    const gapB = atPotentialOrBeyond  > 0 ? Math.round(atMeetingOrBeyond    / atPotentialOrBeyond  * 100) : 0
+    // GAP(C) = Meeting Scheduled → Meeting Done conversion rate
+    const gapC = atMeetingOrBeyond    > 0 ? Math.round(atMeetingDoneOrDeal  / atMeetingOrBeyond    * 100) : 0
+    // GAP(D) = Meeting Done → Done Deal conversion rate
+    const gapD = atMeetingDoneOrDeal  > 0 ? Math.round(atDoneDeal           / atMeetingDoneOrDeal  * 100) : 0
+
+    const directToMeeting = isUsingCrm
+      ? (crmData?.data ?? []).filter(row => {
+          const ts = decodeStatus(String(row['TO_STATUS'] ?? row['TO STATUS'] ?? '')).trim().toLowerCase()
+          return ts === 'direct to meeting'
+        }).length
+      : filtered.filter(c => {
+          const agSt  = (c.agent_stage ?? '').toLowerCase()
+          const effSt = effectiveStage(c)
+          return ['meeting scheduled', 'meeting done'].includes(agSt) && ['meeting scheduled', 'meeting done'].includes(effSt)
+        }).length
 
     return { gapA, gapB, gapC, gapD, directToMeeting, lostLeads, dropped }
-  }, [stageCounts, total, filtered, isUsingCrm])
+  }, [stageCounts, filtered, isUsingCrm, crmData])
 
   const donutData = useMemo(() =>
     ALL_STAGES
@@ -256,6 +297,20 @@ export default function PerformanceDashboard({
     isUsingCrm ? [] : [...new Set(calls.map(c => c.campaign).filter(Boolean))] as string[],
     [calls, isUsingCrm]
   )
+
+  // For CRM mode: leads whose mapped stage is not a known chart stage → project bucket
+  const crmProjectLeads = useMemo(() => {
+    if (!isUsingCrm) return null
+    const buckets: Record<string, Call[]> = {}
+    for (const c of filtered) {
+      const s = effectiveStage(c)
+      if (s && !STAGE_COLORS[s]) {
+        if (!buckets[s]) buckets[s] = []
+        buckets[s].push(c)
+      }
+    }
+    return Object.keys(buckets).length > 0 ? buckets : null
+  }, [isUsingCrm, filtered])
 
   const lastUpdate = useMemo(() => {
     if (isUsingCrm && crmData) return `CRM export ${crmData.dateFrom} → ${crmData.dateTo}`
@@ -352,7 +407,7 @@ export default function PerformanceDashboard({
         {/* Main 3-column layout */}
         <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 260px', gap: 16 }}>
           {/* Left: Lost Leads */}
-          <div onClick={() => openDrawer('Lost Leads — Not Reachable', ['not reachable'])} style={{ ...cardStyle, padding: '16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <div onClick={() => openDrawer('Lost Leads — Lost Deal', ['lost deal'])} style={{ ...cardStyle, padding: '16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.3 }}>Lost<br />Leads</p>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', minHeight: 140 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{metrics.lostLeads}</span>
@@ -442,6 +497,23 @@ export default function PerformanceDashboard({
                       {camp}
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+            {crmProjectLeads && (
+              <div style={{ borderTop: '1px solid rgba(215,255,0,0.08)', paddingTop: 12 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Project Buckets</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxHeight: 240, overflowY: 'auto' }}>
+                  {Object.entries(crmProjectLeads).map(([bucket, leads]) => {
+                    const label = bucket.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+                    return (
+                      <button key={bucket} onClick={() => openDrawer(`Project: ${label}`, [bucket])}
+                        style={{ padding: '10px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textAlign: 'left', lineHeight: 1.35, transition: 'all 0.15s' }}>
+                        <span style={{ display: 'block', color: '#fff', fontSize: 13, fontWeight: 700 }}>{leads.length}</span>
+                        {label}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )}
