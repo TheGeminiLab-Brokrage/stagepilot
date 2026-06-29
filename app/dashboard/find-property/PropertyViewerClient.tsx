@@ -429,6 +429,9 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [pickerFields, setPickerFields] = useState<string[]>([])
   const [pickerPlans, setPickerPlans] = useState<string[]>([])
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+  const [modalFields, setModalFields] = useState<string[]>([])
+  const [modalPlans, setModalPlans] = useState<string[]>([])
+  const [copiedModal, setCopiedModal] = useState(false)
   const [showConfig, setShowConfig] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -587,6 +590,35 @@ export default function PropertyViewerClient({ userId, companyId }: {
     setCopiedIdx(idx)
     setPickerOpen(null)
     setTimeout(() => setCopiedIdx(null), 2000)
+  }
+
+  // Initialise modal field/plan selection whenever a new card is opened
+  useEffect(() => {
+    if (selectedIdx === null) { setModalFields([]); setModalPlans([]); setCopiedModal(false); return }
+    const row = afterSearch[selectedIdx]
+    if (!row) return
+    const colMap = detectColMap(columns)
+    const propInput = buildPropInput(row, colMap)
+    setModalFields(getAvailablePropFields(propInput))
+    setModalPlans(String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean))
+    setCopiedModal(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIdx])
+
+  function handleCopyModal() {
+    if (selectedIdx === null) return
+    const row = afterSearch[selectedIdx]
+    if (!row) return
+    const colMap = detectColMap(columns)
+    const propInput = buildPropInput(row, colMap)
+    const fields = Object.fromEntries(
+      ['code','phase','floor','area','price','discount','delivery','maint','parking'].map(k => [k, modalFields.includes(k)])
+    ) as Record<string, boolean>
+    const msg = generatePropertyMessage(propInput as Parameters<typeof generatePropertyMessage>[0], modalPlans, fields)
+    navigator.clipboard.writeText(msg).then(() => {
+      setCopiedModal(true)
+      setTimeout(() => setCopiedModal(false), 2000)
+    })
   }
 
   function toggleSheet(sheetId: string) {
@@ -1324,7 +1356,15 @@ export default function PropertyViewerClient({ userId, companyId }: {
                     )
                   })()}
                 </div>
-                <button className="ph-modal-close" onClick={() => setSelectedIdx(null)}>×</button>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexShrink: 0 }}>
+                  <button
+                    className={`ph-copy-modal-btn${copiedModal ? ' copied' : ''}`}
+                    onClick={handleCopyModal}
+                  >
+                    {copiedModal ? '✓ تم النسخ' : '📋 نسخ الرسالة'}
+                  </button>
+                  <button className="ph-modal-close" onClick={() => setSelectedIdx(null)}>×</button>
+                </div>
               </div>
 
               <div className="ph-modal-body">
@@ -1341,22 +1381,71 @@ export default function PropertyViewerClient({ userId, companyId }: {
                   )
                 })()}
 
-                {/* All other fields — skip price col (already shown above) and skip blanks */}
-                <div className="ph-modal-grid">
-                  {columns
-                    .filter(col => col.key !== priceSpecCol?.key)
-                    .map(col => {
-                      const val = selectedProperty[col.key]
-                      const display = col.type === 'numeric' ? fmtFull(val) : String(val ?? '')
-                      if (!display || display === '—') return null
-                      return (
-                        <div key={col.key} className="ph-modal-field">
-                          <div className="f-label">{col.label}</div>
-                          <div className="f-value">{display}</div>
+                {/* Fields grid — mapped fields get a checkbox, unmapped ones are plain */}
+                {(() => {
+                  const colMap = detectColMap(columns)
+                  const reverseMap: Record<string, string> = {}
+                  for (const [propKey, colKey] of Object.entries(colMap)) if (colKey) reverseMap[colKey] = propKey
+                  const propInput = buildPropInput(selectedProperty, colMap)
+                  const plansFromRow = String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+                  const plansColKey = colMap['plans']
+                  return (
+                    <>
+                      <div className="ph-modal-grid">
+                        {columns
+                          .filter(col => col.key !== priceSpecCol?.key && col.key !== plansColKey)
+                          .map(col => {
+                            const val = selectedProperty[col.key]
+                            const display = col.type === 'numeric' ? fmtFull(val) : String(val ?? '')
+                            if (!display || display === '—') return null
+                            const propKey = reverseMap[col.key]
+                            const isCheckable = !!propKey && ['code','phase','floor','area','price','discount','delivery','maint','parking'].includes(propKey)
+                            if (isCheckable) {
+                              return (
+                                <div key={col.key} className="ph-modal-field ph-modal-field-selectable">
+                                  <input
+                                    type="checkbox"
+                                    className="ph-modal-field-check"
+                                    checked={modalFields.includes(propKey)}
+                                    onChange={() => setModalFields(prev =>
+                                      prev.includes(propKey) ? prev.filter(x => x !== propKey) : [...prev, propKey]
+                                    )}
+                                  />
+                                  <div className="f-label">{col.label}</div>
+                                  <div className="f-value">{display}</div>
+                                </div>
+                              )
+                            }
+                            return (
+                              <div key={col.key} className="ph-modal-field">
+                                <div className="f-label">{col.label}</div>
+                                <div className="f-value">{display}</div>
+                              </div>
+                            )
+                          })}
+                      </div>
+                      {plansFromRow.length > 0 && (
+                        <div className="ph-modal-section">
+                          <h4>💳 Payment Plans</h4>
+                          <div className="ph-modal-plan-check">
+                            {plansFromRow.map((p, i) => (
+                              <label key={i} className="ph-modal-plan-option">
+                                <input
+                                  type="checkbox"
+                                  checked={modalPlans.includes(p)}
+                                  onChange={() => setModalPlans(prev =>
+                                    prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]
+                                  )}
+                                />
+                                <span>{p}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
-                      )
-                    })}
-                </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             </div>
           </div>
