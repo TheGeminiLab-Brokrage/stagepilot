@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return NextResponse.json({ error: 'Anthropic API key not configured' }, { status: 500 })
 
   const formData = await req.formData()
   const image = formData.get('image') as File | null
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
   const arrayBuffer = await image.arrayBuffer()
   const base64 = Buffer.from(arrayBuffer).toString('base64')
-  const mimeType = image.type || 'image/jpeg'
+  const mimeType = (image.type || 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 
   const prompt =
     'Extract every phone number visible in this image. Return ONLY a valid JSON array of strings, ' +
@@ -24,22 +24,23 @@ export async function POST(req: NextRequest) {
     'Include the country code. If a number has no country code, prefix it with +971. ' +
     'No explanation, no markdown fences, just the raw JSON array.'
 
-  const client = new OpenAI({ apiKey })
+  const client = new Anthropic({ apiKey })
 
   let rawText = '[]'
   try {
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 512,
       messages: [{
         role: 'user',
         content: [
+          { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
           { type: 'text', text: prompt },
-          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
         ],
       }],
     })
-    rawText = response.choices[0]?.message?.content ?? '[]'
+    const block = response.content[0]
+    rawText = block.type === 'text' ? block.text : '[]'
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ error: `AI error: ${msg}` }, { status: 502 })
