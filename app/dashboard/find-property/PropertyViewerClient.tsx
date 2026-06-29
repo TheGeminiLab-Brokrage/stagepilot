@@ -1161,7 +1161,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                         <button
                           className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
                           onClick={e => handleDirectCopy(e, row, idx)}
-                          title="نسخ الرسالة التسويقية"
+                          title="Copy marketing message"
                         >
                           {copiedIdx === idx ? '✓' : '📋'}
                         </button>
@@ -1259,7 +1259,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                     className={`ph-copy-modal-btn${copiedModal ? ' copied' : ''}`}
                     onClick={handleCopyModal}
                   >
-                    {copiedModal ? '✓ تم النسخ' : '📋 نسخ الرسالة'}
+                    {copiedModal ? '✓ Copied!' : '📋 Copy Message'}
                   </button>
                   <button className="ph-modal-close" onClick={() => setSelectedIdx(null)}>×</button>
                 </div>
