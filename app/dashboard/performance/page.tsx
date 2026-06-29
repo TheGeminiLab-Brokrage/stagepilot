@@ -64,7 +64,11 @@ export default async function PerformancePage() {
     .map((p: { full_name: string | null }) => p.full_name?.toLowerCase().trim())
     .filter(Boolean) as string[]
 
+  const registeredAgents = (agentProfileRows ?? [])
+    .map((p: { full_name: string | null }) => p.full_name?.trim())
+    .filter(Boolean) as string[]
+
   return (
-    <PerformanceDashboard calls={calls} role={role} crmExport={crmExport} fullName={profile?.full_name ?? null} registeredAgentNames={registeredAgentNames} />
+    <PerformanceDashboard calls={calls} role={role} crmExport={crmExport} fullName={profile?.full_name ?? null} registeredAgentNames={registeredAgentNames} registeredAgents={registeredAgents} />
   )
 }

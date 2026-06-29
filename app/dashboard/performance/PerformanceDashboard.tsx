@@ -106,11 +106,10 @@ function Gauge({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? Math.min(value / max, 1) : 0
   const endX = cx - R * Math.cos(pct * Math.PI)
   const endY = cy - R * Math.sin(pct * Math.PI)
-  const largeArc = pct > 0.5 ? 1 : 0
   return (
     <svg width={size} height={height}>
       <path d={`M ${cx - R} ${cy} A ${R} ${R} 0 1 0 ${cx + R} ${cy}`} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={10} strokeLinecap="round" />
-      {pct > 0.01 && <path d={`M ${cx - R} ${cy} A ${R} ${R} 0 ${largeArc} 0 ${endX} ${endY}`} fill="none" stroke="#D7FF00" strokeWidth={10} strokeLinecap="round" />}
+      {pct > 0.01 && <path d={`M ${cx - R} ${cy} A ${R} ${R} 0 0 1 ${endX} ${endY}`} fill="none" stroke="#D7FF00" strokeWidth={10} strokeLinecap="round" />}
       <text x={cx} y={cy + 5} fill="#ffffff" fontSize="22" fontWeight="700" textAnchor="middle" fontFamily="'Space Grotesk', sans-serif">{value}</text>
       <text x={cx - R} y={cy + 18} fill="rgba(255,255,255,0.35)" fontSize="9" textAnchor="middle">0</text>
       <text x={cx + R} y={cy + 18} fill="rgba(255,255,255,0.35)" fontSize="9" textAnchor="middle">{max}</text>
@@ -129,12 +128,14 @@ export default function PerformanceDashboard({
   crmExport,
   fullName,
   registeredAgentNames,
+  registeredAgents,
 }: {
   calls: Call[]
   role: string
   crmExport?: CrmDataState
   fullName?: string | null
   registeredAgentNames?: string[]
+  registeredAgents?: string[]
 }) {
   const [activeTab, setActiveTab]             = useState<PerfTab>('leads')
   const [activeChip, setActiveChip]           = useState<string | null>(null)
@@ -206,6 +207,16 @@ export default function PerformanceDashboard({
   const chips = useMemo(() => {
     if (role === 'agent') return []
     if (isUsingCrm) {
+      if (registeredAgents?.length) {
+        const crmAgentSet = new Set(
+          (crmDerivedCalls ?? [])
+            .filter(c => c.agent_id && !c.agent_id.toLowerCase().startsWith('omnia'))
+            .map(c => c.agent_id.toLowerCase().trim())
+        )
+        return registeredAgents
+          .filter(name => crmAgentSet.has(name.toLowerCase().trim()))
+          .map(name => ({ key: name.toLowerCase().trim(), label: name }))
+      }
       const seen = new Map<string, string>()
       for (const c of crmDerivedCalls ?? []) {
         if (c.agent_id && !seen.has(c.agent_id) && !c.agent_id.toLowerCase().startsWith('omnia')) {
@@ -223,18 +234,22 @@ export default function PerformanceDashboard({
     }
     const teams = [...new Set(calls.map(c => c.team_name).filter(Boolean))] as string[]
     return teams.map(t => ({ key: t, label: t }))
-  }, [calls, role, isUsingCrm, crmDerivedCalls])
+  }, [calls, role, isUsingCrm, crmDerivedCalls, registeredAgents])
 
   const filtered = useMemo(() => {
     let result = effectiveCalls
     if (activeChip) {
       result = (isUsingCrm || role === 'team_leader')
-        ? result.filter(c => c.agent_id === activeChip)
+        ? result.filter(c =>
+            isUsingCrm && registeredAgents?.length
+              ? c.agent_id.toLowerCase().trim() === activeChip
+              : c.agent_id === activeChip
+          )
         : result.filter(c => c.team_name === activeChip)
     }
     if (!isUsingCrm && activeCampaign) result = result.filter(c => c.campaign === activeCampaign)
     return result
-  }, [effectiveCalls, activeChip, activeCampaign, role, isUsingCrm])
+  }, [effectiveCalls, activeChip, activeCampaign, role, isUsingCrm, registeredAgents])
 
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = {}
