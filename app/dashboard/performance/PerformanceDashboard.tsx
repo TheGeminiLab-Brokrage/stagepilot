@@ -107,10 +107,12 @@ export default function PerformanceDashboard({
   calls,
   role,
   crmExport,
+  fullName,
 }: {
   calls: Call[]
   role: string
   crmExport?: CrmDataState
+  fullName?: string | null
 }) {
   const [activeTab, setActiveTab]             = useState<PerfTab>('leads')
   const [activeChip, setActiveChip]           = useState<string | null>(null)
@@ -163,7 +165,13 @@ export default function PerformanceDashboard({
   }, [crmData])
 
   const isUsingCrm  = crmDerivedCalls !== null
-  const effectiveCalls = isUsingCrm ? crmDerivedCalls! : calls
+  const effectiveCalls = useMemo(() => {
+    const base = isUsingCrm ? crmDerivedCalls! : calls
+    if (role === 'agent' && isUsingCrm && fullName) {
+      return base.filter(c => c.agent_id.toLowerCase() === fullName.toLowerCase())
+    }
+    return base
+  }, [isUsingCrm, crmDerivedCalls, calls, role, fullName])
 
   const chips = useMemo(() => {
     if (role === 'agent') return []

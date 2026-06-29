@@ -55,6 +55,6 @@ export default async function PerformancePage() {
     : null
 
   return (
-    <PerformanceDashboard calls={calls} role={role} crmExport={crmExport} />
+    <PerformanceDashboard calls={calls} role={role} crmExport={crmExport} fullName={profile?.full_name ?? null} />
   )
 }
