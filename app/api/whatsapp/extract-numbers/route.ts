@@ -7,8 +7,8 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 })
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
 
   const formData = await req.formData()
   const image = formData.get('image') as File | null
@@ -24,17 +24,12 @@ export async function POST(req: NextRequest) {
     'Include the country code. If a number has no country code, prefix it with +971. ' +
     'No explanation, no markdown fences, just the raw JSON array.'
 
-  // Use the openai package pointed at Google's OpenAI-compatible endpoint.
-  // This works with the existing GEMINI_API_KEY without needing a separate key.
-  const client = new OpenAI({
-    apiKey,
-    baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-  })
+  const client = new OpenAI({ apiKey })
 
   let rawText = '[]'
   try {
     const response = await client.chat.completions.create({
-      model: 'gemini-1.5-flash',
+      model: 'gpt-4o-mini',
       max_tokens: 512,
       messages: [{
         role: 'user',
