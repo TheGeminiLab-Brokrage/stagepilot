@@ -425,9 +425,6 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [page, setPage] = useState(1)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
-  const [pickerOpen, setPickerOpen] = useState<number | null>(null)
-  const [pickerFields, setPickerFields] = useState<string[]>([])
-  const [pickerPlans, setPickerPlans] = useState<string[]>([])
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const [modalFields, setModalFields] = useState<string[]>([])
   const [modalPlans, setModalPlans] = useState<string[]>([])
@@ -568,28 +565,16 @@ export default function PropertyViewerClient({ userId, companyId }: {
     }
   }
 
-  function handleCopyOpen(e: ReactMouseEvent, row: RawRow, idx: number) {
-    e.stopPropagation()
-    if (pickerOpen === idx) { setPickerOpen(null); return }
-    const colMap = detectColMap(columns)
-    const propInput = buildPropInput(row, colMap)
-    setPickerFields(getAvailablePropFields(propInput))
-    setPickerPlans(String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean))
-    setPickerOpen(idx)
-  }
-
-  function handlePickerCopy(e: ReactMouseEvent, row: RawRow, idx: number) {
+  function handleDirectCopy(e: ReactMouseEvent, row: RawRow, idx: number) {
     e.stopPropagation()
     const colMap = detectColMap(columns)
     const propInput = buildPropInput(row, colMap)
-    const fields = Object.fromEntries(
-      ['code','phase','floor','area','price','discount','delivery','maint','parking'].map(k => [k, pickerFields.includes(k)])
-    ) as Record<string, boolean>
-    const msg = generatePropertyMessage(propInput as Parameters<typeof generatePropertyMessage>[0], pickerPlans, fields)
-    navigator.clipboard.writeText(msg)
-    setCopiedIdx(idx)
-    setPickerOpen(null)
-    setTimeout(() => setCopiedIdx(null), 2000)
+    const plans = String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+    const msg = generatePropertyMessage(propInput as Parameters<typeof generatePropertyMessage>[0], plans)
+    navigator.clipboard.writeText(msg).then(() => {
+      setCopiedIdx(idx)
+      setTimeout(() => setCopiedIdx(null), 2000)
+    })
   }
 
   // Initialise modal field/plan selection whenever a new card is opened
@@ -599,7 +584,12 @@ export default function PropertyViewerClient({ userId, companyId }: {
     if (!row) return
     const colMap = detectColMap(columns)
     const propInput = buildPropInput(row, colMap)
-    setModalFields(getAvailablePropFields(propInput))
+    const plansColKey = colMap['plans']
+    const allNonEmpty = columns
+      .filter(col => col.key !== plansColKey)
+      .filter(col => { const v = row[col.key]; return v != null && v !== '' && String(v) !== '—' })
+      .map(col => col.key)
+    setModalFields(allNonEmpty)
     setModalPlans(String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean))
     setCopiedModal(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -611,10 +601,25 @@ export default function PropertyViewerClient({ userId, companyId }: {
     if (!row) return
     const colMap = detectColMap(columns)
     const propInput = buildPropInput(row, colMap)
+    const reverseMap: Record<string, string> = {}
+    for (const [pk, ck] of Object.entries(colMap)) if (ck) reverseMap[ck] = pk
+    const knownKeys = ['code','phase','floor','area','price','discount','delivery','maint','parking']
     const fields = Object.fromEntries(
-      ['code','phase','floor','area','price','discount','delivery','maint','parking'].map(k => [k, modalFields.includes(k)])
+      knownKeys.map(k => [k, colMap[k] ? modalFields.includes(colMap[k]!) : false])
     ) as Record<string, boolean>
-    const msg = generatePropertyMessage(propInput as Parameters<typeof generatePropertyMessage>[0], modalPlans, fields)
+    let msg = generatePropertyMessage(propInput as Parameters<typeof generatePropertyMessage>[0], modalPlans, fields)
+    const plansColKey = colMap['plans']
+    const extraLines = modalFields
+      .filter(ck => { const pk = reverseMap[ck]; return !pk || !knownKeys.includes(pk) })
+      .filter(ck => ck !== plansColKey && ck !== priceSpecCol?.key)
+      .map(ck => {
+        const col = columns.find(c => c.key === ck)
+        const val = row[ck]
+        if (!col || val == null || val === '' || String(val) === '—') return null
+        return `${col.label}: ${String(val)}`
+      })
+      .filter((l): l is string => l !== null)
+    if (extraLines.length > 0) msg += '\n\n' + extraLines.join('\n')
     navigator.clipboard.writeText(msg).then(() => {
       setCopiedModal(true)
       setTimeout(() => setCopiedModal(false), 2000)
@@ -1202,71 +1207,13 @@ export default function PropertyViewerClient({ userId, companyId }: {
                               )
                             })}
                         </div>
-                        <div style={{ position: 'relative' }}>
-                          <button
-                            className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
-                            onClick={e => handleCopyOpen(e, row, idx)}
-                            title="نسخ الرسالة التسويقية"
-                          >
-                            {copiedIdx === idx ? '✓' : '📋'}
-                          </button>
-                          {pickerOpen === idx && (() => {
-                            const colMap = detectColMap(columns)
-                            const propInput = buildPropInput(row, colMap)
-                            const avFields = getAvailablePropFields(propInput)
-                            const allPlans = String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean)
-                            return (
-                              <>
-                                <div className="ph-picker-backdrop" onClick={e => { e.stopPropagation(); setPickerOpen(null) }} />
-                                <div className="ph-plan-picker" onClick={e => e.stopPropagation()}>
-                                  <div className="ph-picker-title">محتوى الرسالة</div>
-                                  {avFields.length > 0 && (
-                                    <>
-                                      <div className="ph-picker-section">تفاصيل</div>
-                                      {avFields.map(field => (
-                                        <label key={field} className="ph-picker-option">
-                                          <input
-                                            type="checkbox"
-                                            checked={pickerFields.includes(field)}
-                                            onChange={() => setPickerFields(prev =>
-                                              prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
-                                            )}
-                                          />
-                                          <span>{FIELD_LABELS[field]}: {fieldValuePreview(propInput, field)}</span>
-                                        </label>
-                                      ))}
-                                    </>
-                                  )}
-                                  {allPlans.length > 0 && (
-                                    <>
-                                      <div className="ph-picker-section">أنظمة السداد</div>
-                                      {allPlans.map((plan, pi) => (
-                                        <label key={pi} className="ph-picker-option">
-                                          <input
-                                            type="checkbox"
-                                            checked={pickerPlans.includes(plan)}
-                                            onChange={() => setPickerPlans(prev =>
-                                              prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
-                                            )}
-                                          />
-                                          <span>{plan}</span>
-                                        </label>
-                                      ))}
-                                    </>
-                                  )}
-                                  {avFields.length === 0 && allPlans.length === 0 && (
-                                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: '8px 0' }}>
-                                      No mapped fields detected
-                                    </div>
-                                  )}
-                                  <button className="ph-picker-copy-btn" onClick={e => handlePickerCopy(e, row, idx)}>
-                                    نسخ
-                                  </button>
-                                </div>
-                              </>
-                            )
-                          })()}
-                        </div>
+                        <button
+                          className={`ph-copy-btn${copiedIdx === idx ? ' copied' : ''}`}
+                          onClick={e => handleDirectCopy(e, row, idx)}
+                          title="نسخ الرسالة التسويقية"
+                        >
+                          {copiedIdx === idx ? '✓' : '📋'}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1381,11 +1328,9 @@ export default function PropertyViewerClient({ userId, companyId }: {
                   )
                 })()}
 
-                {/* Fields grid — mapped fields get a checkbox, unmapped ones are plain */}
+                {/* Fields grid — all fields get a checkbox */}
                 {(() => {
                   const colMap = detectColMap(columns)
-                  const reverseMap: Record<string, string> = {}
-                  for (const [propKey, colKey] of Object.entries(colMap)) if (colKey) reverseMap[colKey] = propKey
                   const propInput = buildPropInput(selectedProperty, colMap)
                   const plansFromRow = String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean)
                   const plansColKey = colMap['plans']
@@ -1398,26 +1343,16 @@ export default function PropertyViewerClient({ userId, companyId }: {
                             const val = selectedProperty[col.key]
                             const display = col.type === 'numeric' ? fmtFull(val) : String(val ?? '')
                             if (!display || display === '—') return null
-                            const propKey = reverseMap[col.key]
-                            const isCheckable = !!propKey && ['code','phase','floor','area','price','discount','delivery','maint','parking'].includes(propKey)
-                            if (isCheckable) {
-                              return (
-                                <div key={col.key} className="ph-modal-field ph-modal-field-selectable">
-                                  <input
-                                    type="checkbox"
-                                    className="ph-modal-field-check"
-                                    checked={modalFields.includes(propKey)}
-                                    onChange={() => setModalFields(prev =>
-                                      prev.includes(propKey) ? prev.filter(x => x !== propKey) : [...prev, propKey]
-                                    )}
-                                  />
-                                  <div className="f-label">{col.label}</div>
-                                  <div className="f-value">{display}</div>
-                                </div>
-                              )
-                            }
                             return (
-                              <div key={col.key} className="ph-modal-field">
+                              <div key={col.key} className="ph-modal-field ph-modal-field-selectable">
+                                <input
+                                  type="checkbox"
+                                  className="ph-modal-field-check"
+                                  checked={modalFields.includes(col.key)}
+                                  onChange={() => setModalFields(prev =>
+                                    prev.includes(col.key) ? prev.filter(x => x !== col.key) : [...prev, col.key]
+                                  )}
+                                />
                                 <div className="f-label">{col.label}</div>
                                 <div className="f-value">{display}</div>
                               </div>
