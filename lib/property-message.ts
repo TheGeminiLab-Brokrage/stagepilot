@@ -1,3 +1,115 @@
+import type { RawRow } from './excel-parser'
+import type { ColumnMeta } from './column-analyzer'
+
+// Minimal ViewConfig fields needed for viewer message generation
+interface ViewerMsgConfig {
+  titleColumn: string
+  subtitleColumn: string
+  badgeColumn: string
+  msgPriceCol?: string
+  msgAreaCol?: string
+  msgPlansCol?: string
+}
+
+export function colEmoji(col: ColumnMeta): string {
+  const l = (col.key + ' ' + col.label).toLowerCase()
+  if (/price|value|cost|amount|total|nominal|سعر/.test(l)) return '💰'
+  if (/area|sqm|m²|bua|size|مساحة|built/.test(l)) return '📐'
+  if (/bed|room|غرف|studio/.test(l)) return '🛏️'
+  if (/floor|الدور/.test(l)) return '🏢'
+  if (/discount|خصم/.test(l)) return '💸'
+  if (/finish|تشطيب/.test(l)) return '🎨'
+  if (/parking|موقف/.test(l)) return '🚗'
+  if (/maint|صيانة/.test(l)) return '🔧'
+  if (/phase|building|block|مرحلة|مبنى/.test(l)) return '🏗️'
+  if (/delivery|تسليم/.test(l) || col.type === 'year') return '📅'
+  if (/garden|حديقة/.test(l)) return '🌿'
+  if (/roof|روف/.test(l)) return '🏠'
+  if (/developer|مطور/.test(l)) return '🏗️'
+  if (/project|مشروع/.test(l)) return '🏘️'
+  if (/city|location|مدينة/.test(l)) return '📍'
+  if (/type|unit|نوع/.test(l)) return '🏷️'
+  if (/code|unit.?no|كود/.test(l)) return '#️⃣'
+  if (col.type === 'numeric') return '📊'
+  return '🏷️'
+}
+
+export function generateViewerMessage(
+  row: RawRow,
+  columns: ColumnMeta[],
+  viewConfig: ViewerMsgConfig,
+  selectedColKeys: string[],
+): string {
+  const colMap = Object.fromEntries(columns.map(c => [c.key, c]))
+  const lines: string[] = []
+
+  // Auto-detect plans column if not explicitly mapped
+  const plansKey = viewConfig.msgPlansCol
+    ?? columns.find(c => /plan|payment|خطة|دفع/i.test(c.key + ' ' + c.label))?.key
+
+  // Header: title value
+  const titleVal = viewConfig.titleColumn ? String(row[viewConfig.titleColumn] ?? '').trim() : ''
+  if (titleVal) {
+    lines.push(`🏢 ${titleVal} 🔥`)
+    lines.push('')
+  }
+
+  // Location: subtitle
+  const subVal = viewConfig.subtitleColumn ? String(row[viewConfig.subtitleColumn] ?? '').trim() : ''
+  if (subVal && subVal !== '—') lines.push(`📍 ${subVal}`)
+
+  // Status/type: badge
+  const badgeVal = viewConfig.badgeColumn ? String(row[viewConfig.badgeColumn] ?? '').trim() : ''
+  if (badgeVal && badgeVal !== '—') lines.push(`🏷️ الحالة: ${badgeVal}`)
+
+  // Collect body keys: skip header cols and plans
+  const skipKeys = new Set([
+    viewConfig.titleColumn,
+    viewConfig.subtitleColumn,
+    viewConfig.badgeColumn,
+    plansKey,
+  ].filter((k): k is string => Boolean(k)))
+
+  const bodyKeys = selectedColKeys.filter(k => !skipKeys.has(k))
+
+  // Auto-detect price and area columns for ordering (price last, just before plans)
+  const priceKey = viewConfig.msgPriceCol
+    ?? bodyKeys.find(k => {
+      const c = colMap[k]
+      return c?.type === 'numeric' && /price|value|cost|amount|total|nominal|سعر/i.test(c.key + ' ' + c.label)
+    })
+
+  const nonPriceKeys = bodyKeys.filter(k => k !== priceKey)
+  const orderedKeys = [...nonPriceKeys, ...(priceKey ? [priceKey] : [])]
+
+  if (orderedKeys.length > 0 || (plansKey && selectedColKeys.includes(plansKey))) {
+    lines.push('')
+  }
+
+  for (const key of orderedKeys) {
+    const col = colMap[key]
+    if (!col) continue
+    const val = row[key]
+    if (val == null || val === '' || String(val) === '—') continue
+    const emoji = colEmoji(col)
+    const display = col.type === 'numeric' ? fmtPrice(val) : String(val)
+    lines.push(`${emoji} ${col.label}: ${display}`)
+  }
+
+  // Payment plans section
+  if (plansKey && selectedColKeys.includes(plansKey)) {
+    const plansStr = String(row[plansKey] ?? '')
+    const plans = plansStr.split('|').map(s => s.trim()).filter(Boolean)
+    if (plans.length > 0) {
+      lines.push('')
+      lines.push('✅ أنظمة السداد:')
+      plans.forEach(p => lines.push(`• ${p}`))
+    }
+  }
+
+  return lines.join('\n')
+}
+
 type PropertyInput = {
   city: string
   project: string

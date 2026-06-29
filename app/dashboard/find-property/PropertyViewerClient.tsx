@@ -7,7 +7,7 @@ import MultiCombobox from '@/app/dashboard/components/MultiCombobox'
 import { parseExcelFile, type RawRow } from '@/lib/excel-parser'
 import { analyzeColumns, mergeColumnMeta, type ColumnMeta } from '@/lib/column-analyzer'
 import { fmt, fmtFull } from '@/lib/property-utils'
-import { generatePropertyMessage } from '@/lib/property-message'
+import { generateViewerMessage, colEmoji } from '@/lib/property-message'
 import './property.css'
 
 const PAGE_SIZE = 24
@@ -28,89 +28,17 @@ interface ViewConfig {
   filterColumns: string[]
   sortColumn: string
   sortDir: 'asc' | 'desc'
+  msgPriceCol?: string
+  msgAreaCol?: string
+  msgPlansCol?: string
 }
 
 type NumericFilter = { min: string; max: string }
 type FilterValue = string[] | NumericFilter
 type FilterState = Record<string, FilterValue>
 
-const FIELD_LABELS: Record<string, string> = {
-  code: 'كود الوحدة', phase: 'المرحلة / المبنى', floor: 'الدور',
-  area: 'المساحة', price: 'السعر', discount: 'خصم الكاش',
-  delivery: 'التسليم', maint: 'الصيانة', parking: 'موقف السيارة',
-}
-
-const PROP_PATTERNS: Record<string, RegExp> = {
-  code:      /unit.?no|unit.?num|كود/i,
-  phase:     /phase|building|block|مرحلة|مبنى/i,
-  floor:     /^floor$|الدور/i,
-  area:      /^bua$|^area$|built.?up|مساحة/i,
-  garden:    /garden|حديقة/i,
-  roof:      /roof|روف/i,
-  price:     /price|nominal|سعر/i,
-  discount:  /discount|خصم/i,
-  delivery:  /delivery|تسليم/i,
-  maint:     /maint|صيانة/i,
-  parking:   /parking|موقف/i,
-  beds:      /bed|room|غرف/i,
-  type:      /type|usage|نوع/i,
-  project:   /project|مشروع/i,
-  developer: /developer|مطور/i,
-  city:      /city|location|مدينة/i,
-  finish:    /finish|تشطيب/i,
-  plans:     /plan|payment|خطة|دفع/i,
-}
-
-function detectColMap(columns: ColumnMeta[]): Partial<Record<string, string>> {
-  const map: Partial<Record<string, string>> = {}
-  for (const [propKey, pattern] of Object.entries(PROP_PATTERNS)) {
-    const col = columns.find(c => pattern.test(c.key) || pattern.test(c.label))
-    if (col) map[propKey] = col.key
-  }
-  return map
-}
-
-function buildPropInput(row: RawRow, m: Partial<Record<string, string>>) {
-  const g = (k: string) => (m[k] ? String(row[m[k]!] ?? '') : '')
-  return {
-    city: g('city'), project: g('project'), developer: g('developer'),
-    type: g('type'), beds: g('beds'), area: g('area'),
-    garden: g('garden'), roof: g('roof'), finish: g('finish'),
-    price: g('price'), discount: g('discount'), delivery: g('delivery'),
-    maint: g('maint'), plans: g('plans'),
-    code: g('code'), phase: g('phase'), floor: g('floor'), parking: g('parking'),
-  }
-}
-
-function getAvailablePropFields(p: ReturnType<typeof buildPropInput>): string[] {
-  const f: string[] = []
-  if (p.code) f.push('code')
-  if (p.phase) f.push('phase')
-  if (p.floor !== '' && p.floor !== undefined) f.push('floor')
-  if (p.area) f.push('area')
-  if (p.price) f.push('price')
-  if (parseFloat(String(p.discount)) > 0) f.push('discount')
-  if (p.delivery) f.push('delivery')
-  if (parseFloat(String(p.maint)) > 0) f.push('maint')
-  if (p.parking && p.parking !== '—') f.push('parking')
-  return f
-}
-
-function fieldValuePreview(p: ReturnType<typeof buildPropInput>, field: string): string {
-  switch (field) {
-    case 'code':     return String(p.code)
-    case 'phase':    return String(p.phase)
-    case 'floor':    return String(p.floor)
-    case 'area':     return `${p.area} م²`
-    case 'price':    return `${parseFloat(String(p.price)).toLocaleString('en-EG')} ج`
-    case 'discount': return parseFloat(String(p.discount)) > 99
-                       ? `${parseFloat(String(p.discount)).toLocaleString('en-EG')} ج`
-                       : `${p.discount}%`
-    case 'delivery': return String(p.delivery)
-    case 'maint':    return `${p.maint}%`
-    case 'parking':  return String(p.parking)
-    default:         return ''
-  }
+function plansColKey(columns: ColumnMeta[], cfg: ViewConfig | null): string | undefined {
+  return cfg?.msgPlansCol ?? columns.find(c => /plan|payment|خطة|دفع/i.test(c.key + ' ' + c.label))?.key
 }
 
 // Returns inline styles for status badge based on value text
@@ -271,7 +199,7 @@ function ConfigPanel({
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h2 style={{ margin: 0, color: '#fff', fontSize: 18, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
-            Configure View
+            ⚙️ Configure View
           </h2>
           <button
             onClick={onClose}
@@ -281,7 +209,7 @@ function ConfigPanel({
 
         {/* Section 1: Card Header */}
         <div>
-          <p style={sectionHeadStyle}>Card Header</p>
+          <p style={sectionHeadStyle}>🃏 Card Header</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
               <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 4, fontFamily: "'Montserrat', sans-serif" }}>
@@ -327,7 +255,7 @@ function ConfigPanel({
 
         {/* Section 2: Filter Sidebar */}
         <div>
-          <p style={sectionHeadStyle}>Filter sidebar columns</p>
+          <p style={sectionHeadStyle}>🔧 Filter Sidebar Columns</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {filterableKeys.map(key => {
               const col = columns.find(c => c.key === key)!
@@ -349,9 +277,9 @@ function ConfigPanel({
           </div>
         </div>
 
-        {/* Section 4: Default Sort */}
+        {/* Section 3: Default Sort */}
         <div>
-          <p style={sectionHeadStyle}>Default Sort</p>
+          <p style={sectionHeadStyle}>🔃 Default Sort</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <select
               style={{ ...inputStyle, flex: 2 }}
@@ -369,6 +297,55 @@ function ConfigPanel({
               <option value="asc">↑ Low → High</option>
               <option value="desc">↓ High → Low</option>
             </select>
+          </div>
+        </div>
+
+        {/* Section 4: Message Template */}
+        <div>
+          <p style={sectionHeadStyle}>💬 Message Template</p>
+          <p style={{ margin: '0 0 10px', fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: "'Montserrat', sans-serif", lineHeight: 1.5 }}>
+            Help the message generator identify key columns. Auto-detected if left blank.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 4, fontFamily: "'Montserrat', sans-serif" }}>
+                💰 Price Column
+              </label>
+              <select
+                style={inputStyle}
+                value={draft.msgPriceCol ?? ''}
+                onChange={e => setDraft(d => ({ ...d, msgPriceCol: e.target.value || undefined }))}
+              >
+                <option value="">— Auto-detect —</option>
+                {columns.filter(c => c.type === 'numeric').map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 4, fontFamily: "'Montserrat', sans-serif" }}>
+                📐 Area Column
+              </label>
+              <select
+                style={inputStyle}
+                value={draft.msgAreaCol ?? ''}
+                onChange={e => setDraft(d => ({ ...d, msgAreaCol: e.target.value || undefined }))}
+              >
+                <option value="">— Auto-detect —</option>
+                {columns.filter(c => c.type === 'numeric').map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 4, fontFamily: "'Montserrat', sans-serif" }}>
+                ✅ Payment Plans Column
+              </label>
+              <select
+                style={inputStyle}
+                value={draft.msgPlansCol ?? ''}
+                onChange={e => setDraft(d => ({ ...d, msgPlansCol: e.target.value || undefined }))}
+              >
+                <option value="">— Auto-detect —</option>
+                {columns.map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -567,10 +544,14 @@ export default function PropertyViewerClient({ userId, companyId }: {
 
   function handleDirectCopy(e: ReactMouseEvent, row: RawRow, idx: number) {
     e.stopPropagation()
-    const colMap = detectColMap(columns)
-    const propInput = buildPropInput(row, colMap)
-    const plans = String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean)
-    const msg = generatePropertyMessage(propInput as Parameters<typeof generatePropertyMessage>[0], plans)
+    if (!config) return
+    const pk = plansColKey(columns, config)
+    const allKeys = columns
+      .filter(c => c.key !== pk)
+      .filter(c => { const v = row[c.key]; return v != null && v !== '' && String(v) !== '—' })
+      .map(c => c.key)
+    const selectedKeys = [...allKeys, ...(pk && row[pk] ? [pk] : [])]
+    const msg = generateViewerMessage(row, columns, config, selectedKeys)
     navigator.clipboard.writeText(msg).then(() => {
       setCopiedIdx(idx)
       setTimeout(() => setCopiedIdx(null), 2000)
@@ -582,44 +563,28 @@ export default function PropertyViewerClient({ userId, companyId }: {
     if (selectedIdx === null) { setModalFields([]); setModalPlans([]); setCopiedModal(false); return }
     const row = afterSearch[selectedIdx]
     if (!row) return
-    const colMap = detectColMap(columns)
-    const propInput = buildPropInput(row, colMap)
-    const plansColKey = colMap['plans']
+    const pk = plansColKey(columns, config)
     const allNonEmpty = columns
-      .filter(col => col.key !== plansColKey)
+      .filter(col => col.key !== pk)
       .filter(col => { const v = row[col.key]; return v != null && v !== '' && String(v) !== '—' })
       .map(col => col.key)
     setModalFields(allNonEmpty)
-    setModalPlans(String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean))
+    const plansStr = pk ? String(row[pk] ?? '') : ''
+    setModalPlans(plansStr.split('|').map(s => s.trim()).filter(Boolean))
     setCopiedModal(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIdx])
 
   function handleCopyModal() {
-    if (selectedIdx === null) return
+    if (selectedIdx === null || !config) return
     const row = afterSearch[selectedIdx]
     if (!row) return
-    const colMap = detectColMap(columns)
-    const propInput = buildPropInput(row, colMap)
-    const reverseMap: Record<string, string> = {}
-    for (const [pk, ck] of Object.entries(colMap)) if (ck) reverseMap[ck] = pk
-    const knownKeys = ['code','phase','floor','area','price','discount','delivery','maint','parking']
-    const fields = Object.fromEntries(
-      knownKeys.map(k => [k, colMap[k] ? modalFields.includes(colMap[k]!) : false])
-    ) as Record<string, boolean>
-    let msg = generatePropertyMessage(propInput as Parameters<typeof generatePropertyMessage>[0], modalPlans, fields)
-    const plansColKey = colMap['plans']
-    const extraLines = modalFields
-      .filter(ck => { const pk = reverseMap[ck]; return !pk || !knownKeys.includes(pk) })
-      .filter(ck => ck !== plansColKey && ck !== priceSpecCol?.key)
-      .map(ck => {
-        const col = columns.find(c => c.key === ck)
-        const val = row[ck]
-        if (!col || val == null || val === '' || String(val) === '—') return null
-        return `${col.label}: ${String(val)}`
-      })
-      .filter((l): l is string => l !== null)
-    if (extraLines.length > 0) msg += '\n\n' + extraLines.join('\n')
+    const pk = plansColKey(columns, config)
+    const selectedKeys = [
+      ...modalFields,
+      ...(pk && modalPlans.length > 0 ? [pk] : []),
+    ]
+    const msg = generateViewerMessage(row, columns, config, selectedKeys)
     navigator.clipboard.writeText(msg).then(() => {
       setCopiedModal(true)
       setTimeout(() => setCopiedModal(false), 2000)
@@ -854,7 +819,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
           onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = 'rgba(255,255,255,0.12)'; b.style.color = 'rgba(255,255,255,0.5)' }}
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add Sheet
+          📂 Add Sheet
         </button>
         <input ref={fileInputRef} type="file" accept=".xlsx,.xls" multiple style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
 
@@ -868,7 +833,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
             <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="20" y2="12"/><line x1="12" y1="18" x2="20" y2="18"/>
             <circle cx="4" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="6" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>
           </svg>
-          Configure View
+          ⚙️ Configure View
         </button>
 
         {sheets.length > 0 && (
@@ -1056,7 +1021,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                 </svg>
               </div>
               <div className="ph-kpi-val">{rows.length.toLocaleString()}</div>
-              <div className="ph-kpi-lbl">Total Properties</div>
+              <div className="ph-kpi-lbl">🏠 Total Properties</div>
             </div>
 
             {/* Matching current filters */}
@@ -1069,7 +1034,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
               <div className="ph-kpi-val" style={{ color: hasActiveFilters || search ? '#d7ff00' : 'rgba(255,255,255,0.5)' }}>
                 {afterSearch.length.toLocaleString()}
               </div>
-              <div className="ph-kpi-lbl">{hasActiveFilters || search ? 'Matching' : 'Showing'}</div>
+              <div className="ph-kpi-lbl">{hasActiveFilters || search ? '✅ Matching' : '📋 Showing'}</div>
             </div>
 
             {/* Key numeric range — only if column exists and has variance */}
@@ -1081,7 +1046,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                   </svg>
                 </div>
                 <div className="ph-kpi-val">{fmt(kpiMin)}</div>
-                <div className="ph-kpi-lbl">From · {kpiCol.label}</div>
+                <div className="ph-kpi-lbl">📉 From · {kpiCol.label}</div>
               </div>
             )}
             {kpiCol && kpiMin !== null && kpiMax !== null && kpiMin !== kpiMax && (
@@ -1092,7 +1057,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                   </svg>
                 </div>
                 <div className="ph-kpi-val">{fmt(kpiMax)}</div>
-                <div className="ph-kpi-lbl">Up to · {kpiCol.label}</div>
+                <div className="ph-kpi-lbl">📈 Up to · {kpiCol.label}</div>
               </div>
             )}
           </div>
@@ -1117,8 +1082,8 @@ export default function PropertyViewerClient({ userId, companyId }: {
           {afterSearch.length === 0 ? (
             <div className="ph-empty">
               <div className="ph-empty-icon">🔍</div>
-              <h3>No properties found</h3>
-              <p>{search ? `No results for "${search}"` : 'Try adjusting your filters'}</p>
+              <h3>🏚️ No properties found</h3>
+              <p>{search ? `😕 No results for "${search}"` : '🔧 Try adjusting your filters'}</p>
               {(hasActiveFilters || search) && (
                 <button
                   className="ph-btn-reset"
@@ -1159,21 +1124,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                             if (!display || display === '—') return null
                             return (
                               <div key={col.key} className="ph-spec">
-                                <span className="ph-spec-icon">
-                                  {col.type === 'numeric' ? (
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-                                    </svg>
-                                  ) : col.type === 'year' ? (
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                                    </svg>
-                                  ) : (
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
-                                    </svg>
-                                  )}
-                                </span>
+                                <span className="ph-spec-icon">{colEmoji(col)}</span>
                                 <strong>{display}</strong>
                                 <span>{col.label}</span>
                               </div>
@@ -1330,15 +1281,13 @@ export default function PropertyViewerClient({ userId, companyId }: {
 
                 {/* Fields grid — all fields get a checkbox */}
                 {(() => {
-                  const colMap = detectColMap(columns)
-                  const propInput = buildPropInput(selectedProperty, colMap)
-                  const plansFromRow = String(propInput.plans || '').split('|').map(s => s.trim()).filter(Boolean)
-                  const plansColKey = colMap['plans']
+                  const pk = plansColKey(columns, config)
+                  const plansFromRow = pk ? String(selectedProperty[pk] ?? '').split('|').map(s => s.trim()).filter(Boolean) : []
                   return (
                     <>
                       <div className="ph-modal-grid">
                         {columns
-                          .filter(col => col.key !== priceSpecCol?.key && col.key !== plansColKey)
+                          .filter(col => col.key !== priceSpecCol?.key && col.key !== pk)
                           .map(col => {
                             const val = selectedProperty[col.key]
                             const display = col.type === 'numeric' ? fmtFull(val) : String(val ?? '')
