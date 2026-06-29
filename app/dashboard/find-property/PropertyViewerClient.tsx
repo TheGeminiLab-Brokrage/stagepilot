@@ -634,13 +634,14 @@ export default function PropertyViewerClient({ userId, companyId }: {
     if (!hasSheetFilter && !hasTabFilter) return rows
     return rows.filter((row, i) => {
       const sheetId = rowSheetIds[i]
-      if (selectedSheetIds.has(sheetId)) return true
       const selectedTabs = selectedTabsBySheetId[sheetId]
+      // Tab filter takes precedence: if specific tabs are checked for this file, apply them
       if (selectedTabs && selectedTabs.size > 0) {
         const tab = row.__tab as string | undefined
         return tab ? selectedTabs.has(tab) : true
       }
-      return false
+      // Otherwise fall back to whole-file toggle
+      return selectedSheetIds.has(sheetId)
     })
   }, [rows, rowSheetIds, selectedSheetIds, selectedTabsBySheetId])
 
@@ -835,8 +836,8 @@ export default function PropertyViewerClient({ userId, companyId }: {
               const isMultiTab = tabs.length > 1
               const selectedTabs = selectedTabsBySheetId[sheet.id]
               const selectedTabCount = selectedTabs?.size ?? 0
-              // Multi-tab: highlighted when any tab selected. Single-tab: highlighted when file toggled.
-              const isActive = isMultiTab ? selectedTabCount > 0 : selectedSheetIds.has(sheet.id)
+              const isToggled = selectedSheetIds.has(sheet.id)
+              const isActive = isToggled || selectedTabCount > 0
               const hasAnyFilter = selectedSheetIds.size > 0 || Object.values(selectedTabsBySheetId).some(s => s.size > 0)
               const isDropdownOpen = openTabDropdownId === sheet.id
 
@@ -847,10 +848,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                   style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column' }}
                 >
                   <span
-                    onClick={() => isMultiTab
-                      ? setOpenTabDropdownId(isDropdownOpen ? null : sheet.id)
-                      : toggleSheet(sheet.id)
-                    }
+                    onClick={() => toggleSheet(sheet.id)}
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 5,
                       background: isActive ? 'rgba(215,255,0,0.06)' : 'rgba(255,255,255,0.06)',
@@ -869,10 +867,18 @@ export default function PropertyViewerClient({ userId, companyId }: {
                       </span>
                     )}
                     {isMultiTab && (
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                        style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', opacity: 0.6 }}>
-                        <polyline points="6 9 12 15 18 9"/>
-                      </svg>
+                      <button
+                        onClick={e => { e.stopPropagation(); setOpenTabDropdownId(isDropdownOpen ? null : sheet.id) }}
+                        title="Filter by sheet tab"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 1px', lineHeight: 1, display: 'inline-flex', alignItems: 'center', color: isActive ? 'rgba(215,255,0,0.6)' : 'rgba(255,255,255,0.4)', transition: 'color 0.15s' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = isActive ? 'rgba(215,255,0,0.9)' : 'rgba(255,255,255,0.7)' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = isActive ? 'rgba(215,255,0,0.6)' : 'rgba(255,255,255,0.4)' }}
+                      >
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                          style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                          <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                      </button>
                     )}
                     <button
                       onClick={e => { e.stopPropagation(); deleteSheet(sheet.id) }}
