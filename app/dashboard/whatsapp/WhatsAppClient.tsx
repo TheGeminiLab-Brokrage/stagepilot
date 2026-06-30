@@ -126,11 +126,15 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
 
   function openWhatsApp() {
     if (!current) return
-    // Pre-fill via the text param so the chat opens with the message already
-    // there; clipboard copy stays as a fallback in case it still renders wrong.
+    // No ?text= param — confirmed via live test (screenshot) that WhatsApp's own
+    // URL-param handling corrupts every standard emoji into "�" (plain text and
+    // simple bullets survive fine, so it's specifically 4-byte/astral-plane
+    // characters WhatsApp mishandles in this param). Clipboard + manual paste is
+    // the only path that delivers the message intact. Do not re-attempt the URL
+    // param again without a fundamentally different transport (e.g. official
+    // Business API) — this has now been tested and ruled out twice.
     navigator.clipboard.writeText(messageText).catch(() => {})
-    const url = `https://wa.me/${toWaNumber(current.contact.phone)}?text=${encodeURIComponent(messageText)}`
-    window.open(url, '_blank')
+    window.open(`https://wa.me/${toWaNumber(current.contact.phone)}`, '_blank')
   }
 
   async function copyMessage() {
@@ -260,8 +264,8 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                     <div style={{ background: 'rgba(215,255,0,0.06)', border: `1px solid ${NEON_BORDER}`, borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
                       <div style={{ fontSize: 12, color: NEON, fontWeight: 600, marginBottom: 6 }}>How to send:</div>
                       <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <li style={{ fontSize: 12, color: MUTED }}>Click <strong style={{ color: '#fff' }}>Open in WhatsApp</strong> — the chat opens with the message already filled in</li>
-                        <li style={{ fontSize: 12, color: MUTED }}>Check it matches the preview above. If anything looks wrong, press <strong style={{ color: '#fff' }}>Ctrl+V</strong> to paste the exact text from your clipboard instead</li>
+                        <li style={{ fontSize: 12, color: MUTED }}>Click <strong style={{ color: '#fff' }}>Open in WhatsApp</strong> — message is copied to your clipboard</li>
+                        <li style={{ fontSize: 12, color: MUTED }}>In the chat, click the text box and press <strong style={{ color: '#fff' }}>Ctrl+V</strong> to paste it — this is required, WhatsApp corrupts emoji if sent pre-filled instead</li>
                         {mediaFile && <li style={{ fontSize: 12, color: MUTED }}>Click the 📎 icon, choose the downloaded photo, then attach it</li>}
                         <li style={{ fontSize: 12, color: MUTED }}>Press Enter / the send button in WhatsApp yourself — nothing is sent automatically</li>
                       </ol>
