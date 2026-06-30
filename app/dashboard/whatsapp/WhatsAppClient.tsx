@@ -73,6 +73,8 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   const [numbersCopied, setNumbersCopied] = useState(false)
   const [numbersBatchIndex, setNumbersBatchIndex] = useState(0)
   const [lastCopiedBatch, setLastCopiedBatch] = useState<Assignment[]>([])
+  const [newSearch, setNewSearch] = useState('')
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [mediaFile, setMediaFile] = useState<File | null>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [mediaDragOver, setMediaDragOver] = useState(false)
@@ -91,6 +93,11 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   // Batch progress is per-sheet — reset when switching sheets
   useEffect(() => {
     setNumbersBatchIndex(0); setLastCopiedBatch([])
+  }, [activeSheetId])
+
+  // Search/selection is per-sheet — reset when switching sheets
+  useEffect(() => {
+    setNewSearch(''); setSelectedAssignmentId(null)
   }, [activeSheetId])
 
   const handleMediaSelect = useCallback((file: File) => {
@@ -115,9 +122,15 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
     () => newAssignments.filter(a => a.sheet.id === activeSheetId),
     [newAssignments, activeSheetId]
   )
-  const current = newForActiveSheet[0]
+  const current = newForActiveSheet.find(a => a.id === selectedAssignmentId) ?? newForActiveSheet[0]
   const currentNumbers = useMemo(() => current ? parsePhoneNumbers(current.contact.phone) : [], [current])
   const totalBatches = Math.max(1, Math.ceil(newForActiveSheet.length / BATCH_SIZE))
+
+  const newSearchMatches = useMemo(() => {
+    const q = toWaNumber(newSearch)
+    if (!q) return []
+    return newForActiveSheet.filter(a => parsePhoneNumbers(a.contact.phone).some(n => toWaNumber(n).includes(q)))
+  }, [newForActiveSheet, newSearch])
 
   const [oldSearch, setOldSearch] = useState('')
 
@@ -142,6 +155,7 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
     try {
       await patchAssignment(current.id, { action: 'sent', message_text: messageText })
       setAssignments(prev => prev.map(a => a.id === current.id ? { ...a, sent_at: new Date().toISOString(), message_text: messageText } : a))
+      setSelectedAssignmentId(null); setNewSearch('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to mark as sent')
     } finally {
@@ -306,6 +320,29 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                     </div>
                   </div>
                 </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <input value={newSearch} onChange={e => setNewSearch(e.target.value)}
+                    placeholder="Search by phone number to jump to a contact…"
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 13, ...font, outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+
+                {newSearch.trim() && (
+                  <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, marginBottom: 16, overflow: 'hidden' }}>
+                    {newSearchMatches.length === 0 ? (
+                      <div style={{ padding: '14px 16px', color: MUTED, fontSize: 13 }}>No matches in this sheet.</div>
+                    ) : newSearchMatches.map(a => (
+                      <button key={a.id} onClick={() => { setSelectedAssignmentId(a.id); setNewSearch('') }} style={{
+                        display: 'block', width: '100%', textAlign: 'left', padding: '12px 16px', border: 'none',
+                        borderBottom: `1px solid ${BORDER}`, background: 'transparent',
+                        color: '#fff', fontSize: 13, cursor: 'pointer', ...fontDisplay,
+                      }}>
+                        {parsePhoneNumbers(a.contact.phone).join(', ')}
+                        {a.contact.client_name && <span style={{ color: MUTED, marginLeft: 8 }}>{a.contact.client_name}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {current ? (
                   <div style={{ background: CARD, border: `1px solid ${NEON_BORDER}`, borderRadius: 12, padding: 24 }}>
