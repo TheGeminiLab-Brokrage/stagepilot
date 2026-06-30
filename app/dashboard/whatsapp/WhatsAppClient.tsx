@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 
 const NEON = '#D7FF00'
 const NEON_DIM = 'rgba(215,255,0,0.12)'
@@ -63,11 +63,38 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   const [activeSheetId, setActiveSheetId] = useState<string | null>(newSheets[0]?.id ?? null)
   const [messageText, setMessageText] = useState('')
   const [copied, setCopied] = useState(false)
+  const [mediaFile, setMediaFile] = useState<File | null>(null)
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null)
+  const [mediaDragOver, setMediaDragOver] = useState(false)
+  const mediaInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!activeSheetId && newSheets.length > 0) setActiveSheetId(newSheets[0].id)
     if (activeSheetId && !newSheets.some(s => s.id === activeSheetId)) setActiveSheetId(newSheets[0]?.id ?? null)
   }, [newSheets, activeSheetId])
+
+  // Photo is scoped to the active sheet's send session — clear it when switching sheets
+  useEffect(() => {
+    setMediaFile(null); setMediaPreview(null)
+  }, [activeSheetId])
+
+  const handleMediaSelect = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) return
+    setMediaFile(file); setMediaPreview(URL.createObjectURL(file))
+  }, [])
+
+  const handleMediaDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); setMediaDragOver(false)
+    const f = e.dataTransfer.files[0]; if (f) handleMediaSelect(f)
+  }, [handleMediaSelect])
+
+  function downloadMedia() {
+    if (!mediaFile || !mediaPreview) return
+    const a = document.createElement('a')
+    a.href = mediaPreview
+    a.download = mediaFile.name
+    a.click()
+  }
 
   const newForActiveSheet = useMemo(
     () => newAssignments.filter(a => a.sheet.id === activeSheetId),
@@ -99,8 +126,11 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
 
   function openWhatsApp() {
     if (!current) return
+    // Pre-fill via URL so the message actually shows up in the chat; also copy
+    // to clipboard as a fallback in case emojis render oddly through the URL param.
     navigator.clipboard.writeText(messageText).catch(() => {})
-    window.open(`https://wa.me/${toWaNumber(current.contact.phone)}`, '_blank')
+    const url = `https://wa.me/${toWaNumber(current.contact.phone)}?text=${encodeURIComponent(messageText)}`
+    window.open(url, '_blank')
   }
 
   async function copyMessage() {
@@ -175,6 +205,33 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                   }}>{copied ? '✓ Copied!' : '⎘ Copy Message'}</button>
                 </div>
 
+                <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: '#fff', ...fontDisplay, display: 'block', marginBottom: 6 }}>
+                    Attach Photo <span style={{ color: MUTED, fontWeight: 400 }}>(optional)</span>
+                  </label>
+                  <p style={{ color: MUTED, fontSize: 11, margin: '0 0 12px' }}>You&apos;ll attach this manually in each WhatsApp chat when sending.</p>
+                  {mediaPreview ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <img src={mediaPreview} alt="Media" style={{ height: 80, width: 80, objectFit: 'cover', borderRadius: 8, border: `1px solid ${BORDER}` }} />
+                      <div>
+                        <div style={{ color: '#fff', fontSize: 13 }}>{mediaFile?.name}</div>
+                        <button onClick={() => { setMediaFile(null); setMediaPreview(null) }}
+                          style={{ color: 'rgba(255,80,80,0.7)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0, marginTop: 4 }}>Remove</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div onClick={() => mediaInputRef.current?.click()}
+                      onDragOver={e => { e.preventDefault(); setMediaDragOver(true) }}
+                      onDragLeave={() => setMediaDragOver(false)}
+                      onDrop={handleMediaDrop}
+                      style={{ border: `2px dashed ${mediaDragOver ? NEON : BORDER}`, borderRadius: 8, padding: '18px', textAlign: 'center', cursor: 'pointer', background: mediaDragOver ? NEON_DIM : 'transparent', transition: 'all 0.2s' }}>
+                      <div style={{ color: MUTED, fontSize: 13 }}>Drop image or <span style={{ color: NEON, textDecoration: 'underline' }}>browse</span></div>
+                    </div>
+                  )}
+                  <input ref={mediaInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleMediaSelect(f) }} />
+                </div>
+
                 <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, ...fontDisplay }}>{newForActiveSheet.length} remaining</span>
@@ -186,6 +243,11 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                     <div style={{ fontSize: 11, color: MUTED, letterSpacing: '0.08em', ...fontDisplay, marginBottom: 8 }}>CURRENT</div>
                     <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', ...fontDisplay, marginBottom: 4 }}>{current.contact.phone}</div>
                     {current.contact.client_name && <div style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>{current.contact.client_name}</div>}
+
+                    <div style={{ background: 'rgba(215,255,0,0.06)', border: `1px solid ${NEON_BORDER}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: MUTED }}>
+                      Message is pre-filled in WhatsApp — if emojis look wrong, press <strong style={{ color: '#fff' }}>Ctrl+V</strong> to paste the exact text from your clipboard.
+                      {mediaFile && <> Click the 📎 icon in WhatsApp to attach the downloaded photo, then send.</>}
+                    </div>
 
                     <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                       <button onClick={openWhatsApp} disabled={!messageText.trim()} style={{
@@ -202,6 +264,16 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                         {busyId === current.id ? '…' : '✓ Mark Sent'}
                       </button>
                     </div>
+
+                    {mediaFile && mediaPreview && (
+                      <button onClick={downloadMedia} style={{
+                        width: '100%', marginTop: 10, padding: '11px', borderRadius: 8,
+                        border: `1px solid ${BORDER}`, background: 'transparent',
+                        color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer', ...fontDisplay,
+                      }}>
+                        ↓ Download Photo to Attach
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <EmptyState text="All new contacts in this sheet have been sent." />
