@@ -369,6 +369,8 @@ export default function PropertyDashboardClient() {
   const [pickerFields, setPickerFields] = useState<string[]>([])
   const [modalPlanSelected, setModalPlanSelected] = useState<string[]>([])
   const [modalFields, setModalFields] = useState<string[]>([])
+  const [previewLines, setPreviewLines] = useState<string[] | null>(null)
+  const [previewCopied, setPreviewCopied] = useState(false)
 
   useEffect(() => {
     fetch('/property-data.json')
@@ -643,11 +645,9 @@ export default function PropertyDashboardClient() {
       ['code','phase','floor','area','price','discount','delivery','maint','parking'].map(k => [k, pickerFields.includes(k)])
     ) as Record<string, boolean>
     const msg = generatePropertyMessage(r, pickerPlans, fields)
-    navigator.clipboard.writeText(msg).then(() => {
-      setCopiedIdx(idx)
-      setPickerOpen(null)
-      setTimeout(() => setCopiedIdx(c => (c === idx ? null : c)), 2000)
-    })
+    setPickerOpen(null)
+    setPreviewLines(msg.split('\n'))
+    setPreviewCopied(false)
   }, [pickerPlans, pickerFields])
 
   const handleCopyModal = useCallback((r: Property) => {
@@ -655,10 +655,8 @@ export default function PropertyDashboardClient() {
       ['code','phase','floor','area','price','discount','delivery','maint','parking'].map(k => [k, modalFields.includes(k)])
     ) as Record<string, boolean>
     const msg = generatePropertyMessage(r, modalPlanSelected, fields)
-    navigator.clipboard.writeText(msg).then(() => {
-      setCopiedModal(true)
-      setTimeout(() => setCopiedModal(false), 2000)
-    })
+    setPreviewLines(msg.split('\n'))
+    setPreviewCopied(false)
   }, [modalPlanSelected, modalFields])
 
   const handlePage = useCallback((p: number) => {
@@ -1250,6 +1248,75 @@ export default function PropertyDashboardClient() {
         </div>
       )}
     </div>
+
+      {/* ── MESSAGE PREVIEW OVERLAY ── */}
+      {previewLines && (
+        <div className="msg-preview-overlay" onClick={() => setPreviewLines(null)}>
+          <div className="msg-preview-panel" onClick={e => e.stopPropagation()}>
+            <div className="msg-preview-header">
+              <span>تعديل الرسالة</span>
+              <button className="msg-preview-close" onClick={() => setPreviewLines(null)}>×</button>
+            </div>
+            <div className="msg-preview-lines">
+              {previewLines.map((line, i) => (
+                <div key={i} className="msg-preview-row">
+                  <span
+                    className="msg-preview-drag"
+                    draggable
+                    onDragStart={e => { e.dataTransfer.setData('text/plain', String(i)) }}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => {
+                      e.preventDefault()
+                      const from = parseInt(e.dataTransfer.getData('text/plain'))
+                      if (isNaN(from) || from === i) return
+                      setPreviewLines(prev => {
+                        if (!prev) return prev
+                        const next = [...prev]
+                        const [moved] = next.splice(from, 1)
+                        next.splice(i, 0, moved)
+                        return next
+                      })
+                    }}
+                    title="اسحب لإعادة الترتيب"
+                  >⠿</span>
+                  <input
+                    className={`msg-preview-line${line === '' ? ' msg-preview-line-blank' : ''}`}
+                    value={line}
+                    onChange={e => setPreviewLines(prev => prev!.map((l, j) => j === i ? e.target.value : l))}
+                    placeholder="— فاصل —"
+                    dir="auto"
+                  />
+                  <button
+                    className="msg-preview-del"
+                    onClick={() => setPreviewLines(prev => prev!.filter((_, j) => j !== i))}
+                    title="حذف السطر"
+                  >×</button>
+                </div>
+              ))}
+              <button
+                className="msg-preview-add"
+                onClick={() => setPreviewLines(prev => [...(prev ?? []), ''])}
+              >+ إضافة سطر</button>
+            </div>
+            <div className="msg-preview-footer">
+              <button
+                className={`msg-preview-copy-btn${previewCopied ? ' copied' : ''}`}
+                onClick={() => {
+                  navigator.clipboard.writeText(previewLines.join('\n')).then(() => {
+                    setPreviewCopied(true)
+                    setTimeout(() => {
+                      setPreviewLines(null)
+                      setPreviewCopied(false)
+                    }, 900)
+                  })
+                }}
+              >
+                {previewCopied ? '✓ تم النسخ' : '📋 نسخ الرسالة'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
