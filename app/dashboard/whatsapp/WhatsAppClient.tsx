@@ -23,8 +23,15 @@ interface Assignment {
   sheet: Sheet
 }
 
+const BATCH_SIZE = 30
+
 function toWaNumber(n: string): string {
   return n.replace(/\D/g, '')
+}
+
+// Cells can contain multiple numbers for the same client, e.g. "+201064442200, +20222871945"
+function parsePhoneNumbers(raw: string): string[] {
+  return raw.split(/[,/;]+/).map(s => s.trim()).filter(Boolean)
 }
 
 async function patchAssignment(id: string, body: Record<string, unknown>) {
@@ -63,6 +70,9 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   const [activeSheetId, setActiveSheetId] = useState<string | null>(newSheets[0]?.id ?? null)
   const [messageText, setMessageText] = useState('')
   const [copied, setCopied] = useState(false)
+  const [numbersCopied, setNumbersCopied] = useState(false)
+  const [numbersBatchIndex, setNumbersBatchIndex] = useState(0)
+  const [lastCopiedBatch, setLastCopiedBatch] = useState<Assignment[]>([])
   const [mediaFile, setMediaFile] = useState<File | null>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [mediaDragOver, setMediaDragOver] = useState(false)
@@ -76,6 +86,11 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   // Photo is scoped to the active sheet's send session — clear it when switching sheets
   useEffect(() => {
     setMediaFile(null); setMediaPreview(null)
+  }, [activeSheetId])
+
+  // Batch progress is per-sheet — reset when switching sheets
+  useEffect(() => {
+    setNumbersBatchIndex(0); setLastCopiedBatch([])
   }, [activeSheetId])
 
   const handleMediaSelect = useCallback((file: File) => {
@@ -101,15 +116,25 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
     [newAssignments, activeSheetId]
   )
   const current = newForActiveSheet[0]
+  const currentNumbers = useMemo(() => current ? parsePhoneNumbers(current.contact.phone) : [], [current])
+  const totalBatches = Math.max(1, Math.ceil(newForActiveSheet.length / BATCH_SIZE))
+
+  const [oldSearch, setOldSearch] = useState('')
+
+  const filteredOldAssignments = useMemo(() => {
+    const q = toWaNumber(oldSearch)
+    if (!q) return oldAssignments
+    return oldAssignments.filter(a => parsePhoneNumbers(a.contact.phone).some(n => toWaNumber(n).includes(q)))
+  }, [oldAssignments, oldSearch])
 
   const oldBySheet = useMemo(() => {
     const map = new Map<string, { sheet: Sheet; rows: Assignment[] }>()
-    for (const a of oldAssignments) {
+    for (const a of filteredOldAssignments) {
       if (!map.has(a.sheet.id)) map.set(a.sheet.id, { sheet: a.sheet, rows: [] })
       map.get(a.sheet.id)!.rows.push(a)
     }
     return [...map.values()]
-  }, [oldAssignments])
+  }, [filteredOldAssignments])
 
   async function markSent() {
     if (!current) return
@@ -124,8 +149,7 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
     }
   }
 
-  function openWhatsApp() {
-    if (!current) return
+  function openWhatsApp(number: string) {
     // No ?text= param — confirmed via live test (screenshot) that WhatsApp's own
     // URL-param handling corrupts every standard emoji into "�" (plain text and
     // simple bullets survive fine, so it's specifically 4-byte/astral-plane
@@ -134,12 +158,41 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
     // param again without a fundamentally different transport (e.g. official
     // Business API) — this has now been tested and ruled out twice.
     navigator.clipboard.writeText(messageText).catch(() => {})
-    window.open(`https://wa.me/${toWaNumber(current.contact.phone)}`, '_blank')
+    window.open(`https://wa.me/${toWaNumber(number)}`, '_blank')
   }
 
   async function copyMessage() {
     await navigator.clipboard.writeText(messageText)
     setCopied(true); setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function copyNumbersBatch() {
+    if (newForActiveSheet.length === 0) return
+    const start = numbersBatchIndex * BATCH_SIZE
+    const batch = newForActiveSheet.slice(start, start + BATCH_SIZE)
+    const numbers = batch.flatMap(a => parsePhoneNumbers(a.contact.phone))
+    await navigator.clipboard.writeText(numbers.join('\n'))
+    setLastCopiedBatch(batch)
+    setNumbersCopied(true); setTimeout(() => setNumbersCopied(false), 2000)
+    setNumbersBatchIndex(prev => (prev + 1) % totalBatches)
+  }
+
+  async function markBatchSent() {
+    if (lastCopiedBatch.length === 0) return
+    if (!window.confirm(`Mark these ${lastCopiedBatch.length} clients as sent?`)) return
+    setBusyId('bulk'); setError(null)
+    try {
+      await Promise.all(lastCopiedBatch.map(a => patchAssignment(a.id, { action: 'sent', message_text: messageText })))
+      const now = new Date().toISOString()
+      const ids = new Set(lastCopiedBatch.map(a => a.id))
+      setAssignments(prev => prev.map(a => ids.has(a.id) ? { ...a, sent_at: now, message_text: messageText } : a))
+      setLastCopiedBatch([])
+      setNumbersBatchIndex(0)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to mark batch as sent')
+    } finally {
+      setBusyId(null)
+    }
   }
 
   async function classify(assignment: Assignment, status: 'answered' | 'not_answered') {
@@ -237,15 +290,29 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                 </div>
 
                 <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, ...fontDisplay }}>{newForActiveSheet.length} remaining</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+                    <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, ...fontDisplay }}>
+                      {newForActiveSheet.length} remaining — Batch {numbersBatchIndex + 1}/{totalBatches}
+                    </span>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button onClick={copyNumbersBatch} disabled={newForActiveSheet.length === 0} style={{
+                        padding: '6px 12px', borderRadius: 6, border: `1px solid ${NEON_BORDER}`,
+                        background: NEON_DIM, color: numbersCopied ? NEON : '#fff', fontSize: 12, cursor: 'pointer', ...fontDisplay,
+                      }}>{numbersCopied ? '✓ Copied!' : `⎘ Copy Next Batch (${Math.min(BATCH_SIZE, newForActiveSheet.length - numbersBatchIndex * BATCH_SIZE)})`}</button>
+                      <button onClick={markBatchSent} disabled={busyId === 'bulk' || lastCopiedBatch.length === 0} style={{
+                        padding: '6px 12px', borderRadius: 6, border: `1px solid ${NEON_BORDER}`,
+                        background: NEON_DIM, color: NEON, fontSize: 12, cursor: 'pointer', ...fontDisplay,
+                      }}>{busyId === 'bulk' ? '…' : `✓ Mark Batch Sent (${lastCopiedBatch.length})`}</button>
+                    </div>
                   </div>
                 </div>
 
                 {current ? (
                   <div style={{ background: CARD, border: `1px solid ${NEON_BORDER}`, borderRadius: 12, padding: 24 }}>
                     <div style={{ fontSize: 11, color: MUTED, letterSpacing: '0.08em', ...fontDisplay, marginBottom: 8 }}>CURRENT</div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', ...fontDisplay, marginBottom: 4 }}>{current.contact.phone}</div>
+                    {currentNumbers.map(num => (
+                      <div key={num} style={{ fontSize: 22, fontWeight: 700, color: '#fff', ...fontDisplay, marginBottom: 4 }}>{num}</div>
+                    ))}
                     {current.contact.client_name && <div style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>{current.contact.client_name}</div>}
 
                     {messageText.trim() && (
@@ -271,16 +338,18 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                       </ol>
                     </div>
 
-                    <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                      <button onClick={openWhatsApp} disabled={!messageText.trim()} style={{
-                        flex: 2, padding: '14px', borderRadius: 8, border: 'none',
-                        background: messageText.trim() ? NEON : 'rgba(215,255,0,0.25)',
-                        color: '#000', fontWeight: 700, fontSize: 15, cursor: messageText.trim() ? 'pointer' : 'not-allowed', ...fontDisplay,
-                      }}>
-                        Open in WhatsApp ↗
-                      </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                      {currentNumbers.map(num => (
+                        <button key={num} onClick={() => openWhatsApp(num)} disabled={!messageText.trim()} style={{
+                          padding: '14px', borderRadius: 8, border: 'none',
+                          background: messageText.trim() ? NEON : 'rgba(215,255,0,0.25)',
+                          color: '#000', fontWeight: 700, fontSize: 15, cursor: messageText.trim() ? 'pointer' : 'not-allowed', ...fontDisplay,
+                        }}>
+                          {currentNumbers.length > 1 ? `Open ${num} in WhatsApp ↗` : 'Open in WhatsApp ↗'}
+                        </button>
+                      ))}
                       <button onClick={markSent} disabled={busyId === current.id} style={{
-                        flex: 1, padding: '14px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
+                        padding: '14px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
                         background: NEON_DIM, color: NEON, fontWeight: 600, fontSize: 13, cursor: 'pointer', ...fontDisplay,
                       }}>
                         {busyId === current.id ? '…' : '✓ Mark Sent'}
@@ -307,7 +376,12 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
 
         {tab === 'old' && (
           <>
-            {oldBySheet.length === 0 && <EmptyState text="Nothing waiting on a response classification." />}
+            <input value={oldSearch} onChange={e => setOldSearch(e.target.value)}
+              placeholder="Search by phone number…"
+              style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 13, ...font, outline: 'none', boxSizing: 'border-box', marginBottom: 16 }} />
+            {oldBySheet.length === 0 && (
+              <EmptyState text={oldSearch.trim() ? 'No contacts match that number.' : 'Nothing waiting on a response classification.'} />
+            )}
             {oldBySheet.map(({ sheet, rows }) => (
               <div key={sheet.id} style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', ...fontDisplay, marginBottom: 10 }}>{sheet.name}</div>
