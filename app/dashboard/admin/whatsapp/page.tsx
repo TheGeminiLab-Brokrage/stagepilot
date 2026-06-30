@@ -36,5 +36,12 @@ export default async function WhatsAppAdminPage() {
 
   const sheetsWithCounts = (sheets ?? []).map(s => ({ ...s, contactCount: counts[s.id] ?? 0 }))
 
-  return <WhatsAppAdminClient initialSheets={sheetsWithCounts} />
+  const { data: agents } = await adminClient
+    .from('profiles')
+    .select('id, full_name, team_name, whatsapp_active')
+    .eq('company_id', profile.company_id)
+    .eq('role', 'agent')
+    .order('full_name')
+
+  return <WhatsAppAdminClient initialSheets={sheetsWithCounts} initialAgents={agents ?? []} />
 }

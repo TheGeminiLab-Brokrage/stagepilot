@@ -43,7 +43,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (sheetErr || !sheet) return NextResponse.json({ error: 'Sheet not found' }, { status: 404 })
 
   const [{ data: agents, error: agentsErr }, { data: contacts, error: contactsErr }, { data: existing, error: existingErr }] = await Promise.all([
-    adminClient.from('profiles').select('id').eq('company_id', sheet.company_id).eq('role', 'agent'),
+    adminClient.from('profiles').select('id').eq('company_id', sheet.company_id).eq('role', 'agent').eq('whatsapp_active', true),
     adminClient.from('whatsapp_contacts').select('id').eq('sheet_id', id),
     adminClient.from('whatsapp_assignments').select('contact_id, agent_id').eq('sheet_id', id),
   ])

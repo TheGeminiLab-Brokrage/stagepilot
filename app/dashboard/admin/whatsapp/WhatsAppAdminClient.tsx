@@ -23,6 +23,8 @@ interface SheetSummary {
 
 interface Agent { id: string; full_name: string }
 
+interface AgentSetting { id: string; full_name: string; team_name: string | null; whatsapp_active: boolean }
+
 interface AssignmentRow {
   id: string
   contact_id: string
@@ -96,8 +98,11 @@ const STATUS_COLOR: Record<string, string> = {
   not_answered: 'rgba(255,120,120,0.8)',
 }
 
-export default function WhatsAppAdminClient({ initialSheets }: { initialSheets: SheetSummary[] }) {
+export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { initialSheets: SheetSummary[]; initialAgents: AgentSetting[] }) {
   const [sheets, setSheets] = useState<SheetSummary[]>(initialSheets)
+  const [agents, setAgents] = useState<AgentSetting[]>(initialAgents)
+  const [showAgents, setShowAgents] = useState(false)
+  const [togglingAgent, setTogglingAgent] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(initialSheets[0]?.id ?? null)
   const [detail, setDetail] = useState<SheetDetail | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
@@ -147,6 +152,25 @@ export default function WhatsAppAdminClient({ initialSheets }: { initialSheets: 
     } finally {
       setRandomizing(false)
       setConfirmRandomize(false)
+    }
+  }
+
+  async function toggleAgentActive(agent: AgentSetting) {
+    const next = !agent.whatsapp_active
+    setTogglingAgent(agent.id)
+    setAgents(prev => prev.map(a => a.id === agent.id ? { ...a, whatsapp_active: next } : a))
+    try {
+      const res = await fetch('/api/whatsapp/admin/agents', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: agent.id, whatsapp_active: next }),
+      })
+      if (!res.ok) throw new Error('Failed to update agent')
+    } catch (err) {
+      setAgents(prev => prev.map(a => a.id === agent.id ? { ...a, whatsapp_active: agent.whatsapp_active } : a))
+      setError(err instanceof Error ? err.message : 'Failed to update agent')
+    } finally {
+      setTogglingAgent(null)
     }
   }
 
@@ -226,6 +250,48 @@ export default function WhatsAppAdminClient({ initialSheets }: { initialSheets: 
         {showUpload && (
           <UploadPanel onClose={() => setShowUpload(false)} onUploaded={handleUploaded} />
         )}
+
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, marginBottom: 20, overflow: 'hidden' }}>
+          <button
+            onClick={() => setShowAgents(s => !s)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+            }}
+          >
+            <span style={{ fontSize: 12, fontWeight: 600, color: MUTED, ...fontDisplay, letterSpacing: '0.05em' }}>
+              AGENTS ({agents.filter(a => a.whatsapp_active).length}/{agents.length} active)
+            </span>
+            <span style={{ color: MUTED, fontSize: 12 }}>{showAgents ? '▾' : '▸'}</span>
+          </button>
+          {showAgents && (
+            <div style={{ padding: '0 16px 16px', borderTop: `1px solid ${BORDER}` }}>
+              <p style={{ color: MUTED, fontSize: 11, margin: '12px 0' }}>
+                Unchecked agents won&apos;t receive new clients on the next re-randomize. Existing assignments are unaffected.
+              </p>
+              {agents.length === 0 && <div style={{ color: MUTED, fontSize: 12, padding: '8px 0' }}>No agents found.</div>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {agents.map(a => (
+                  <label key={a.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8,
+                    border: `1px solid ${BORDER}`, fontSize: 12, color: a.whatsapp_active ? '#fff' : MUTED, cursor: 'pointer',
+                    opacity: togglingAgent === a.id ? 0.6 : 1,
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={a.whatsapp_active}
+                      disabled={togglingAgent === a.id}
+                      onChange={() => toggleAgentActive(a)}
+                      style={{ accentColor: NEON }}
+                    />
+                    {a.full_name}
+                    {a.team_name && <span style={{ color: MUTED, fontSize: 10 }}>· {a.team_name}</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           {/* Sheet list */}

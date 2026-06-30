@@ -89,3 +89,12 @@ create policy "admin sees company assignments"
 
 -- Service role (used by API routes) bypasses RLS by default — used for
 -- sheet/contact creation and the randomize (insert) action.
+
+-- =============================================
+-- AGENT ELIGIBILITY (added later — run separately if base schema already exists)
+-- =============================================
+
+-- Lets a super_admin opt an agent out of WhatsApp client rotation without
+-- changing their role. Defaults to true so existing behavior is unchanged.
+alter table public.profiles
+  add column whatsapp_active boolean not null default true;
