@@ -56,6 +56,34 @@ function cellToString(v: string | number | null | undefined): string {
   return String(v).trim()
 }
 
+const PHONE_HEADER_KEYWORDS = ['mobile', 'phone', 'whatsapp', 'tel', 'number', 'contact']
+const NAME_HEADER_KEYWORDS = ['name']
+
+function looksLikePhone(v: string | number | null): boolean {
+  const digits = String(v ?? '').replace(/\D/g, '')
+  return digits.length >= 7 && digits.length <= 16
+}
+
+// Header-keyword match first; falls back to sniffing which column's values
+// actually look like phone numbers, so it still works on unusual headers.
+function detectPhoneColumn(sheet: ParsedSheet): string {
+  const byHeader = sheet.headers.find(h => PHONE_HEADER_KEYWORDS.some(k => h.toLowerCase().includes(k)))
+  if (byHeader) return byHeader
+
+  const sample = sheet.rows.slice(0, 30)
+  let best = ''
+  let bestScore = 0
+  for (const h of sheet.headers) {
+    const score = sample.filter(r => looksLikePhone(r[h])).length / Math.max(1, sample.length)
+    if (score > bestScore) { bestScore = score; best = h }
+  }
+  return bestScore > 0.3 ? best : ''
+}
+
+function detectNameColumn(sheet: ParsedSheet, phoneCol: string): string {
+  return sheet.headers.find(h => h !== phoneCol && NAME_HEADER_KEYWORDS.some(k => h.toLowerCase().includes(k))) ?? ''
+}
+
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Pending',
   answered: 'Answered',
@@ -335,8 +363,9 @@ function UploadPanel({ onClose, onUploaded }: { onClose: () => void; onUploaded:
       if (result.length === 0) { setError('No data found in this file.'); return }
       setParsedSheets(result)
       setSheetIdx(0)
-      setPhoneCol('')
-      setNameCol('')
+      const detectedPhone = detectPhoneColumn(result[0])
+      setPhoneCol(detectedPhone)
+      setNameCol(detectNameColumn(result[0], detectedPhone))
       setSheetName(file.name.replace(/\.[^.]+$/, ''))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to read file')
@@ -404,7 +433,13 @@ function UploadPanel({ onClose, onUploaded }: { onClose: () => void; onUploaded:
           {parsedSheets.length > 1 && (
             <div>
               <label style={{ fontSize: 12, color: MUTED, display: 'block', marginBottom: 6 }}>Workbook sheet</label>
-              <select value={sheetIdx} onChange={e => { setSheetIdx(Number(e.target.value)); setPhoneCol(''); setNameCol('') }} style={{
+              <select value={sheetIdx} onChange={e => {
+                const idx = Number(e.target.value)
+                setSheetIdx(idx)
+                const detectedPhone = detectPhoneColumn(parsedSheets[idx])
+                setPhoneCol(detectedPhone)
+                setNameCol(detectNameColumn(parsedSheets[idx], detectedPhone))
+              }} style={{
                 background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '7px 10px', color: '#fff', fontSize: 13, width: '100%', ...font,
               }}>
                 {parsedSheets.map((s, i) => <option key={s.sheetName} value={i}>{s.sheetName} ({s.rows.length} rows)</option>)}
@@ -414,7 +449,7 @@ function UploadPanel({ onClose, onUploaded }: { onClose: () => void; onUploaded:
 
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 200 }}>
-              <label style={{ fontSize: 12, color: MUTED, display: 'block', marginBottom: 6 }}>Phone number column *</label>
+              <label style={{ fontSize: 12, color: MUTED, display: 'block', marginBottom: 6 }}>Phone number column * <span style={{ color: phoneCol ? NEON : 'rgba(255,120,120,0.8)' }}>{phoneCol ? '(auto-detected)' : '(not detected — pick one)'}</span></label>
               <select value={phoneCol} onChange={e => setPhoneCol(e.target.value)} style={{
                 background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '7px 10px', color: '#fff', fontSize: 13, width: '100%', ...font,
               }}>
@@ -423,7 +458,7 @@ function UploadPanel({ onClose, onUploaded }: { onClose: () => void; onUploaded:
               </select>
             </div>
             <div style={{ flex: 1, minWidth: 200 }}>
-              <label style={{ fontSize: 12, color: MUTED, display: 'block', marginBottom: 6 }}>Client name column (optional)</label>
+              <label style={{ fontSize: 12, color: MUTED, display: 'block', marginBottom: 6 }}>Client name column (optional) {nameCol && <span style={{ color: NEON }}>(auto-detected)</span>}</label>
               <select value={nameCol} onChange={e => setNameCol(e.target.value)} style={{
                 background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, borderRadius: 6, padding: '7px 10px', color: '#fff', fontSize: 13, width: '100%', ...font,
               }}>
