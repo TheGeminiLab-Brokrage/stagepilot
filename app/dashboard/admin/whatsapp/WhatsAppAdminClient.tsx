@@ -11,6 +11,7 @@ const BORDER = 'rgba(255,255,255,0.08)'
 const MUTED = 'rgba(255,255,255,0.35)'
 const font = { fontFamily: "'Montserrat', sans-serif" }
 const fontDisplay = { fontFamily: "'Space Grotesk', sans-serif" }
+const PAGE_SIZE = 20
 
 interface SheetSummary {
   id: string
@@ -107,6 +108,8 @@ export default function WhatsAppAdminClient({ initialSheets }: { initialSheets: 
   const [error, setError] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [page, setPage] = useState(1)
+  const [messageModalContact, setMessageModalContact] = useState<{ contact: ContactRow; assignment: AssignmentRow | null } | null>(null)
 
   const loadDetail = useCallback(async (sheetId: string) => {
     setLoadingDetail(true)
@@ -184,6 +187,15 @@ export default function WhatsAppAdminClient({ initialSheets }: { initialSheets: 
       return { contact, assignment, agent, firstAgent }
     })
   }, [detail, cycleFilter])
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const showStart = rows.length > 0 ? (page - 1) * PAGE_SIZE + 1 : 0
+  const showEnd = Math.min(page * PAGE_SIZE, rows.length)
+
+  useEffect(() => {
+    setPage(1)
+  }, [cycleFilter, detail?.sheet.id])
 
   return (
     <div style={{ minHeight: '100vh', background: '#000', ...font }}>
@@ -332,32 +344,57 @@ export default function WhatsAppAdminClient({ initialSheets }: { initialSheets: 
                   )}
                 </div>
 
+                <style>{`
+                  tr.wa-row:nth-child(even) { background: rgba(255,255,255,0.015); }
+                  tr.wa-row:hover { background: rgba(255,255,255,0.04); }
+                  td.wa-msg:hover { color: rgba(255,255,255,0.65) !important; }
+                `}</style>
+
                 <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
-                  <div style={{ overflowX: 'auto' }}>
+                  <div style={{ overflowX: 'auto', maxHeight: 600, overflowY: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                       <thead>
                         <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                          {['Phone', 'Client', 'Agent (this cycle)', 'Sent At', 'Status', 'Message', 'First Response'].map(h => (
-                            <th key={h} style={{ textAlign: 'left', padding: '10px 14px', color: MUTED, fontWeight: 600, ...fontDisplay, whiteSpace: 'nowrap' }}>{h}</th>
+                          {[
+                            { label: 'Phone', width: 120 },
+                            { label: 'Client', width: 140 },
+                            { label: 'Agent (this cycle)', width: 130 },
+                            { label: 'Sent At', width: 150 },
+                            { label: 'Status', width: 90 },
+                            { label: 'Message', width: undefined },
+                            { label: 'First Response', width: 130 },
+                          ].map(h => (
+                            <th key={h.label} style={{
+                              textAlign: 'left', padding: '12px 14px', color: MUTED, fontWeight: 600, ...fontDisplay,
+                              whiteSpace: 'nowrap', width: h.width, position: 'sticky', top: 0, background: '#0a0a0a', zIndex: 1,
+                            }}>{h.label}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {rows.map(({ contact, assignment, agent, firstAgent }) => (
-                          <tr key={contact.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
-                            <td style={{ padding: '10px 14px', color: '#fff', ...fontDisplay, whiteSpace: 'nowrap' }}>{contact.phone}</td>
-                            <td style={{ padding: '10px 14px', color: MUTED }}>{contact.client_name ?? '—'}</td>
-                            <td style={{ padding: '10px 14px', color: '#fff' }}>{agent?.full_name ?? '—'}</td>
-                            <td style={{ padding: '10px 14px', color: MUTED, whiteSpace: 'nowrap' }}>{assignment?.sent_at ? new Date(assignment.sent_at).toLocaleString() : '—'}</td>
-                            <td style={{ padding: '10px 14px' }}>
+                        {pageRows.map(({ contact, assignment, agent, firstAgent }) => (
+                          <tr key={contact.id} className="wa-row" style={{ borderBottom: `1px solid ${BORDER}` }}>
+                            <td style={{ padding: '12px 14px', color: '#fff', ...fontDisplay, whiteSpace: 'nowrap', width: 120 }}>{contact.phone}</td>
+                            <td style={{ padding: '12px 14px', color: MUTED, width: 140 }}>{contact.client_name ?? '—'}</td>
+                            <td style={{ padding: '12px 14px', color: '#fff', width: 130 }}>{agent?.full_name ?? '—'}</td>
+                            <td style={{ padding: '12px 14px', color: MUTED, whiteSpace: 'nowrap', width: 150 }}>{assignment?.sent_at ? new Date(assignment.sent_at).toLocaleString() : '—'}</td>
+                            <td style={{ padding: '12px 14px', width: 90 }}>
                               <span style={{ color: assignment ? STATUS_COLOR[assignment.response_status] : MUTED, fontWeight: 600 }}>
                                 {assignment ? STATUS_LABEL[assignment.response_status] : '—'}
                               </span>
                             </td>
-                            <td style={{ padding: '10px 14px', color: MUTED, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={assignment?.message_text ?? ''}>
+                            <td
+                              className="wa-msg"
+                              style={{
+                                padding: '12px 14px', color: MUTED, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap', cursor: assignment?.message_text ? 'pointer' : 'default',
+                              }}
+                              title={assignment?.message_text ?? ''}
+                              onClick={() => assignment?.message_text && setMessageModalContact({ contact, assignment })}
+                            >
                               {assignment?.message_text ?? '—'}
                             </td>
-                            <td style={{ padding: '10px 14px', color: NEON, whiteSpace: 'nowrap' }}>{firstAgent?.full_name ?? '—'}</td>
+                            <td style={{ padding: '12px 14px', color: NEON, whiteSpace: 'nowrap', width: 130 }}>{firstAgent?.full_name ?? '—'}</td>
                           </tr>
                         ))}
                         {rows.length === 0 && (
@@ -367,6 +404,23 @@ export default function WhatsAppAdminClient({ initialSheets }: { initialSheets: 
                     </table>
                   </div>
                 </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, flexWrap: 'wrap', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: MUTED }}>
+                    {rows.length > 0 ? `Showing ${showStart}–${showEnd} of ${rows.length} contacts` : 'No contacts'}
+                  </span>
+                  {totalPages > 1 && (
+                    <Pager page={page} totalPages={totalPages} onPageChange={setPage} />
+                  )}
+                </div>
+
+                {messageModalContact && (
+                  <MessageModal
+                    contact={messageModalContact.contact}
+                    assignment={messageModalContact.assignment}
+                    onClose={() => setMessageModalContact(null)}
+                  />
+                )}
               </>
             )}
           </div>
@@ -381,6 +435,107 @@ function StatCard({ label, value }: { label: string; value: number }) {
     <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '12px 18px', minWidth: 130 }}>
       <div style={{ fontSize: 20, fontWeight: 700, color: NEON, ...fontDisplay }}>{value}</div>
       <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{label}</div>
+    </div>
+  )
+}
+
+function pageButtonStyle(active: boolean, disabled?: boolean): React.CSSProperties {
+  return {
+    minWidth: 32, padding: '6px 10px', borderRadius: 8, fontSize: 12, textAlign: 'center',
+    cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.3 : 1, ...font,
+    background: active ? NEON_DIM : '#161616',
+    border: `1px solid ${active ? NEON_BORDER : 'rgba(255,255,255,0.12)'}`,
+    color: active ? NEON : '#fff', fontWeight: active ? 700 : 500,
+  }
+}
+
+function Pager({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
+  const start = Math.max(1, Math.min(page - 3, totalPages - 6))
+  const end = Math.min(totalPages, start + 6)
+  const pages: number[] = []
+  for (let p = start; p <= end; p++) pages.push(p)
+
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <button
+        onClick={() => onPageChange(page - 1)}
+        disabled={page === 1}
+        style={pageButtonStyle(false, page === 1)}
+      >
+        ‹
+      </button>
+      {pages.map(p => (
+        <button key={p} onClick={() => onPageChange(p)} style={pageButtonStyle(p === page)}>
+          {p}
+        </button>
+      ))}
+      <button
+        onClick={() => onPageChange(page + 1)}
+        disabled={page === totalPages}
+        style={pageButtonStyle(false, page === totalPages)}
+      >
+        ›
+      </button>
+    </div>
+  )
+}
+
+function MessageModal({
+  contact,
+  assignment,
+  onClose,
+}: {
+  contact: ContactRow
+  assignment: AssignmentRow | null
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(6px)',
+        zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#0d0d0d', border: `1px solid ${NEON_BORDER}`, borderRadius: 18,
+          width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', padding: 24,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+          <div>
+            <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, ...fontDisplay }}>{contact.phone}</div>
+            <div style={{ color: MUTED, fontSize: 13, marginTop: 2 }}>{contact.client_name ?? '—'}</div>
+            {assignment && (
+              <span style={{ display: 'inline-block', marginTop: 8, fontSize: 11, fontWeight: 600, color: STATUS_COLOR[assignment.response_status] }}>
+                {STATUS_LABEL[assignment.response_status]}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              flexShrink: 0, width: 32, height: 32, borderRadius: '50%', border: 'none',
+              background: 'rgba(255,255,255,0.07)', color: MUTED, cursor: 'pointer', fontSize: 14,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = NEON_DIM; e.currentTarget.style.color = NEON }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = MUTED }}
+          >
+            ✕
+          </button>
+        </div>
+        <div style={{ color: '#fff', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', ...font }}>
+          {assignment?.message_text ?? '—'}
+        </div>
+      </div>
     </div>
   )
 }
