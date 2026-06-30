@@ -126,11 +126,11 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
 
   function openWhatsApp() {
     if (!current) return
-    // No ?text= param on purpose — WhatsApp Web mangles emoji/special characters
-    // passed through the URL (e.g. bullet emoji turn into "�"). Clipboard + manual
-    // paste is the only reliable way to send the message exactly as typed.
+    // Pre-fill via the text param so the chat opens with the message already
+    // there; clipboard copy stays as a fallback in case it still renders wrong.
     navigator.clipboard.writeText(messageText).catch(() => {})
-    window.open(`https://wa.me/${toWaNumber(current.contact.phone)}`, '_blank')
+    const url = `https://wa.me/${toWaNumber(current.contact.phone)}?text=${encodeURIComponent(messageText)}`
+    window.open(url, '_blank')
   }
 
   async function copyMessage() {
@@ -244,11 +244,24 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                     <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', ...fontDisplay, marginBottom: 4 }}>{current.contact.phone}</div>
                     {current.contact.client_name && <div style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>{current.contact.client_name}</div>}
 
+                    {messageText.trim() && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 11, color: MUTED, letterSpacing: '0.08em', ...fontDisplay, marginBottom: 6 }}>MESSAGE PREVIEW</div>
+                        <div style={{
+                          background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}`, borderRadius: 8,
+                          padding: '10px 12px', color: '#fff', fontSize: 13, whiteSpace: 'pre-wrap',
+                          fontFamily: "system-ui, 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif",
+                        }}>
+                          {messageText}
+                        </div>
+                      </div>
+                    )}
+
                     <div style={{ background: 'rgba(215,255,0,0.06)', border: `1px solid ${NEON_BORDER}`, borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
                       <div style={{ fontSize: 12, color: NEON, fontWeight: 600, marginBottom: 6 }}>How to send:</div>
                       <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <li style={{ fontSize: 12, color: MUTED }}>Click <strong style={{ color: '#fff' }}>Open in WhatsApp</strong> — message is copied to your clipboard</li>
-                        <li style={{ fontSize: 12, color: MUTED }}>In the chat, click the text box and press <strong style={{ color: '#fff' }}>Ctrl+V</strong> to paste it (this keeps emojis/Arabic text intact — WhatsApp corrupts them if sent pre-filled)</li>
+                        <li style={{ fontSize: 12, color: MUTED }}>Click <strong style={{ color: '#fff' }}>Open in WhatsApp</strong> — the chat opens with the message already filled in</li>
+                        <li style={{ fontSize: 12, color: MUTED }}>Check it matches the preview above. If anything looks wrong, press <strong style={{ color: '#fff' }}>Ctrl+V</strong> to paste the exact text from your clipboard instead</li>
                         {mediaFile && <li style={{ fontSize: 12, color: MUTED }}>Click the 📎 icon, choose the downloaded photo, then attach it</li>}
                         <li style={{ fontSize: 12, color: MUTED }}>Press Enter / the send button in WhatsApp yourself — nothing is sent automatically</li>
                       </ol>
