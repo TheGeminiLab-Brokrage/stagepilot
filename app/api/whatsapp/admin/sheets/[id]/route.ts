@@ -51,3 +51,29 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   return NextResponse.json({ sheet, contacts: contacts ?? [], assignments: assignments ?? [] })
 }
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { error, status, companyId } = await requireSuperAdmin()
+  if (error) return NextResponse.json({ error }, { status })
+
+  const { id } = await params
+  const adminClient = createAdminClient()
+
+  const { data: sheet, error: sheetErr } = await adminClient
+    .from('whatsapp_sheets')
+    .select('id')
+    .eq('id', id)
+    .eq('company_id', companyId!)
+    .single()
+
+  if (sheetErr || !sheet) return NextResponse.json({ error: 'Sheet not found' }, { status: 404 })
+
+  const { error: deleteErr } = await adminClient
+    .from('whatsapp_sheets')
+    .delete()
+    .eq('id', id)
+
+  if (deleteErr) return NextResponse.json({ error: deleteErr.message }, { status: 500 })
+
+  return NextResponse.json({ success: true })
+}

@@ -67,8 +67,6 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [mediaDragOver, setMediaDragOver] = useState(false)
   const mediaInputRef = useRef<HTMLInputElement>(null)
-  const [showPrimeSenderInfo, setShowPrimeSenderInfo] = useState(false)
-  const [bulkBusy, setBulkBusy] = useState(false)
 
   useEffect(() => {
     if (!activeSheetId && newSheets.length > 0) setActiveSheetId(newSheets[0].id)
@@ -138,39 +136,6 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   async function copyMessage() {
     await navigator.clipboard.writeText(messageText)
     setCopied(true); setTimeout(() => setCopied(false), 2000)
-  }
-
-  function downloadCSV() {
-    const rows = ['Phone Number', ...newForActiveSheet.map(a => a.contact.phone)].join('\n')
-    const blob = new Blob([rows], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'whatsapp-numbers.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  async function bulkMarkSent() {
-    if (newForActiveSheet.length === 0) return
-    setBulkBusy(true); setError(null)
-    try {
-      const assignmentIds = newForActiveSheet.map(a => a.id)
-      const res = await fetch('/api/whatsapp/assignments/bulk-sent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignmentIds, message_text: messageText }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Failed to mark as sent')
-      const idSet = new Set(assignmentIds)
-      const now = new Date().toISOString()
-      setAssignments(prev => prev.map(a => idSet.has(a.id) ? { ...a, sent_at: now, message_text: messageText } : a))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to mark as sent')
-    } finally {
-      setBulkBusy(false)
-    }
   }
 
   async function classify(assignment: Assignment, status: 'answered' | 'not_answered') {
@@ -271,81 +236,6 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, ...fontDisplay }}>{newForActiveSheet.length} remaining</span>
                   </div>
-                </div>
-
-                <div style={{ background: CARD, border: `1px solid ${NEON_BORDER}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, color: NEON, margin: '0 0 6px', ...fontDisplay }}>
-                    Bulk Send via Prime Sender
-                  </h3>
-                  <p style={{ fontSize: 12, color: MUTED, margin: '0 0 16px' }}>
-                    Send all {newForActiveSheet.length} contact{newForActiveSheet.length !== 1 ? 's' : ''} in this sheet at once instead of one by one.
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                    <button onClick={downloadCSV} disabled={newForActiveSheet.length === 0} style={{
-                      padding: '12px', borderRadius: 8, border: 'none',
-                      background: newForActiveSheet.length > 0 ? NEON : 'rgba(215,255,0,0.25)',
-                      color: '#000', fontWeight: 700, fontSize: 14, cursor: newForActiveSheet.length > 0 ? 'pointer' : 'not-allowed', ...fontDisplay,
-                    }}>
-                      ↓ Download Numbers CSV
-                    </button>
-                    <button onClick={copyMessage} disabled={!messageText.trim()} style={{
-                      padding: '12px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
-                      background: NEON_DIM, color: copied ? NEON : '#fff', fontWeight: 600,
-                      fontSize: 14, cursor: messageText.trim() ? 'pointer' : 'not-allowed', ...fontDisplay,
-                    }}>
-                      {copied ? '✓ Copied!' : '⎘ Copy Message Text'}
-                    </button>
-                    {mediaFile && (
-                      <button onClick={downloadMedia} style={{
-                        padding: '12px', borderRadius: 8, border: `1px solid ${BORDER}`,
-                        background: 'transparent', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer', ...fontDisplay,
-                      }}>
-                        ↓ Download Media Photo
-                      </button>
-                    )}
-                  </div>
-
-                  <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
-                    <button onClick={() => setShowPrimeSenderInfo(v => !v)} style={{
-                      width: '100%', padding: '12px 16px', background: 'none', border: 'none',
-                      cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', ...fontDisplay }}>How to use with Prime Sender</span>
-                      <span style={{ color: MUTED, fontSize: 12 }}>{showPrimeSenderInfo ? '▲' : '▼'}</span>
-                    </button>
-                    {showPrimeSenderInfo && (
-                      <div style={{ padding: '0 16px 16px', borderTop: `1px solid ${BORDER}` }}>
-                        <ol style={{ margin: '12px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {[
-                            'Download the Numbers CSV file above.',
-                            'Copy your message text using the "Copy Message Text" button.',
-                            'If you have a media photo, download it too.',
-                            'Open WhatsApp Web in Chrome (web.whatsapp.com).',
-                            'Open the Prime Sender extension and go to "Bulk Send".',
-                            'Import the CSV file as your contacts list.',
-                            'Paste your message in the Prime Sender message field.',
-                            'If sending media, attach the downloaded photo in Prime Sender.',
-                            'Start sending!',
-                          ].map((s, i) => (
-                            <li key={i} style={{ color: MUTED, fontSize: 12, lineHeight: 1.5 }}>
-                              <span style={{ color: NEON, fontWeight: 700 }}>{i + 1}.</span> {s}
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ background: 'rgba(255,60,60,0.06)', border: '1px solid rgba(255,60,60,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 11, color: 'rgba(255,150,150,0.85)' }}>
-                    Heads up: Prime Sender automates WhatsApp Web, which is outside WhatsApp&apos;s own terms for bulk messaging — there&apos;s a real risk of the number getting limited or banned, especially for large batches. Use your judgment on batch size.
-                  </div>
-
-                  <button onClick={bulkMarkSent} disabled={bulkBusy || newForActiveSheet.length === 0} style={{
-                    width: '100%', padding: '12px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
-                    background: NEON_DIM, color: NEON, fontWeight: 600, fontSize: 13, cursor: 'pointer', ...fontDisplay,
-                  }}>
-                    {bulkBusy ? 'Marking…' : `✓ Mark All ${newForActiveSheet.length} as Sent (after sending via Prime Sender)`}
-                  </button>
                 </div>
 
                 {current ? (

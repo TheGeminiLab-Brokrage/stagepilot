@@ -105,6 +105,8 @@ export default function WhatsAppAdminClient({ initialSheets }: { initialSheets: 
   const [confirmRandomize, setConfirmRandomize] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const loadDetail = useCallback(async (sheetId: string) => {
     setLoadingDetail(true)
@@ -149,6 +151,26 @@ export default function WhatsAppAdminClient({ initialSheets }: { initialSheets: 
     setSheets(prev => [sheet, ...prev])
     setSelectedId(sheet.id)
     setShowUpload(false)
+  }
+
+  async function handleDeleteSheet(sheetId: string) {
+    setDeleting(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/whatsapp/admin/sheets/${sheetId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Delete failed')
+      setSheets(prev => prev.filter(s => s.id !== sheetId))
+      if (selectedId === sheetId) {
+        setSelectedId(null)
+        setDetail(null)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
+    } finally {
+      setDeleting(false)
+      setConfirmDeleteId(null)
+    }
   }
 
   const cycles = detail ? Array.from({ length: detail.sheet.current_cycle }, (_, i) => i + 1) : []
@@ -203,12 +225,48 @@ export default function WhatsAppAdminClient({ initialSheets }: { initialSheets: 
               <div style={{ padding: 20, color: MUTED, fontSize: 12, textAlign: 'center' }}>No sheets yet</div>
             )}
             {sheets.map(s => (
-              <div key={s.id} onClick={() => setSelectedId(s.id)} style={{
-                padding: '12px 16px', cursor: 'pointer', borderBottom: `1px solid ${BORDER}`,
+              <div key={s.id} style={{
+                padding: '12px 16px', borderBottom: `1px solid ${BORDER}`,
                 background: s.id === selectedId ? NEON_DIM : 'transparent',
               }}>
-                <div style={{ color: s.id === selectedId ? NEON : '#fff', fontSize: 13, fontWeight: 600, ...fontDisplay }}>{s.name}</div>
-                <div style={{ color: MUTED, fontSize: 11, marginTop: 4 }}>{s.contactCount} contacts &middot; cycle {s.current_cycle}</div>
+                {confirmDeleteId === s.id ? (
+                  <div>
+                    <div style={{ color: '#fff', fontSize: 12, marginBottom: 8 }}>Delete &quot;{s.name}&quot;? This removes all contacts and assignments.</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => handleDeleteSheet(s.id)} disabled={deleting} style={{
+                        padding: '6px 10px', borderRadius: 6, border: 'none', background: 'rgba(255,80,80,0.9)',
+                        color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer', ...fontDisplay,
+                      }}>
+                        {deleting ? 'Deleting…' : 'Confirm'}
+                      </button>
+                      <button onClick={() => setConfirmDeleteId(null)} disabled={deleting} style={{
+                        padding: '6px 10px', borderRadius: 6, border: `1px solid ${BORDER}`, background: 'transparent',
+                        color: MUTED, fontSize: 11, cursor: 'pointer', ...fontDisplay,
+                      }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div onClick={() => setSelectedId(s.id)} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: s.id === selectedId ? NEON : '#fff', fontSize: 13, fontWeight: 600, ...fontDisplay, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                      <div style={{ color: MUTED, fontSize: 11, marginTop: 4 }}>{s.contactCount} contacts &middot; cycle {s.current_cycle}</div>
+                    </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); setConfirmDeleteId(s.id) }}
+                      title="Remove sheet"
+                      style={{
+                        flexShrink: 0, background: 'none', border: 'none', color: MUTED, cursor: 'pointer',
+                        fontSize: 13, padding: '2px 4px', lineHeight: 1,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,120,120,0.9)' }}
+                      onMouseLeave={e => { e.currentTarget.style.color = MUTED }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
