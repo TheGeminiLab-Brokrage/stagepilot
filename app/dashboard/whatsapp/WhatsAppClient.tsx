@@ -59,8 +59,120 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
     [assignments]
   )
 
-  const [tab, setTab] = useState<'new' | 'old'>(newAssignments.length > 0 ? 'new' : 'old')
+  const [tab, setTab] = useState<'new' | 'old' | 'login'>(newAssignments.length > 0 ? 'new' : 'old')
 
+  // --- WhatsApp session state ---
+  const [sessionStatus, setSessionStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  const [sessionPhone, setSessionPhone] = useState<string | null>(null)
+  const [qrCode, setQrCode] = useState<string | null>(null)
+  const [qrLoading, setQrLoading] = useState(false)
+  const [sendingId, setSendingId] = useState<string | null>(null)
+
+  // Check session status on mount
+  useEffect(() => {
+    fetch('/api/whatsapp/session')
+      .then(r => r.json())
+      .then((data: { connected: boolean; phone?: string }) => {
+        if (data.connected) {
+          setSessionStatus('connected')
+          setSessionPhone(data.phone ?? null)
+        } else {
+          setSessionStatus('disconnected')
+        }
+      })
+      .catch(() => setSessionStatus('disconnected'))
+  }, [])
+
+  // QR polling + status polling while Login tab is open and not connected
+  useEffect(() => {
+    if (tab !== 'login' || sessionStatus !== 'disconnected') return
+
+    let cancelled = false
+
+    async function refreshQR() {
+      if (cancelled) return
+      setQrLoading(true)
+      try {
+        const res = await fetch('/api/whatsapp/qr')
+        const data: { connected?: boolean; phone?: string; qr?: string; error?: string } = await res.json()
+        if (cancelled) return
+        if (data.connected) {
+          setSessionStatus('connected')
+          setSessionPhone(data.phone ?? null)
+          setQrCode(null)
+        } else if (data.qr) {
+          setQrCode(data.qr)
+        }
+      } catch { /* ignore */ } finally {
+        if (!cancelled) setQrLoading(false)
+      }
+    }
+
+    refreshQR()
+    const qrTimer = setInterval(refreshQR, 28000)
+
+    // Poll status every 3s to detect when the user scans
+    const statusTimer = setInterval(() => {
+      if (cancelled) return
+      fetch('/api/whatsapp/session')
+        .then(r => r.json())
+        .then((data: { connected: boolean; phone?: string }) => {
+          if (cancelled) return
+          if (data.connected) {
+            setSessionStatus('connected')
+            setSessionPhone(data.phone ?? null)
+            setQrCode(null)
+          }
+        })
+        .catch(() => {})
+    }, 3000)
+
+    return () => {
+      cancelled = true
+      clearInterval(qrTimer)
+      clearInterval(statusTimer)
+    }
+  }, [tab, sessionStatus])
+
+  async function logout() {
+    await fetch('/api/whatsapp/session', { method: 'DELETE' })
+    setSessionStatus('disconnected')
+    setSessionPhone(null)
+    setQrCode(null)
+  }
+
+  async function sendViaWhatsApp() {
+    if (!current) return
+    setSendingId(current.id)
+    setError(null)
+    try {
+      const res = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignmentId: current.id,
+          phones: currentNumbers,
+          message: messageText,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Send failed')
+      // Auto-move contact to Old tab — no separate "Mark Sent" click needed
+      setAssignments(prev => prev.map(a =>
+        a.id === current.id
+          ? { ...a, sent_at: new Date().toISOString(), message_text: messageText }
+          : a
+      ))
+      setSelectedAssignmentId(null)
+      setNewSearch('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send')
+    } finally {
+      setSendingId(null)
+    }
+  }
+
+  // --- Sheet / batch / search state ---
   const newSheets = useMemo(() => {
     const map = new Map<string, Sheet>()
     for (const a of newAssignments) map.set(a.sheet.id, a.sheet)
@@ -165,7 +277,7 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
 
   function openWhatsApp(number: string) {
     // No ?text= param — confirmed via live test (screenshot) that WhatsApp's own
-    // URL-param handling corrupts every standard emoji into "�" (plain text and
+    // URL-param handling corrupts every standard emoji into "?" (plain text and
     // simple bullets survive fine, so it's specifically 4-byte/astral-plane
     // characters WhatsApp mishandles in this param). Clipboard + manual paste is
     // the only path that delivers the message intact. Do not re-attempt the URL
@@ -237,6 +349,7 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
         <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
           <TabButton active={tab === 'new'} onClick={() => setTab('new')} label={`New (${newAssignments.length})`} />
           <TabButton active={tab === 'old'} onClick={() => setTab('old')} label={`Old (${oldAssignments.length})`} />
+          <TabButton active={tab === 'login'} onClick={() => setTab('login')} label="Login" />
         </div>
 
         {error && (
@@ -245,6 +358,74 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
           </div>
         )}
 
+        {/* ── LOGIN TAB ── */}
+        {tab === 'login' && (
+          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 40, textAlign: 'center' }}>
+            {sessionStatus === 'checking' && (
+              <div style={{ color: MUTED, fontSize: 14 }}>Checking connection…</div>
+            )}
+
+            {sessionStatus === 'connected' && (
+              <>
+                <div style={{ fontSize: 48, marginBottom: 12, color: NEON }}>✓</div>
+                <div style={{ color: NEON, fontWeight: 700, fontSize: 20, ...fontDisplay, marginBottom: 6 }}>Connected</div>
+                {sessionPhone && (
+                  <div style={{ color: MUTED, fontSize: 13, marginBottom: 24 }}>+{sessionPhone}</div>
+                )}
+                <p style={{ color: MUTED, fontSize: 13, marginBottom: 24 }}>
+                  Your WhatsApp is linked. Go to the{' '}
+                  <button onClick={() => setTab('new')} style={{ color: NEON, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 0, textDecoration: 'underline', ...fontDisplay }}>
+                    New tab
+                  </button>{' '}
+                  to auto-send messages.
+                </p>
+                <button
+                  onClick={logout}
+                  style={{
+                    padding: '10px 22px', borderRadius: 8,
+                    border: '1px solid rgba(255,80,80,0.35)',
+                    background: 'rgba(255,80,80,0.08)',
+                    color: 'rgba(255,100,100,0.9)', fontSize: 13,
+                    cursor: 'pointer', ...fontDisplay,
+                  }}
+                >
+                  Unlink / Logout
+                </button>
+              </>
+            )}
+
+            {sessionStatus === 'disconnected' && (
+              <>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: 18, ...fontDisplay, marginBottom: 10 }}>
+                  Link your WhatsApp
+                </div>
+                <p style={{ color: MUTED, fontSize: 13, marginBottom: 24, maxWidth: 340, margin: '0 auto 24px' }}>
+                  Open WhatsApp on your phone → tap <strong style={{ color: '#fff' }}>⋮ Menu</strong> or <strong style={{ color: '#fff' }}>Settings</strong> → <strong style={{ color: '#fff' }}>Linked Devices</strong> → <strong style={{ color: '#fff' }}>Link a Device</strong> → scan this code
+                </p>
+
+                {qrLoading && !qrCode && (
+                  <div style={{ color: MUTED, fontSize: 13, padding: '40px 0' }}>Generating QR code…</div>
+                )}
+
+                {qrCode && (
+                  <>
+                    <div style={{
+                      display: 'inline-block', background: '#fff',
+                      padding: 14, borderRadius: 14, marginBottom: 12,
+                    }}>
+                      <img src={qrCode} alt="WhatsApp QR Code" style={{ display: 'block', width: 220, height: 220 }} />
+                    </div>
+                    <p style={{ color: MUTED, fontSize: 11, marginTop: 8 }}>
+                      Code refreshes automatically. Scan within 30 seconds.
+                    </p>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── NEW TAB ── */}
         {tab === 'new' && (
           <>
             {newSheets.length === 0 && (
@@ -365,26 +546,60 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                       </div>
                     )}
 
-                    <div style={{ background: 'rgba(215,255,0,0.06)', border: `1px solid ${NEON_BORDER}`, borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
-                      <div style={{ fontSize: 12, color: NEON, fontWeight: 600, marginBottom: 6 }}>How to send:</div>
-                      <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <li style={{ fontSize: 12, color: MUTED }}>Click <strong style={{ color: '#fff' }}>Open in WhatsApp</strong> — message is copied to your clipboard</li>
-                        <li style={{ fontSize: 12, color: MUTED }}>In the chat, click the text box and press <strong style={{ color: '#fff' }}>Ctrl+V</strong> to paste it — this is required, WhatsApp corrupts emoji if sent pre-filled instead</li>
-                        {mediaFile && <li style={{ fontSize: 12, color: MUTED }}>Click the 📎 icon, choose the downloaded photo, then attach it</li>}
-                        <li style={{ fontSize: 12, color: MUTED }}>Press Enter / the send button in WhatsApp yourself — nothing is sent automatically</li>
-                      </ol>
-                    </div>
+                    {/* Manual send instructions — hidden when connected (auto-send handles delivery) */}
+                    {sessionStatus !== 'connected' && (
+                      <div style={{ background: 'rgba(215,255,0,0.06)', border: `1px solid ${NEON_BORDER}`, borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
+                        <div style={{ fontSize: 12, color: NEON, fontWeight: 600, marginBottom: 6 }}>How to send:</div>
+                        <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <li style={{ fontSize: 12, color: MUTED }}>Click <strong style={{ color: '#fff' }}>Open in WhatsApp</strong> — message is copied to your clipboard</li>
+                          <li style={{ fontSize: 12, color: MUTED }}>In the chat, click the text box and press <strong style={{ color: '#fff' }}>Ctrl+V</strong> to paste it — this is required, WhatsApp corrupts emoji if sent pre-filled instead</li>
+                          {mediaFile && <li style={{ fontSize: 12, color: MUTED }}>Click the 📎 icon, choose the downloaded photo, then attach it</li>}
+                          <li style={{ fontSize: 12, color: MUTED }}>Press Enter / the send button in WhatsApp yourself — nothing is sent automatically</li>
+                        </ol>
+                      </div>
+                    )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                      {currentNumbers.map(num => (
-                        <button key={num} onClick={() => openWhatsApp(num)} disabled={!messageText.trim()} style={{
-                          padding: '14px', borderRadius: 8, border: 'none',
-                          background: messageText.trim() ? NEON : 'rgba(215,255,0,0.25)',
-                          color: '#000', fontWeight: 700, fontSize: 15, cursor: messageText.trim() ? 'pointer' : 'not-allowed', ...fontDisplay,
-                        }}>
-                          {currentNumbers.length > 1 ? `Open ${num} in WhatsApp ↗` : 'Open in WhatsApp ↗'}
+                      {sessionStatus === 'connected' ? (
+                        /* Auto-send: fires through the agent's linked WhatsApp session */
+                        <button
+                          onClick={sendViaWhatsApp}
+                          disabled={!messageText.trim() || sendingId === current.id}
+                          style={{
+                            padding: '14px', borderRadius: 8, border: 'none',
+                            background: messageText.trim() ? NEON : 'rgba(215,255,0,0.25)',
+                            color: '#000', fontWeight: 700, fontSize: 15,
+                            cursor: messageText.trim() ? 'pointer' : 'not-allowed', ...fontDisplay,
+                          }}
+                        >
+                          {sendingId === current.id ? 'Sending…' : 'Send via WhatsApp'}
                         </button>
-                      ))}
+                      ) : (
+                        /* Manual flow when not connected */
+                        <>
+                          {sessionStatus === 'disconnected' && (
+                            <div style={{ background: 'rgba(215,255,0,0.04)', border: `1px solid ${NEON_BORDER}`, borderRadius: 8, padding: '10px 14px', fontSize: 12, color: MUTED }}>
+                              <span style={{ color: NEON }}>Tip:</span>{' '}
+                              Connect in the{' '}
+                              <button onClick={() => setTab('login')} style={{ color: NEON, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0, textDecoration: 'underline', ...fontDisplay }}>
+                                Login tab
+                              </button>{' '}
+                              to auto-send messages.
+                            </div>
+                          )}
+                          {currentNumbers.map(num => (
+                            <button key={num} onClick={() => openWhatsApp(num)} disabled={!messageText.trim()} style={{
+                              padding: '14px', borderRadius: 8, border: 'none',
+                              background: messageText.trim() ? NEON : 'rgba(215,255,0,0.25)',
+                              color: '#000', fontWeight: 700, fontSize: 15, cursor: messageText.trim() ? 'pointer' : 'not-allowed', ...fontDisplay,
+                            }}>
+                              {currentNumbers.length > 1 ? `Open ${num} in WhatsApp ↗` : 'Open in WhatsApp ↗'}
+                            </button>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Always keep Mark Sent as a fallback */}
                       <button onClick={markSent} disabled={busyId === current.id} style={{
                         padding: '14px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
                         background: NEON_DIM, color: NEON, fontWeight: 600, fontSize: 13, cursor: 'pointer', ...fontDisplay,
@@ -411,6 +626,7 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
           </>
         )}
 
+        {/* ── OLD TAB ── */}
         {tab === 'old' && (
           <>
             <input value={oldSearch} onChange={e => setOldSearch(e.target.value)}
