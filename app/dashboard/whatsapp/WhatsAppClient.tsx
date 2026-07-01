@@ -156,7 +156,7 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           assignmentId: current.id,
-          phones: currentNumbers,
+          phones: editableNumbers,
           message: messageText,
         }),
       })
@@ -242,6 +242,10 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   const current = newForActiveSheet.find(a => a.id === selectedAssignmentId) ?? newForActiveSheet[0]
   const currentNumbers = useMemo(() => current ? parsePhoneNumbers(current.contact.phone) : [], [current])
   const totalBatches = Math.max(1, Math.ceil(newForActiveSheet.length / BATCH_SIZE))
+
+  // Editable copy of the phone numbers — agent can correct a number before sending
+  const [editableNumbers, setEditableNumbers] = useState<string[]>([])
+  useEffect(() => { setEditableNumbers(currentNumbers) }, [current?.id])
 
   const newSearchMatches = useMemo(() => {
     const q = toWaNumber(newSearch)
@@ -533,10 +537,21 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                 {current ? (
                   <div style={{ background: CARD, border: `1px solid ${NEON_BORDER}`, borderRadius: 12, padding: 24 }}>
                     <div style={{ fontSize: 11, color: MUTED, letterSpacing: '0.08em', ...fontDisplay, marginBottom: 8 }}>CURRENT</div>
-                    {currentNumbers.map(num => (
-                      <div key={num} style={{ fontSize: 22, fontWeight: 700, color: '#fff', ...fontDisplay, marginBottom: 4 }}>{num}</div>
+                    {editableNumbers.map((num, i) => (
+                      <input
+                        key={i}
+                        value={num}
+                        onChange={e => setEditableNumbers(prev => prev.map((n, j) => j === i ? e.target.value : n))}
+                        style={{
+                          display: 'block', width: '100%', fontSize: 20, fontWeight: 700,
+                          color: '#fff', background: 'rgba(255,255,255,0.05)',
+                          border: `1px solid ${BORDER}`, borderRadius: 8,
+                          padding: '8px 12px', marginBottom: 6, outline: 'none',
+                          boxSizing: 'border-box', ...fontDisplay,
+                        }}
+                      />
                     ))}
-                    {current.contact.client_name && <div style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>{current.contact.client_name}</div>}
+                    {current.contact.client_name && <div style={{ fontSize: 13, color: MUTED, marginBottom: 10 }}>{current.contact.client_name}</div>}
 
                     {messageText.trim() && (
                       <div style={{ marginBottom: 16 }}>
@@ -592,13 +607,13 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                               to auto-send messages.
                             </div>
                           )}
-                          {currentNumbers.map(num => (
-                            <button key={num} onClick={() => openWhatsApp(num)} disabled={!messageText.trim()} style={{
+                          {editableNumbers.map((num, i) => (
+                            <button key={i} onClick={() => openWhatsApp(num)} disabled={!messageText.trim()} style={{
                               padding: '14px', borderRadius: 8, border: 'none',
                               background: messageText.trim() ? NEON : 'rgba(215,255,0,0.25)',
                               color: '#000', fontWeight: 700, fontSize: 15, cursor: messageText.trim() ? 'pointer' : 'not-allowed', ...fontDisplay,
                             }}>
-                              {currentNumbers.length > 1 ? `Open ${num} in WhatsApp ↗` : 'Open in WhatsApp ↗'}
+                              {editableNumbers.length > 1 ? `Open ${num} in WhatsApp ↗` : 'Open in WhatsApp ↗'}
                             </button>
                           ))}
                         </>
