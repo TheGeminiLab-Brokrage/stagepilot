@@ -50,6 +50,8 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [isRefilling, setIsRefilling] = useState(false)
+  const [refillDone, setRefillDone] = useState(false)
 
   const newAssignments = useMemo(
     () => assignments.filter(a => a.cycle === a.sheet.current_cycle && !a.sent_at),
@@ -152,7 +154,18 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
     if (!current) return
     setSendingId(current.id)
     setError(null)
+    const isLast = newForActiveSheet.length === 1
     try {
+      let imageBase64: string | undefined
+      let imageMimeType: string | undefined
+      if (mediaFile) {
+        const buf = await mediaFile.arrayBuffer()
+        const bytes = new Uint8Array(buf)
+        let binary = ''
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
+        imageBase64 = btoa(binary)
+        imageMimeType = mediaFile.type
+      }
       const res = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -160,6 +173,7 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
           assignmentId: current.id,
           phones: editableNumbers,
           message: messageText,
+          ...(imageBase64 ? { imageBase64, imageMimeType } : {}),
         }),
       })
       let data: { error?: string } = {}
@@ -173,6 +187,7 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
       ))
       setSelectedAssignmentId(null)
       setNewSearch('')
+      if (isLast && activeSheetId) refill(activeSheetId)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send')
     } finally {
@@ -213,6 +228,11 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   // Batch progress is per-sheet — reset when switching sheets
   useEffect(() => {
     setNumbersBatchIndex(0); setLastCopiedBatch([])
+  }, [activeSheetId])
+
+  // Refill state is per-sheet — reset when switching sheets
+  useEffect(() => {
+    setRefillDone(false)
   }, [activeSheetId])
 
   // Search/selection is per-sheet — reset when switching sheets
@@ -273,13 +293,36 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
     return [...map.values()]
   }, [filteredOldAssignments])
 
+  async function refill(sheetId: string) {
+    setIsRefilling(true)
+    try {
+      const res = await fetch('/api/whatsapp/assignments/refill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sheetId }),
+      })
+      const data = await res.json()
+      if (data.done || !data.assignments?.length) {
+        setRefillDone(true)
+      } else {
+        setAssignments(prev => [...prev, ...data.assignments])
+      }
+    } catch {
+      // silent fail — agent can reload page to retry
+    } finally {
+      setIsRefilling(false)
+    }
+  }
+
   async function markSent() {
     if (!current) return
     setBusyId(current.id); setError(null)
+    const isLast = newForActiveSheet.length === 1
     try {
       await patchAssignment(current.id, { action: 'sent', message_text: messageText })
       setAssignments(prev => prev.map(a => a.id === current.id ? { ...a, sent_at: new Date().toISOString(), message_text: messageText } : a))
       setSelectedAssignmentId(null); setNewSearch('')
+      if (isLast && activeSheetId) refill(activeSheetId)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to mark as sent')
     } finally {
@@ -323,9 +366,16 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
       await Promise.all(lastCopiedBatch.map(a => patchAssignment(a.id, { action: 'sent', message_text: messageText })))
       const now = new Date().toISOString()
       const ids = new Set(lastCopiedBatch.map(a => a.id))
-      setAssignments(prev => prev.map(a => ids.has(a.id) ? { ...a, sent_at: now, message_text: messageText } : a))
+      const updatedAssignments = assignments.map(a => ids.has(a.id) ? { ...a, sent_at: now, message_text: messageText } : a)
+      setAssignments(updatedAssignments)
       setLastCopiedBatch([])
       setNumbersBatchIndex(0)
+      const stillUnsent = updatedAssignments.filter(a =>
+        a.sheet.id === activeSheetId &&
+        a.cycle === a.sheet.current_cycle &&
+        !a.sent_at
+      ).length
+      if (stillUnsent === 0 && activeSheetId) refill(activeSheetId)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to mark batch as sent')
     } finally {
@@ -472,8 +522,15 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
         {/* ── NEW TAB ── */}
         {tab === 'new' && (
           <>
-            {newSheets.length === 0 && (
-              <EmptyState text="No new contacts assigned right now." />
+            {isRefilling && (
+              <div style={{ background: NEON_DIM, border: `1px solid ${NEON_BORDER}`, borderRadius: 10, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ color: NEON, fontSize: 16 }}>⟳</span>
+                <span style={{ color: NEON, fontSize: 13, fontWeight: 600, ...fontDisplay }}>Getting your next 30 clients…</span>
+              </div>
+            )}
+
+            {!isRefilling && newSheets.length === 0 && (
+              <EmptyState text={refillDone ? 'You\'ve finished all clients for this sheet!' : 'No new contacts assigned right now.'} />
             )}
 
             {newSheets.length > 0 && (
@@ -505,7 +562,7 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                   <label style={{ fontSize: 13, fontWeight: 600, color: '#fff', ...fontDisplay, display: 'block', marginBottom: 6 }}>
                     Attach Photo <span style={{ color: MUTED, fontWeight: 400 }}>(optional)</span>
                   </label>
-                  <p style={{ color: MUTED, fontSize: 11, margin: '0 0 12px' }}>You&apos;ll attach this manually in each WhatsApp chat when sending.</p>
+                  <p style={{ color: MUTED, fontSize: 11, margin: '0 0 12px' }}>When connected, the photo is sent automatically with the message. If not connected, download it and attach manually.</p>
                   {mediaPreview ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                       <img src={mediaPreview} alt="Media" style={{ height: 80, width: 80, objectFit: 'cover', borderRadius: 8, border: `1px solid ${BORDER}` }} />
@@ -673,6 +730,13 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                       </button>
                     )}
                   </div>
+                ) : isRefilling ? (
+                  <div style={{ background: NEON_DIM, border: `1px solid ${NEON_BORDER}`, borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ color: NEON, fontSize: 16 }}>⟳</span>
+                    <span style={{ color: NEON, fontSize: 13, fontWeight: 600, ...fontDisplay }}>Getting your next 30 clients…</span>
+                  </div>
+                ) : refillDone ? (
+                  <EmptyState text="You've finished all clients for this sheet!" />
                 ) : (
                   <EmptyState text="All new contacts in this sheet have been sent." />
                 )}

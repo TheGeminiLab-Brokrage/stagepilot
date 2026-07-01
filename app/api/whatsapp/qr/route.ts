@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createSupabaseAuthState, clearSession } from '@/lib/whatsapp/session'
+import { getBaileysVersion } from '@/lib/whatsapp/version'
 import qrcode from 'qrcode'
 
 // Allow up to 60s — enough time for the user to scan the QR code
@@ -17,13 +18,13 @@ export async function GET() {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const { default: makeWASocket, DisconnectReason, fetchLatestBaileysVersion } =
+      const { default: makeWASocket, DisconnectReason } =
         await import('@whiskeysockets/baileys')
       const { default: pino } = await import('pino')
       const logger = pino({ level: 'silent' })
 
       const { state, saveCreds } = await createSupabaseAuthState(user.id)
-      const { version } = await fetchLatestBaileysVersion()
+      const version = await getBaileysVersion()
 
       const socket = makeWASocket({
         version,

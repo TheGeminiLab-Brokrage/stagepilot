@@ -281,138 +281,159 @@ function Calendar({
   )
 }
 
-// ── Read-only report view ─────────────────────────────────────────────────────
+// ── HTML report generator (matches admin report aesthetic) ────────────────────
 
-function ReportView({ report, onEdit, onClose }: {
-  report: BayReport; onEdit: () => void; onClose: () => void
-}) {
-  const metrics: { label: string; value: number; warn?: boolean }[] = [
-    { label: 'ورقات المكالمات الباردة', value: report.sheets },
-    { label: 'بوستات السوشيال ميديا', value: report.posts, warn: report.posts < 5 },
-    { label: 'الطلبات الجديدة',       value: report.requests },
-    { label: 'مكالمات المتابعة',      value: report.followups },
-    { label: 'إجمالي الليدز الجديدة', value: report.total_leads },
-    { label: 'ليدز تم التواصل معاهم', value: report.reached },
-    { label: 'ليدز ما تمش التواصل',   value: report.not_reached },
-    { label: 'ليدز على الـ CRM',      value: report.crm_actions },
-    { label: 'مكالمات مرفوعة Drive',  value: report.uploaded },
-    { label: 'مكالمات ما اترفعتش',   value: report.not_uploaded },
+function esc(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function generateDailyHtml(report: BayReport): string {
+  // Matches admin layout: 4-column grid, label on top, large value below
+  const row1 = [
+    { label: 'COLD CALL SHEETS',  value: report.sheets,      check: false },
+    { label: 'ORGANIC POSTS',     value: report.posts,       check: report.posts >= 5, warn: report.posts > 0 && report.posts < 5 },
+    { label: 'NEW REQUESTS',      value: report.requests,    check: false },
+    { label: 'FOLLOW-UPS',        value: report.followups,   check: false },
+  ]
+  const row2 = [
+    { label: 'TOTAL NEW LEADS',   value: report.total_leads, check: false },
+    { label: 'REACHED',           value: report.reached,     check: false },
+    { label: 'NOT REACHED',       value: report.not_reached, check: false },
+    { label: 'CRM ACTIVITIES',    value: report.crm_actions, check: false },
+  ]
+  const row3 = [
+    { label: 'CALLS UPLOADED',    value: report.uploaded,    check: report.uploaded > 0, isText: false },
+    { label: 'NOT UPLOADED',      value: report.not_uploaded,check: false, isText: false },
+    { label: 'CRM UPDATED',       value: report.crm_confirm ? 'Yes' : 'No', check: report.crm_confirm, isText: true },
   ]
 
+  function statBox(label: string, value: number | string, check: boolean, warn?: boolean, isText?: boolean) {
+    const valColor = warn ? '#fbbf24' : isText ? (value === 'Yes' ? '#4ade80' : 'rgba(255,255,255,0.5)') : '#fff'
+    return `<div class="stat-box">
+      <div class="stat-label">${label}${check ? ' <span class="check">✓</span>' : ''}</div>
+      <div class="stat-value" style="color:${valColor}">${value}</div>
+    </div>`
+  }
+
+  const missedHtml = report.has_missed_uploads && report.missed_calls.length > 0
+    ? `<div class="missed-section">
+        <div class="missed-title">⚠ مكالمات ما اترفعتش (${report.missed_calls.length})</div>
+        <ul>
+          ${report.missed_calls.map(mc => `
+            <li>
+              <strong>${esc(mc.name)}</strong>
+              ${mc.phone ? `<span class="phone">${esc(mc.phone)}</span>` : ''}
+              ${mc.reason ? `<span class="reason">سبب: ${esc(mc.reason)}</span>` : ''}
+            </li>`).join('')}
+        </ul>
+      </div>`
+    : ''
+
+  const summaryHtml = report.summary
+    ? `<div class="summary-box">
+        <div class="summary-label">Daily Summary / ملخص اليوم</div>
+        <div class="summary-text">${esc(report.summary)}</div>
+      </div>`
+    : ''
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Montserrat',sans-serif;background:#0a0a0a;color:#fff;padding:20px}
+.agent-name{font-size:18px;font-weight:700;color:#ffffff;margin-bottom:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.stat-box{background:#141414;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:14px 16px}
+.stat-label{font-size:10px;font-weight:700;letter-spacing:0.1em;color:rgba(255,255,255,0.4);text-transform:uppercase;margin-bottom:10px}
+.check{color:#4ade80}
+.stat-value{font-size:26px;font-weight:800;color:#fff}
+.missed-section{background:rgba(248,113,113,0.08);border-left:3px solid rgba(248,113,113,0.6);padding:12px 16px;border-radius:8px;margin-bottom:12px}
+.missed-title{font-size:12px;font-weight:700;color:#f87171;margin-bottom:10px;letter-spacing:0.05em}
+.missed-section ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+.missed-section li{font-size:13px;background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:6px;color:rgba(255,255,255,0.8)}
+.missed-section li strong{display:block;font-size:14px;margin-bottom:2px;color:#fff}
+.phone{font-size:12px;opacity:0.5;margin-left:8px}
+.reason{display:block;font-size:12px;margin-top:4px;color:#f87171}
+.summary-box{background:#141414;border:1px solid rgba(255,255,255,0.06);padding:14px 16px;border-radius:10px}
+.summary-label{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-bottom:8px}
+.summary-text{font-size:14px;line-height:1.7;color:rgba(255,255,255,0.8);white-space:pre-wrap;word-break:break-word;direction:rtl;text-align:right}
+</style>
+</head>
+<body>
+<div class="agent-name">${esc(report.full_name)}</div>
+<div class="grid4">
+  ${row1.map(m => statBox(m.label, m.value, m.check, m.warn)).join('')}
+</div>
+<div class="grid4">
+  ${row2.map(m => statBox(m.label, m.value, m.check)).join('')}
+</div>
+<div class="grid3">
+  ${row3.map(m => statBox(m.label, m.value, m.check, false, m.isText)).join('')}
+</div>
+${missedHtml}
+${summaryHtml}
+</body>
+</html>`
+}
+
+// ── Read-only report view ─────────────────────────────────────────────────────
+
+function ReportView({ report, onEdit, onClose, isToday }: {
+  report: BayReport; onEdit: () => void; onClose: () => void; isToday: boolean
+}) {
   return (
-    <div style={{ ...S.card, marginTop: 20 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div>
+    <div style={{
+      background: 'rgba(215,255,0,0.03)',
+      border: '1px solid rgba(215,255,0,0.15)',
+      borderRadius: 12,
+      padding: 20,
+      marginTop: 20,
+    }}>
+      {/* Header — matches admin ReportPanel */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 20, flexWrap: 'wrap', gap: 10,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{
             background: 'rgba(215,255,0,0.12)', color: '#D7FF00',
             borderRadius: 6, padding: '3px 10px', fontSize: 11,
             fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
-            fontFamily: "'Space Grotesk', sans-serif",
           }}>Daily</span>
-          <span style={{
-            marginLeft: 10, color: '#fff', fontWeight: 700, fontSize: 16,
-            fontFamily: "'Montserrat', sans-serif",
-          }}>{report.report_date}</span>
+          <span style={{ color: '#D7FF00', fontWeight: 700, fontSize: 16, fontFamily: "'Montserrat', sans-serif" }}>
+            {report.report_date}
+          </span>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={onEdit} style={{
-            background: 'rgba(215,255,0,0.08)', border: '1px solid rgba(215,255,0,0.25)',
-            color: '#D7FF00', borderRadius: 6, padding: '0 14px', height: 30,
-            cursor: 'pointer', fontSize: 12, fontWeight: 700,
-            fontFamily: "'Montserrat', sans-serif",
-          }}>✏ Edit</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isToday && (
+            <button onClick={onEdit} style={{
+              background: 'rgba(215,255,0,0.08)', border: '1px solid rgba(215,255,0,0.25)',
+              color: '#D7FF00', borderRadius: 6, padding: '0 14px', height: 30,
+              cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontFamily: "'Montserrat', sans-serif", flexShrink: 0,
+            }}>✏ Edit</button>
+          )}
           <button onClick={onClose} style={{
             background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
             color: 'rgba(255,255,255,0.5)', borderRadius: 6,
             width: 30, height: 30, cursor: 'pointer', fontSize: 16,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: "'Montserrat', sans-serif",
+            fontFamily: "'Montserrat', sans-serif", flexShrink: 0,
           }}>×</button>
         </div>
       </div>
 
-      {/* Metrics grid */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 16,
-      }}>
-        {metrics.map(({ label, value, warn }) => (
-          <div key={label} style={{
-            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 10, padding: '12px 16px', display: 'flex',
-            justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontFamily: "'Space Grotesk', sans-serif" }}>
-              {label}
-            </span>
-            <span style={{ fontSize: 18, fontWeight: 800, color: warn ? '#fbbf24' : '#D7FF00', fontFamily: "'Montserrat', sans-serif" }}>
-              {value}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* CRM confirm */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
-        background: report.crm_confirm ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.03)',
-        border: `1px solid ${report.crm_confirm ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}`,
-        borderRadius: 10, padding: '12px 16px',
-      }}>
-        <span style={{ fontSize: 16 }}>{report.crm_confirm ? '✅' : '⬜'}</span>
-        <span style={{ fontSize: 13, color: report.crm_confirm ? '#22c55e' : 'rgba(255,255,255,0.4)', fontFamily: "'Montserrat', sans-serif" }}>
-          تأكيد تحديث الـ CRM — {report.crm_confirm ? 'تم تحديث كل الليدز' : 'لم يتم التأكيد'}
-        </span>
-      </div>
-
-      {/* Missed calls */}
-      {report.has_missed_uploads && report.missed_calls.length > 0 && (
-        <div style={{
-          background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.25)',
-          borderRadius: 10, padding: '14px 16px', marginBottom: 14,
-        }}>
-          <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 800, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Space Grotesk', sans-serif" }}>
-            مكالمات ما اترفعتش ({report.missed_calls.length})
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {report.missed_calls.map((mc, i) => (
-              <div key={i} style={{
-                background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: '10px 14px',
-                fontSize: 13, color: 'rgba(255,255,255,0.8)', fontFamily: "'Montserrat', sans-serif",
-              }}>
-                <strong style={{ color: '#fff' }}>{mc.name}</strong>
-                {mc.phone && <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: 8 }}>{mc.phone}</span>}
-                {mc.reason && <div style={{ marginTop: 4, color: '#f87171', fontSize: 12 }}>سبب: {mc.reason}</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {report.has_missed_uploads && report.missed_calls.length === 0 && (
-        <div style={{
-          background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.25)',
-          borderRadius: 10, padding: '12px 16px', marginBottom: 14,
-        }}>
-          <span style={{ fontSize: 13, color: '#f87171', fontFamily: "'Montserrat', sans-serif" }}>
-            عندي مكالمات ما اترفعتش — بدون تفاصيل
-          </span>
-        </div>
-      )}
-
-      {/* Summary */}
-      {report.summary && (
-        <div style={{
-          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: 10, padding: '14px 16px',
-        }}>
-          <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Space Grotesk', sans-serif" }}>
-            ملخص اليوم
-          </p>
-          <p style={{ margin: 0, fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.6, fontFamily: "'Montserrat', sans-serif", whiteSpace: 'pre-wrap' }}>
-            {report.summary}
-          </p>
-        </div>
-      )}
+      {/* Report body in iframe — same as admin */}
+      <iframe
+        srcDoc={generateDailyHtml(report)}
+        style={{ width: '100%', height: 520, border: 'none', borderRadius: 8, display: 'block' }}
+        sandbox=""
+        title="Daily Report"
+      />
     </div>
   )
 }
@@ -931,6 +952,7 @@ export default function DailyReportClient({
           report={selectedReport}
           onEdit={() => setFormMode(true)}
           onClose={() => { setSelectedDate(null); setFormMode(false) }}
+          isToday={selectedReport.report_date === todayStr}
         />
       )}
 

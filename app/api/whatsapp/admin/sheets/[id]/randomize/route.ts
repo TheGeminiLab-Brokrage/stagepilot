@@ -56,6 +56,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: 'No agents available to assign' }, { status: 400 })
   }
 
+  const DRIP_SIZE = 30
+
   const assignedPairs = new Set((existing ?? []).map(a => `${a.contact_id}:${a.agent_id}`))
   const newCycle = sheet.current_cycle + 1
   const load = new Map<string, number>(agents.map(a => [a.id, 0]))
@@ -64,7 +66,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   let exhausted = 0
 
   for (const contact of shuffle(contacts ?? [])) {
-    const eligible = agents.filter(a => !assignedPairs.has(`${contact.id}:${a.id}`))
+    const eligible = agents.filter(a =>
+      !assignedPairs.has(`${contact.id}:${a.id}`) &&
+      load.get(a.id)! < DRIP_SIZE
+    )
     if (eligible.length === 0) { exhausted++; continue }
 
     eligible.sort((a, b) => (load.get(a.id)! - load.get(b.id)!))

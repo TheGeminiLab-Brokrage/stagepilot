@@ -1,15 +1,15 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 
-// Loads Baileys auth credentials from Supabase and returns the state object
-// that makeWASocket expects. Signal keys are kept in memory — sufficient for
-// text messaging (Baileys re-negotiates sessions automatically as needed).
+// Loads Baileys auth credentials AND signal keys from Supabase.
+// Both are persisted together so the send route can reconnect without
+// re-negotiating the Signal session from scratch on every request.
 export async function createSupabaseAuthState(agentId: string) {
   const { initAuthCreds, BufferJSON } = await import('@whiskeysockets/baileys')
   const admin = createAdminClient()
 
   const { data } = await admin
     .from('whatsapp_baileys_sessions')
-    .select('creds_json')
+    .select('creds_json, keys_json')
     .eq('agent_id', agentId)
     .single()
 
@@ -19,7 +19,22 @@ export async function createSupabaseAuthState(agentId: string) {
     : initAuthCreds()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const keys: Record<string, Record<string, any>> = {}
+  const keys: Record<string, Record<string, any>> = data?.keys_json
+    ? JSON.parse(JSON.stringify(data.keys_json), BufferJSON.reviver)
+    : {}
+
+  // Single upsert keeps creds + keys in sync with one DB round-trip
+  async function save() {
+    await admin.from('whatsapp_baileys_sessions').upsert(
+      {
+        agent_id: agentId,
+        creds_json: JSON.parse(JSON.stringify(creds, BufferJSON.replacer)),
+        keys_json: JSON.parse(JSON.stringify(keys, BufferJSON.replacer)),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'agent_id' }
+    )
+  }
 
   const state = {
     creds,
@@ -32,22 +47,12 @@ export async function createSupabaseAuthState(agentId: string) {
         for (const [type, typeData] of Object.entries(data)) {
           keys[type] = { ...(keys[type] ?? {}), ...typeData }
         }
+        await save()
       },
     },
   }
 
-  const saveCreds = async () => {
-    await admin.from('whatsapp_baileys_sessions').upsert(
-      {
-        agent_id: agentId,
-        creds_json: JSON.parse(JSON.stringify(creds, BufferJSON.replacer)),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'agent_id' }
-    )
-  }
-
-  return { state, saveCreds }
+  return { state, saveCreds: save }
 }
 
 export async function hasSession(agentId: string): Promise<boolean> {

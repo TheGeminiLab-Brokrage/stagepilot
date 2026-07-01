@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createSupabaseAuthState, hasSession } from '@/lib/whatsapp/session'
+import { getBaileysVersion } from '@/lib/whatsapp/version'
 
 // Allow up to 30s for reconnect + send
 export const maxDuration = 30
@@ -15,8 +16,10 @@ export async function POST(req: Request) {
     assignmentId?: string
     phones?: string[]
     message?: string
+    imageBase64?: string
+    imageMimeType?: string
   }
-  const { assignmentId, phones, message } = body
+  const { assignmentId, phones, message, imageBase64, imageMimeType } = body
   if (!assignmentId || !phones?.length || !message) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   }
@@ -42,12 +45,12 @@ export async function POST(req: Request) {
   let socket: Awaited<ReturnType<typeof import('@whiskeysockets/baileys').default>> | null = null
 
   try {
-    const { default: makeWASocket, fetchLatestBaileysVersion } = await import('@whiskeysockets/baileys')
+    const { default: makeWASocket } = await import('@whiskeysockets/baileys')
     const { default: pino } = await import('pino')
     const logger = pino({ level: 'silent' })
 
     const { state, saveCreds } = await createSupabaseAuthState(user.id)
-    const { version } = await fetchLatestBaileysVersion()
+    const version = await getBaileysVersion()
 
     socket = makeWASocket({
       version,
@@ -74,7 +77,10 @@ export async function POST(req: Request) {
       const digits = phone.replace(/\D/g, '')
       // Egyptian numbers: 01XXXXXXXXXX → 201XXXXXXXXXX@s.whatsapp.net
       const normalized = digits.startsWith('0') ? '20' + digits.slice(1) : digits
-      await socket.sendMessage(`${normalized}@s.whatsapp.net`, { text: message })
+      const msgContent = imageBase64
+        ? { image: Buffer.from(imageBase64, 'base64'), mimetype: imageMimeType as string, caption: message }
+        : { text: message }
+      await socket.sendMessage(`${normalized}@s.whatsapp.net`, msgContent)
     }
   } catch (err) {
     try { socket?.end(new Error('error')) } catch { /* ignore */ }
