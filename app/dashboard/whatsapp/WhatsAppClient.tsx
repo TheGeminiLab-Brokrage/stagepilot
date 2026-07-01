@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import * as XLSX from 'xlsx'
 
 const NEON = '#D7FF00'
 const NEON_DIM = 'rgba(215,255,0,0.12)'
@@ -332,6 +333,23 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
     }
   }
 
+  function downloadClientsExcel() {
+    const rows = assignments.map(a => ({
+      'Client Name': a.contact.client_name ?? '',
+      'Phone': a.contact.phone,
+      'Sheet': a.sheet.name,
+      'Cycle': a.cycle,
+      'Status': a.response_status === 'answered' ? 'Answered'
+              : a.response_status === 'not_answered' ? 'Not Answered'
+              : 'Pending',
+      'Sent At': a.sent_at ? new Date(a.sent_at).toLocaleString() : '',
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'My Clients')
+    XLSX.writeFile(wb, `my-clients-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
   async function classify(assignment: Assignment, status: 'answered' | 'not_answered') {
     setBusyId(assignment.id); setError(null)
     try {
@@ -348,13 +366,28 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
     <div style={{ minHeight: '100vh', background: '#000', ...font }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '32px 24px' }}>
 
-        <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: 26, fontWeight: 700, color: '#fff', margin: 0, ...fontDisplay }}>
-            WhatsApp <span style={{ color: NEON }}>Assignments</span>
-          </h1>
-          <p style={{ color: MUTED, fontSize: 13, marginTop: 6 }}>
-            Clients assigned to you by admin. Send to new contacts, then mark old ones as answered or not.
-          </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
+          <div>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: '#fff', margin: 0, ...fontDisplay }}>
+              WhatsApp <span style={{ color: NEON }}>Assignments</span>
+            </h1>
+            <p style={{ color: MUTED, fontSize: 13, marginTop: 6 }}>
+              Clients assigned to you by admin. Send to new contacts, then mark old ones as answered or not.
+            </p>
+          </div>
+          <button
+            onClick={downloadClientsExcel}
+            disabled={assignments.length === 0}
+            style={{
+              padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              background: NEON_DIM, border: `1px solid ${NEON_BORDER}`,
+              color: NEON, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              opacity: assignments.length === 0 ? 0.4 : 1,
+              ...fontDisplay,
+            }}
+          >
+            ↓ Download Clients
+          </button>
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { parseExcelFile, type ParsedSheet, type RawRow } from '@/lib/excel-parser'
+import * as XLSX from 'xlsx'
 
 const NEON = '#D7FF00'
 const NEON_DIM = 'rgba(215,255,0,0.12)'
@@ -136,6 +137,44 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
     if (selectedId) loadDetail(selectedId)
     else setDetail(null)
   }, [selectedId, loadDetail])
+
+  function downloadByAgent() {
+    if (!detail) return
+    const filtered = cycleFilter
+      ? detail.assignments.filter(a => a.cycle === cycleFilter)
+      : detail.assignments
+
+    const byAgent = new Map<string, typeof filtered>()
+    for (const a of filtered) {
+      const agent = oneOf(a.agent)
+      const name = agent?.full_name ?? 'Unassigned'
+      if (!byAgent.has(name)) byAgent.set(name, [])
+      byAgent.get(name)!.push(a)
+    }
+
+    const wb = XLSX.utils.book_new()
+    for (const [agentName, agentAssignments] of byAgent) {
+      const rows = agentAssignments.map(a => {
+        const contact = detail.contacts.find(c => c.id === a.contact_id)
+        return {
+          'Client Name': contact?.client_name ?? '',
+          'Phone': contact?.phone ?? '',
+          'Cycle': a.cycle,
+          'Status': a.response_status === 'answered' ? 'Answered'
+                  : a.response_status === 'not_answered' ? 'Not Answered'
+                  : 'Pending',
+          'Sent At': a.sent_at ? new Date(a.sent_at).toLocaleString() : '',
+          'Responded At': a.responded_at ? new Date(a.responded_at).toLocaleString() : '',
+        }
+      })
+      const safeName = agentName.slice(0, 31).replace(/[\\/*?:[\]]/g, '')
+      const ws = XLSX.utils.json_to_sheet(rows)
+      XLSX.utils.book_append_sheet(wb, ws, safeName)
+    }
+
+    const label = cycleFilter ? `cycle${cycleFilter}` : 'all-cycles'
+    XLSX.writeFile(wb, `${detail.sheet.name}-${label}-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
 
   async function handleRandomize() {
     if (!selectedId) return
@@ -385,12 +424,20 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                   </div>
 
                   {!confirmRandomize ? (
-                    <button onClick={() => setConfirmRandomize(true)} style={{
-                      padding: '9px 16px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
-                      background: NEON_DIM, color: NEON, fontWeight: 600, fontSize: 12, cursor: 'pointer', ...fontDisplay,
-                    }}>
-                      ↻ Re-randomize
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={downloadByAgent} style={{
+                        padding: '9px 16px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
+                        background: NEON_DIM, color: NEON, fontWeight: 600, fontSize: 12, cursor: 'pointer', ...fontDisplay,
+                      }}>
+                        ↓ Download by Agent
+                      </button>
+                      <button onClick={() => setConfirmRandomize(true)} style={{
+                        padding: '9px 16px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
+                        background: NEON_DIM, color: NEON, fontWeight: 600, fontSize: 12, cursor: 'pointer', ...fontDisplay,
+                      }}>
+                        ↻ Re-randomize
+                      </button>
+                    </div>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 12, color: MUTED }}>Redistribute all contacts to a new agent for cycle {detail.sheet.current_cycle + 1}?</span>
