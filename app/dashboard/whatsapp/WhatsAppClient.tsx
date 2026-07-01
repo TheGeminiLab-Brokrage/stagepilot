@@ -98,8 +98,9 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
 
       es.onmessage = (event) => {
         if (cancelled) return
-        const data: { qr?: string; connected?: boolean; phone?: string; error?: string } =
-          JSON.parse(event.data)
+        let data: { qr?: string; connected?: boolean; phone?: string; error?: string } | null = null
+        try { data = JSON.parse(event.data) } catch { return }
+        if (!data) return
 
         if (data.qr) {
           setQrCode(data.qr)
@@ -160,8 +161,9 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
           message: messageText,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Send failed')
+      let data: { error?: string } = {}
+      try { data = await res.json() } catch { /* non-JSON body (e.g. 504 timeout) */ }
+      if (!res.ok) throw new Error(data.error ?? `Send failed (HTTP ${res.status})`)
       // Auto-move contact to Old tab — no separate "Mark Sent" click needed
       setAssignments(prev => prev.map(a =>
         a.id === current.id

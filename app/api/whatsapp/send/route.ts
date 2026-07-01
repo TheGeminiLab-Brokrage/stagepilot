@@ -39,42 +39,52 @@ export async function POST(req: Request) {
     )
   }
 
-  const { default: makeWASocket, fetchLatestBaileysVersion } = await import('@whiskeysockets/baileys')
-  const { default: pino } = await import('pino')
-  const logger = pino({ level: 'silent' })
+  let socket: Awaited<ReturnType<typeof import('@whiskeysockets/baileys').default>> | null = null
 
-  const { state, saveCreds } = await createSupabaseAuthState(user.id)
-  const { version } = await fetchLatestBaileysVersion()
+  try {
+    const { default: makeWASocket, fetchLatestBaileysVersion } = await import('@whiskeysockets/baileys')
+    const { default: pino } = await import('pino')
+    const logger = pino({ level: 'silent' })
 
-  const socket = makeWASocket({
-    version,
-    auth: state,
-    logger,
-    printQRInTerminal: false,
-    browser: ['StagePilot', 'Chrome', '120.0.0'],
-    getMessage: async () => undefined,
-  })
+    const { state, saveCreds } = await createSupabaseAuthState(user.id)
+    const { version } = await fetchLatestBaileysVersion()
 
-  socket.ev.on('creds.update', saveCreds)
-
-  // Wait for reconnection using stored credentials (no QR needed)
-  await new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Connection timeout')), 20000)
-    socket.ev.on('connection.update', ({ connection }) => {
-      if (connection === 'open') { clearTimeout(timeout); resolve() }
-      if (connection === 'close') { clearTimeout(timeout); reject(new Error('Connection closed')) }
+    socket = makeWASocket({
+      version,
+      auth: state,
+      logger,
+      printQRInTerminal: false,
+      browser: ['StagePilot', 'Chrome', '120.0.0'],
+      getMessage: async () => undefined,
     })
-  })
 
-  // Send to each phone number for this contact
-  for (const phone of phones) {
-    const digits = phone.replace(/\D/g, '')
-    // Egyptian numbers: 01XXXXXXXXXX → 201XXXXXXXXXX@s.whatsapp.net
-    const normalized = digits.startsWith('0') ? '20' + digits.slice(1) : digits
-    await socket.sendMessage(`${normalized}@s.whatsapp.net`, { text: message })
+    socket.ev.on('creds.update', saveCreds)
+
+    // Wait for reconnection using stored credentials (no QR needed)
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Connection timeout — try again')), 20000)
+      socket!.ev.on('connection.update', ({ connection }) => {
+        if (connection === 'open') { clearTimeout(timeout); resolve() }
+        if (connection === 'close') { clearTimeout(timeout); reject(new Error('Connection closed — re-scan the QR code in the Login tab')) }
+      })
+    })
+
+    // Send to each phone number for this contact
+    for (const phone of phones) {
+      const digits = phone.replace(/\D/g, '')
+      // Egyptian numbers: 01XXXXXXXXXX → 201XXXXXXXXXX@s.whatsapp.net
+      const normalized = digits.startsWith('0') ? '20' + digits.slice(1) : digits
+      await socket.sendMessage(`${normalized}@s.whatsapp.net`, { text: message })
+    }
+  } catch (err) {
+    try { socket?.end(new Error('error')) } catch { /* ignore */ }
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Send failed — please try again' },
+      { status: 500 }
+    )
   }
 
-  try { socket.end(new Error('done')) } catch { /* ignore */ }
+  try { socket?.end(new Error('done')) } catch { /* ignore */ }
 
   // Mark assignment as sent in the database
   await adminClient
