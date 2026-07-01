@@ -83,54 +83,59 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
       .catch(() => setSessionStatus('disconnected'))
   }, [])
 
-  // QR polling + status polling while Login tab is open and not connected
+  // SSE stream for QR — stays connected until scanned, timed out, or tab changes
   useEffect(() => {
     if (tab !== 'login' || sessionStatus !== 'disconnected') return
 
+    let es: EventSource | null = null
     let cancelled = false
 
-    async function refreshQR() {
+    function connect() {
       if (cancelled) return
       setQrLoading(true)
-      try {
-        const res = await fetch('/api/whatsapp/qr')
-        const data: { connected?: boolean; phone?: string; qr?: string; error?: string } = await res.json()
+
+      es = new EventSource('/api/whatsapp/qr')
+
+      es.onmessage = (event) => {
         if (cancelled) return
+        const data: { qr?: string; connected?: boolean; phone?: string; error?: string } =
+          JSON.parse(event.data)
+
+        if (data.qr) {
+          setQrCode(data.qr)
+          setQrLoading(false)
+        }
         if (data.connected) {
           setSessionStatus('connected')
           setSessionPhone(data.phone ?? null)
           setQrCode(null)
-        } else if (data.qr) {
-          setQrCode(data.qr)
+          es?.close()
         }
-      } catch { /* ignore */ } finally {
-        if (!cancelled) setQrLoading(false)
+        if (data.error === 'timeout') {
+          // Server hit its 55s limit — reconnect immediately to get a fresh QR
+          es?.close()
+          if (!cancelled) connect()
+        }
+        if (data.error && data.error !== 'timeout') {
+          setQrLoading(false)
+          es?.close()
+        }
+      }
+
+      es.onerror = () => {
+        if (cancelled) return
+        setQrLoading(false)
+        es?.close()
+        // Retry after 3s on network error
+        setTimeout(connect, 3000)
       }
     }
 
-    refreshQR()
-    const qrTimer = setInterval(refreshQR, 28000)
-
-    // Poll status every 3s to detect when the user scans
-    const statusTimer = setInterval(() => {
-      if (cancelled) return
-      fetch('/api/whatsapp/session')
-        .then(r => r.json())
-        .then((data: { connected: boolean; phone?: string }) => {
-          if (cancelled) return
-          if (data.connected) {
-            setSessionStatus('connected')
-            setSessionPhone(data.phone ?? null)
-            setQrCode(null)
-          }
-        })
-        .catch(() => {})
-    }, 3000)
+    connect()
 
     return () => {
       cancelled = true
-      clearInterval(qrTimer)
-      clearInterval(statusTimer)
+      es?.close()
     }
   }, [tab, sessionStatus])
 
