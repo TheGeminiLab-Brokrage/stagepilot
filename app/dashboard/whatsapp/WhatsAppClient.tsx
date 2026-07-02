@@ -236,15 +236,34 @@ export default function WhatsAppClient({
   }, [assignedSheets, newSheets])
 
   const [activeSheetId, setActiveSheetId] = useState<string | null>(allSheets[0]?.id ?? null)
-  const [messageText, setMessageText] = useState('')
+
+  // Message text and media are stored per sheet so switching tabs preserves each sheet's state
+  const [messageTexts, setMessageTexts] = useState<Record<string, string>>({})
+  const [mediaFiles, setMediaFiles] = useState<Record<string, File | null>>({})
+  const [mediaPreviews, setMediaPreviews] = useState<Record<string, string | null>>({})
+
+  const messageText = messageTexts[activeSheetId ?? ''] ?? ''
+  const setMessageText = (text: string) => {
+    if (!activeSheetId) return
+    setMessageTexts(prev => ({ ...prev, [activeSheetId]: text }))
+  }
+  const mediaFile = mediaFiles[activeSheetId ?? ''] ?? null
+  const mediaPreview = mediaPreviews[activeSheetId ?? ''] ?? null
+  const setMediaFile = (file: File | null) => {
+    if (!activeSheetId) return
+    setMediaFiles(prev => ({ ...prev, [activeSheetId]: file }))
+  }
+  const setMediaPreview = (url: string | null) => {
+    if (!activeSheetId) return
+    setMediaPreviews(prev => ({ ...prev, [activeSheetId]: url }))
+  }
+
   const [copied, setCopied] = useState(false)
   const [numbersCopied, setNumbersCopied] = useState(false)
   const [numbersBatchIndex, setNumbersBatchIndex] = useState(0)
   const [lastCopiedBatch, setLastCopiedBatch] = useState<Assignment[]>([])
   const [newSearch, setNewSearch] = useState('')
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
-  const [mediaFile, setMediaFile] = useState<File | null>(null)
-  const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [mediaDragOver, setMediaDragOver] = useState(false)
   const mediaInputRef = useRef<HTMLInputElement>(null)
 
@@ -252,11 +271,6 @@ export default function WhatsAppClient({
     if (!activeSheetId && allSheets.length > 0) setActiveSheetId(allSheets[0].id)
     if (activeSheetId && !allSheets.some(s => s.id === activeSheetId)) setActiveSheetId(allSheets[0]?.id ?? null)
   }, [allSheets, activeSheetId])
-
-  // Photo is scoped to the active sheet's send session — clear it when switching sheets
-  useEffect(() => {
-    setMediaFile(null); setMediaPreview(null)
-  }, [activeSheetId])
 
   // Batch progress is per-sheet — reset when switching sheets
   useEffect(() => {
