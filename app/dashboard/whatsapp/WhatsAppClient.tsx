@@ -116,11 +116,12 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
           es?.close()
         }
         if (data.error === 'timeout') {
-          // Server hit its 55s limit — reconnect immediately to get a fresh QR
+          // Server hit its 55s limit or had a transient close — reconnect for a fresh QR
           es?.close()
           if (!cancelled) connect()
         }
-        if (data.error && data.error !== 'timeout') {
+        if (data.error === 'loggedout') {
+          // Genuine logout — stop retrying, user must re-link
           setQrLoading(false)
           es?.close()
         }

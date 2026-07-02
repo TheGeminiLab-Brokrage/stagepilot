@@ -35,7 +35,9 @@ export async function GET() {
         getMessage: async () => undefined,
       })
 
-      socket.ev.on('creds.update', saveCreds)
+      // Track the latest save so we can await it before confirming connection
+      let lastSave: Promise<void> = Promise.resolve()
+      socket.ev.on('creds.update', () => { lastSave = saveCreds() })
 
       await new Promise<void>((resolve) => {
         socket.ev.on('connection.update', async ({ connection, qr, lastDisconnect }) => {
@@ -47,6 +49,10 @@ export async function GET() {
           }
 
           if (connection === 'open') {
+            // Wait for the credential save to finish before telling the client
+            // they're connected — otherwise a page reload before the DB write
+            // commits will show the QR screen again.
+            await lastSave.catch(() => {})
             const phone = socket.user?.id?.split('@')[0]?.split(':')[0] ?? null
             send(controller, { connected: true, phone })
             resolve()
@@ -57,8 +63,13 @@ export async function GET() {
             const code = (lastDisconnect?.error as any)?.output?.statusCode
             if (code === DisconnectReason.loggedOut) {
               await clearSession(user.id)
+              // Tell client this was a real logout so it stops retrying
+              send(controller, { error: 'loggedout' })
+            } else {
+              // Transient close (network hiccup, server restart, etc.) —
+              // tell client to reconnect and get a fresh QR
+              send(controller, { error: 'timeout' })
             }
-            send(controller, { error: 'closed' })
             resolve()
           }
         })
