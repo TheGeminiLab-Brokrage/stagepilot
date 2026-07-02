@@ -35,6 +35,11 @@ function parsePhoneNumbers(raw: string): string[] {
   return raw.split(/[,/;]+/).map(s => s.trim()).filter(Boolean)
 }
 
+// 4-byte (astral-plane) emoji like 😊 🏠 corrupt into "?" via wa.me?text= — only BMP is safe
+function hasAstralEmoji(text: string): boolean {
+  return /[\u{10000}-\u{10FFFF}]/u.test(text)
+}
+
 async function patchAssignment(id: string, body: Record<string, unknown>) {
   const res = await fetch(`/api/whatsapp/assignments/${id}`, {
     method: 'PATCH',
@@ -259,6 +264,7 @@ export default function WhatsAppClient({
   }
 
   const [copied, setCopied] = useState(false)
+  const [showPasteHint, setShowPasteHint] = useState(false)
   const [numbersCopied, setNumbersCopied] = useState(false)
   const [numbersBatchIndex, setNumbersBatchIndex] = useState(0)
   const [lastCopiedBatch, setLastCopiedBatch] = useState<Assignment[]>([])
@@ -419,15 +425,17 @@ export default function WhatsAppClient({
   }
 
   function openWhatsApp(number: string) {
-    // No ?text= param — confirmed via live test (screenshot) that WhatsApp's own
-    // URL-param handling corrupts every standard emoji into "?" (plain text and
-    // simple bullets survive fine, so it's specifically 4-byte/astral-plane
-    // characters WhatsApp mishandles in this param). Clipboard + manual paste is
-    // the only path that delivers the message intact. Do not re-attempt the URL
-    // param again without a fundamentally different transport (e.g. official
-    // Business API) — this has now been tested and ruled out twice.
-    navigator.clipboard.writeText(messageText).catch(() => {})
-    window.open(`https://wa.me/${toWaNumber(number)}`, '_blank')
+    if (hasAstralEmoji(messageText)) {
+      // Astral-plane emoji (😊 🏠 etc.) corrupt into "?" via ?text= — confirmed
+      // in two live tests. Clipboard fallback only; show paste hint so agent knows.
+      navigator.clipboard.writeText(messageText).catch(() => {})
+      setShowPasteHint(true)
+      setTimeout(() => setShowPasteHint(false), 6000)
+      window.open(`https://wa.me/${toWaNumber(number)}`, '_blank')
+    } else {
+      // Plain text / BMP-only message — pre-fill via URL so agent just taps Send.
+      window.open(`https://wa.me/${toWaNumber(number)}?text=${encodeURIComponent(messageText)}`, '_blank')
+    }
   }
 
   async function copyMessage() {
@@ -883,6 +891,11 @@ export default function WhatsAppClient({
                               {editableNumbers.length > 1 ? `Open ${num} in WhatsApp ↗` : 'Open in WhatsApp ↗'}
                             </button>
                           ))}
+                          {showPasteHint && (
+                            <div style={{ fontSize: 12, color: '#92400e', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 12px' }}>
+                              Message copied — paste it in WhatsApp and tap <strong>Send</strong>.
+                            </div>
+                          )}
                         </>
                       )}
 
