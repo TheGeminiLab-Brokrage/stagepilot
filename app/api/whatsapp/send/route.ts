@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createSupabaseAuthState, hasSession, clearSession } from '@/lib/whatsapp/session'
 import { getBaileysVersion } from '@/lib/whatsapp/version'
 
-// 20s connection timeout + send time + 2s flush window
+// 20s connection timeout + send time + 5s SERVER_ACK window
 export const maxDuration = 30
 
 export async function POST(req: Request) {
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   try {
     const { default: makeWASocket, DisconnectReason } = await import('@whiskeysockets/baileys')
     const { default: pino } = await import('pino')
-    const logger = pino({ level: 'silent' })
+    const logger = pino({ level: 'warn' })
 
     const { state, saveCreds } = await createSupabaseAuthState(user.id)
     const version = await getBaileysVersion()
@@ -76,6 +76,7 @@ export async function POST(req: Request) {
         if (connection === 'open') {
           clearTimeout(timeout)
           opened = true
+          console.log('[WA-SEND] opened, user:', socket!.user?.id ?? 'NONE')
           resolve()
           return
         }
@@ -104,7 +105,12 @@ export async function POST(req: Request) {
       })
     })
 
+    if (!socket!.user?.id) {
+      throw new Error('WhatsApp session credentials not accepted — please re-scan the QR code in the Login tab')
+    }
+
     // Send to each phone number for this contact
+    const sentIds = new Set<string>()
     for (const phone of phones) {
       const digits = phone.replace(/\D/g, '')
       // Egyptian numbers: 01XXXXXXXXXX → 201XXXXXXXXXX@s.whatsapp.net
@@ -112,13 +118,30 @@ export async function POST(req: Request) {
       const msgContent = imageBase64
         ? { image: Buffer.from(imageBase64, 'base64'), mimetype: imageMimeType as string, caption: message }
         : { text: message }
-      await socket.sendMessage(`${normalized}@s.whatsapp.net`, msgContent)
+      const result = await socket.sendMessage(`${normalized}@s.whatsapp.net`, msgContent)
+      if (result?.key?.id) sentIds.add(result.key.id)
+      console.log('[WA-SEND] queued to', normalized, 'msgId:', result?.key?.id)
     }
 
-    // Wait 2s so Baileys can flush outbound WebSocket data AND so any pending
-    // connection.update close events have time to arrive and set dropError.
-    await new Promise(r => setTimeout(r, 2000))
+    // Wait for WhatsApp SERVER_ACK (status >= 2) on every sent message, up to 5s.
+    // This confirms the message reached WhatsApp's servers, not just Baileys' local
+    // queue — catching the "ghost connection" case where sendMessage resolves but
+    // the session is stale and the message is silently dropped.
+    const remaining = new Set(sentIds)
+    await new Promise<void>(resolve => {
+      const t = setTimeout(resolve, 5000)
+      if (remaining.size === 0) { clearTimeout(t); resolve(); return }
+      socket!.ev.on('messages.update', updates => {
+        for (const { key, update } of updates) {
+          if (key?.id && remaining.has(key.id) && (update?.status ?? 0) >= 2) {
+            remaining.delete(key.id)
+            if (remaining.size === 0) { clearTimeout(t); resolve() }
+          }
+        }
+      })
+    })
 
+    console.log('[WA-SEND] post-wait, unacked:', remaining.size, 'dropError:', dropError ? dropError.message : null)
     if (dropError) throw dropError
   } catch (err) {
     try { socket?.end(new Error('error')) } catch { /* ignore */ }
