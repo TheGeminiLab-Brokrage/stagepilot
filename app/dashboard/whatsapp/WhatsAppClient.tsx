@@ -81,6 +81,8 @@ export default function WhatsAppClient({
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [qrLoading, setQrLoading] = useState(false)
   const [sendingId, setSendingId] = useState<string | null>(null)
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
+  const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const [autoSendInterval, setAutoSendInterval] = useState<number | null>(null)
   const [autoSendDropdownOpen, setAutoSendDropdownOpen] = useState(false)
   const autoSendIntervalRef = useRef<number | null>(null)
@@ -206,6 +208,9 @@ export default function WhatsAppClient({
       setSelectedAssignmentId(null)
       setNewSearch('')
       if (isLast && activeSheetId) refill(activeSheetId)
+      // Start 30-second cooldown so the agent pauses before sending to the next client
+      setCooldownUntil(Date.now() + 30000)
+      setCooldownRemaining(30)
       if (autoSendIntervalRef.current !== null) {
         autoSendTimerRef.current = setTimeout(() => {
           sendViaWhatsAppRef.current()
@@ -254,14 +259,14 @@ export default function WhatsAppClient({
   }
   const mediaFile = mediaFiles[activeSheetId ?? ''] ?? null
   const mediaPreview = mediaPreviews[activeSheetId ?? ''] ?? null
-  const setMediaFile = (file: File | null) => {
+  const setMediaFile = useCallback((file: File | null) => {
     if (!activeSheetId) return
     setMediaFiles(prev => ({ ...prev, [activeSheetId]: file }))
-  }
-  const setMediaPreview = (url: string | null) => {
+  }, [activeSheetId])
+  const setMediaPreview = useCallback((url: string | null) => {
     if (!activeSheetId) return
     setMediaPreviews(prev => ({ ...prev, [activeSheetId]: url }))
-  }
+  }, [activeSheetId])
 
   const [copied, setCopied] = useState(false)
   const [showPasteHint, setShowPasteHint] = useState(false)
@@ -293,6 +298,19 @@ export default function WhatsAppClient({
     setNewSearch(''); setSelectedAssignmentId(null)
   }, [activeSheetId])
 
+  // Cooldown countdown — ticks every 200ms until the 30s window expires
+  useEffect(() => {
+    if (!cooldownUntil) return
+    const tick = () => {
+      const remaining = Math.ceil((cooldownUntil - Date.now()) / 1000)
+      if (remaining <= 0) { setCooldownUntil(null); setCooldownRemaining(0) }
+      else setCooldownRemaining(remaining)
+    }
+    tick()
+    const id = setInterval(tick, 200)
+    return () => clearInterval(id)
+  }, [cooldownUntil])
+
   // Keep ref in sync so timer callbacks always see the latest interval value
   useEffect(() => {
     autoSendIntervalRef.current = autoSendInterval
@@ -306,10 +324,12 @@ export default function WhatsAppClient({
     }
   }, [refillDone, autoSendInterval])
 
-  // Reset auto-send when switching sheets
+  // Reset auto-send and cooldown when switching sheets
   useEffect(() => {
     setAutoSendInterval(null)
     setAutoSendDropdownOpen(false)
+    setCooldownUntil(null)
+    setCooldownRemaining(0)
     if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current)
   }, [activeSheetId])
 
@@ -333,7 +353,7 @@ export default function WhatsAppClient({
   const handleMediaSelect = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return
     setMediaFile(file); setMediaPreview(URL.createObjectURL(file))
-  }, [])
+  }, [setMediaFile, setMediaPreview])
 
   const handleMediaDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setMediaDragOver(false)
@@ -793,15 +813,15 @@ export default function WhatsAppClient({
                           {/* Primary send button */}
                           <button
                             onClick={sendViaWhatsApp}
-                            disabled={!messageText.trim() || !!sendingId}
+                            disabled={!messageText.trim() || !!sendingId || !!cooldownUntil}
                             style={{
                               flex: 1, padding: '14px', borderRadius: 8, border: 'none',
-                              background: messageText.trim() ? NEON : 'rgba(215,255,0,0.25)',
+                              background: messageText.trim() && !cooldownUntil ? NEON : 'rgba(215,255,0,0.25)',
                               color: '#000', fontWeight: 700, fontSize: 15,
-                              cursor: messageText.trim() && !sendingId ? 'pointer' : 'not-allowed', ...fontDisplay,
+                              cursor: messageText.trim() && !sendingId && !cooldownUntil ? 'pointer' : 'not-allowed', ...fontDisplay,
                             }}
                           >
-                            {sendingId === current.id ? 'Sending…' : 'Send via WhatsApp'}
+                            {sendingId === current.id ? 'Sending…' : cooldownUntil ? `Wait ${cooldownRemaining}s…` : 'Send via WhatsApp'}
                           </button>
 
                           {/* Auto Send toggle + dropdown */}
