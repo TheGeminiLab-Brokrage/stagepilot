@@ -143,6 +143,12 @@ export async function POST(req: Request) {
 
     console.log('[WA-SEND] post-wait, unacked:', remaining.size, 'dropError:', String(dropError))
     if (dropError) throw dropError
+    // If WhatsApp never ACKed the message (e.g. error 463 — recipient has restrictions,
+    // or ghost-connection where session accepted the socket but dropped the message),
+    // surface it as an error so the contact is NOT marked sent in the DB.
+    if (remaining.size > 0) {
+      throw new Error('Message was not delivered — the recipient may have restrictions on receiving messages, or your WhatsApp session needs re-scanning')
+    }
   } catch (err) {
     try { socket?.end(new Error('error')) } catch { /* ignore */ }
     return NextResponse.json(
