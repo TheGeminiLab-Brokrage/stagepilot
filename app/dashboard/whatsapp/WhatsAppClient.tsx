@@ -70,6 +70,12 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [qrLoading, setQrLoading] = useState(false)
   const [sendingId, setSendingId] = useState<string | null>(null)
+  const [autoSendInterval, setAutoSendInterval] = useState<number | null>(null)
+  const [autoSendDropdownOpen, setAutoSendDropdownOpen] = useState(false)
+  const autoSendIntervalRef = useRef<number | null>(null)
+  const autoSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoSendDropdownRef = useRef<HTMLDivElement>(null)
+  const sendViaWhatsAppRef = useRef<() => Promise<void>>(() => Promise.resolve())
 
   // Check session status on mount
   useEffect(() => {
@@ -189,12 +195,20 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
       setSelectedAssignmentId(null)
       setNewSearch('')
       if (isLast && activeSheetId) refill(activeSheetId)
+      if (autoSendIntervalRef.current !== null) {
+        autoSendTimerRef.current = setTimeout(() => {
+          sendViaWhatsAppRef.current()
+        }, autoSendIntervalRef.current)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send')
+      setAutoSendInterval(null)
+      if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current)
     } finally {
       setSendingId(null)
     }
   }
+  sendViaWhatsAppRef.current = sendViaWhatsApp
 
   // --- Sheet / batch / search state ---
   const newSheets = useMemo(() => {
@@ -240,6 +254,43 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   useEffect(() => {
     setNewSearch(''); setSelectedAssignmentId(null)
   }, [activeSheetId])
+
+  // Keep ref in sync so timer callbacks always see the latest interval value
+  useEffect(() => {
+    autoSendIntervalRef.current = autoSendInterval
+  }, [autoSendInterval])
+
+  // Stop auto-send when all contacts are exhausted
+  useEffect(() => {
+    if (refillDone && autoSendInterval !== null) {
+      setAutoSendInterval(null)
+      if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current)
+    }
+  }, [refillDone, autoSendInterval])
+
+  // Reset auto-send when switching sheets
+  useEffect(() => {
+    setAutoSendInterval(null)
+    setAutoSendDropdownOpen(false)
+    if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current)
+  }, [activeSheetId])
+
+  // Clear pending timer on unmount
+  useEffect(() => {
+    return () => { if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current) }
+  }, [])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!autoSendDropdownOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (autoSendDropdownRef.current && !autoSendDropdownRef.current.contains(e.target as Node)) {
+        setAutoSendDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [autoSendDropdownOpen])
 
   const handleMediaSelect = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return
@@ -674,19 +725,88 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                       {sessionStatus === 'connected' ? (
-                        /* Auto-send: fires through the agent's linked WhatsApp session */
-                        <button
-                          onClick={sendViaWhatsApp}
-                          disabled={!messageText.trim() || sendingId === current.id}
-                          style={{
-                            padding: '14px', borderRadius: 8, border: 'none',
-                            background: messageText.trim() ? NEON : 'rgba(215,255,0,0.25)',
-                            color: '#000', fontWeight: 700, fontSize: 15,
-                            cursor: messageText.trim() ? 'pointer' : 'not-allowed', ...fontDisplay,
-                          }}
-                        >
-                          {sendingId === current.id ? 'Sending…' : 'Send via WhatsApp'}
-                        </button>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          {/* Primary send button */}
+                          <button
+                            onClick={sendViaWhatsApp}
+                            disabled={!messageText.trim() || !!sendingId}
+                            style={{
+                              flex: 1, padding: '14px', borderRadius: 8, border: 'none',
+                              background: messageText.trim() ? NEON : 'rgba(215,255,0,0.25)',
+                              color: '#000', fontWeight: 700, fontSize: 15,
+                              cursor: messageText.trim() && !sendingId ? 'pointer' : 'not-allowed', ...fontDisplay,
+                            }}
+                          >
+                            {sendingId === current.id ? 'Sending…' : 'Send via WhatsApp'}
+                          </button>
+
+                          {/* Auto Send toggle + dropdown */}
+                          <div ref={autoSendDropdownRef} style={{ position: 'relative' }}>
+                            {autoSendInterval === null ? (
+                              <button
+                                onClick={() => setAutoSendDropdownOpen(v => !v)}
+                                disabled={!messageText.trim()}
+                                style={{
+                                  height: '100%', padding: '0 16px', borderRadius: 8,
+                                  border: `1px solid ${NEON_BORDER}`, background: NEON_DIM,
+                                  color: NEON, fontWeight: 600, fontSize: 13,
+                                  cursor: messageText.trim() ? 'pointer' : 'not-allowed',
+                                  whiteSpace: 'nowrap', ...fontDisplay,
+                                }}
+                              >
+                                Auto Send ▾
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setAutoSendInterval(null)
+                                  if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current)
+                                }}
+                                style={{
+                                  height: '100%', padding: '0 16px', borderRadius: 8,
+                                  border: '1px solid rgba(255,80,80,0.35)',
+                                  background: 'rgba(255,80,80,0.08)',
+                                  color: 'rgba(255,120,120,0.9)', fontWeight: 600, fontSize: 13,
+                                  cursor: 'pointer', whiteSpace: 'nowrap', ...fontDisplay,
+                                }}
+                              >
+                                Stop Auto
+                              </button>
+                            )}
+                            {autoSendDropdownOpen && autoSendInterval === null && (
+                              <div style={{
+                                position: 'absolute', right: 0, top: '100%', marginTop: 4,
+                                background: '#111', border: `1px solid ${BORDER}`,
+                                borderRadius: 8, overflow: 'hidden', zIndex: 20, minWidth: 130,
+                              }}>
+                                {([
+                                  { label: '15 sec', ms: 15000 },
+                                  { label: '30 sec', ms: 30000 },
+                                  { label: '1 min',  ms: 60000 },
+                                  { label: '2 min',  ms: 120000 },
+                                ] as const).map(({ label, ms }) => (
+                                  <button
+                                    key={ms}
+                                    onClick={() => {
+                                      setAutoSendInterval(ms)
+                                      setAutoSendDropdownOpen(false)
+                                      sendViaWhatsApp()
+                                    }}
+                                    style={{
+                                      display: 'block', width: '100%', textAlign: 'left',
+                                      padding: '10px 14px', border: 'none',
+                                      borderBottom: `1px solid ${BORDER}`,
+                                      background: 'transparent', color: '#fff',
+                                      fontSize: 13, cursor: 'pointer', ...fontDisplay,
+                                    }}
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       ) : (
                         /* Manual flow when not connected */
                         <>
