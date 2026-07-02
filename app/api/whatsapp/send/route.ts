@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createSupabaseAuthState, hasSession } from '@/lib/whatsapp/session'
+import { createSupabaseAuthState, hasSession, clearSession } from '@/lib/whatsapp/session'
 import { getBaileysVersion } from '@/lib/whatsapp/version'
 
-// Allow up to 35s: 20s connection timeout + send time + 3s flush delay
-export const maxDuration = 35
+// 20s connection timeout + send time + 2s flush window
+export const maxDuration = 30
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   let socket: Awaited<ReturnType<typeof import('@whiskeysockets/baileys').default>> | null = null
 
   try {
-    const { default: makeWASocket } = await import('@whiskeysockets/baileys')
+    const { default: makeWASocket, DisconnectReason } = await import('@whiskeysockets/baileys')
     const { default: pino } = await import('pino')
     const logger = pino({ level: 'silent' })
 
@@ -63,12 +63,44 @@ export async function POST(req: Request) {
 
     socket.ev.on('creds.update', saveCreds)
 
-    // Wait for reconnection using stored credentials (no QR needed)
+    // dropError captures connection drops that happen AFTER the socket opens —
+    // WhatsApp sends an immediate close when a session has expired, which arrives
+    // after the 'open' event and causes sendMessage to silently fail to deliver.
+    let dropError: Error | null = null
+
     await new Promise<void>((resolve, reject) => {
+      let opened = false
       const timeout = setTimeout(() => reject(new Error('Connection timeout — try again')), 20000)
-      socket!.ev.on('connection.update', ({ connection }) => {
-        if (connection === 'open') { clearTimeout(timeout); resolve() }
-        if (connection === 'close') { clearTimeout(timeout); reject(new Error('Connection closed — re-scan the QR code in the Login tab')) }
+
+      socket!.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
+        if (connection === 'open') {
+          clearTimeout(timeout)
+          opened = true
+          resolve()
+          return
+        }
+        if (connection === 'close') {
+          clearTimeout(timeout)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const code = (lastDisconnect?.error as any)?.output?.statusCode
+          const loggedOut = code === DisconnectReason.loggedOut
+
+          if (loggedOut) {
+            // Stale session — wipe it so UI transitions to disconnected on next check
+            await clearSession(user.id).catch(() => {})
+          }
+
+          const msg = loggedOut
+            ? 'WhatsApp session expired — please re-scan the QR code in the Login tab'
+            : 'Connection closed — please try again or re-scan the QR code'
+
+          if (!opened) {
+            reject(new Error(msg))
+          } else {
+            // Dropped right after connecting; capture so we can surface it after send
+            dropError = new Error(msg)
+          }
+        }
       })
     })
 
@@ -83,10 +115,11 @@ export async function POST(req: Request) {
       await socket.sendMessage(`${normalized}@s.whatsapp.net`, msgContent)
     }
 
-    // Give Baileys time to flush the sent message over the WebSocket before
-    // we tear down the socket — without this delay the socket can close before
-    // the queued bytes are transmitted and the message silently never arrives.
-    await new Promise(r => setTimeout(r, 3000))
+    // Wait 2s so Baileys can flush outbound WebSocket data AND so any pending
+    // connection.update close events have time to arrive and set dropError.
+    await new Promise(r => setTimeout(r, 2000))
+
+    if (dropError) throw dropError
   } catch (err) {
     try { socket?.end(new Error('error')) } catch { /* ignore */ }
     return NextResponse.json(

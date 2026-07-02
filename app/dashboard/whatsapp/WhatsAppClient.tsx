@@ -201,7 +201,11 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
         }, autoSendIntervalRef.current)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send')
+      const msg = err instanceof Error ? err.message : 'Failed to send'
+      setError(msg)
+      if (msg.toLowerCase().includes('session expired') || msg.toLowerCase().includes('re-scan')) {
+        setSessionStatus('disconnected')
+      }
       setAutoSendInterval(null)
       if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current)
     } finally {
