@@ -141,7 +141,7 @@ export async function POST(req: Request) {
       })
     })
 
-    console.log('[WA-SEND] post-wait, unacked:', remaining.size, 'dropError:', dropError ? dropError.message : null)
+    console.log('[WA-SEND] post-wait, unacked:', remaining.size, 'dropError:', String(dropError))
     if (dropError) throw dropError
   } catch (err) {
     try { socket?.end(new Error('error')) } catch { /* ignore */ }
