@@ -480,16 +480,18 @@ export default function WhatsAppClient({
   }
 
   function downloadClientsExcel() {
-    const rows = assignments.map(a => ({
-      'Client Name': a.contact.client_name ?? '',
-      'Phone': a.contact.phone,
-      'Sheet': a.sheet.name,
-      'Cycle': a.cycle,
-      'Status': a.response_status === 'answered' ? 'Answered'
-              : a.response_status === 'not_answered' ? 'Not Answered'
-              : 'Pending',
-      'Sent At': a.sent_at ? new Date(a.sent_at).toLocaleString() : '',
-    }))
+    const rows = assignments
+      .filter(a => a.sheet.id === activeSheetId && a.cycle === a.sheet.current_cycle)
+      .map(a => ({
+        'Client Name': a.contact.client_name ?? '',
+        'Phone': a.contact.phone,
+        'Sheet': a.sheet.name,
+        'Cycle': a.cycle,
+        'Status': a.response_status === 'answered' ? 'Answered'
+                : a.response_status === 'not_answered' ? 'Not Answered'
+                : 'Pending',
+        'Sent At': a.sent_at ? new Date(a.sent_at).toLocaleString() : '',
+      }))
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'My Clients')
