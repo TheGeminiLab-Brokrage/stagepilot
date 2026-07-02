@@ -4,8 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createSupabaseAuthState, hasSession } from '@/lib/whatsapp/session'
 import { getBaileysVersion } from '@/lib/whatsapp/version'
 
-// Allow up to 30s for reconnect + send
-export const maxDuration = 30
+// Allow up to 35s: 20s connection timeout + send time + 3s flush delay
+export const maxDuration = 35
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -82,6 +82,11 @@ export async function POST(req: Request) {
         : { text: message }
       await socket.sendMessage(`${normalized}@s.whatsapp.net`, msgContent)
     }
+
+    // Give Baileys time to flush the sent message over the WebSocket before
+    // we tear down the socket — without this delay the socket can close before
+    // the queued bytes are transmitted and the message silently never arrives.
+    await new Promise(r => setTimeout(r, 3000))
   } catch (err) {
     try { socket?.end(new Error('error')) } catch { /* ignore */ }
     return NextResponse.json(
