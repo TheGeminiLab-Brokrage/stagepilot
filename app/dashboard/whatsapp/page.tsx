@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import WhatsAppClient from './WhatsAppClient'
 
 export default async function WhatsAppPage() {
@@ -32,5 +33,18 @@ export default async function WhatsAppPage() {
     sheet: Array.isArray(a.sheet) ? a.sheet[0] : a.sheet,
   })).filter(a => a.contact && a.sheet)
 
-  return <WhatsAppClient initialAssignments={assignments} />
+  // Fetch sheets this agent is explicitly assigned to (for the sheet switcher)
+  const adminClient = createAdminClient()
+  const { data: agentSheetRows } = await adminClient
+    .from('whatsapp_sheet_agents')
+    .select('sheet_id, sheet:whatsapp_sheets!sheet_id(id, name, current_cycle)')
+    .eq('agent_id', user.id)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const assignedSheets = (agentSheetRows ?? []).map((r: any) => {
+    const s = Array.isArray(r.sheet) ? r.sheet[0] : r.sheet
+    return { id: s?.id ?? r.sheet_id, name: s?.name ?? '', current_cycle: s?.current_cycle ?? 0 }
+  }).filter((s: { name: string }) => s.name)
+
+  return <WhatsAppClient initialAssignments={assignments} assignedSheets={assignedSheets} />
 }

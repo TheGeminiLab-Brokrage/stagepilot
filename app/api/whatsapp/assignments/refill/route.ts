@@ -42,6 +42,18 @@ export async function POST(req: Request) {
 
   if (!sheet) return NextResponse.json({ error: 'Sheet not found' }, { status: 404 })
 
+  // If sheet has specific agent assignments, verify this agent is one of them
+  const { data: sheetAgents } = await adminClient
+    .from('whatsapp_sheet_agents')
+    .select('agent_id')
+    .eq('sheet_id', sheetId)
+
+  if (sheetAgents && sheetAgents.length > 0) {
+    if (!sheetAgents.some(r => r.agent_id === user.id)) {
+      return NextResponse.json({ error: 'You are not assigned to this sheet' }, { status: 403 })
+    }
+  }
+
   // Get all contact_ids already claimed by any agent for this sheet
   const { data: claimed } = await adminClient
     .from('whatsapp_assignments')

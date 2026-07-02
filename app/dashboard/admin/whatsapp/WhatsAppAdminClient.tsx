@@ -49,6 +49,7 @@ interface SheetDetail {
   sheet: { id: string; name: string; current_cycle: number; created_at: string }
   contacts: ContactRow[]
   assignments: AssignmentRow[]
+  assigned_agents: { id: string; full_name: string }[]
 }
 
 function oneOf<T>(v: T | T[] | null): T | null {
@@ -117,6 +118,11 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
   const [page, setPage] = useState(1)
   const [messageModalContact, setMessageModalContact] = useState<{ contact: ContactRow; assignment: AssignmentRow | null } | null>(null)
 
+  const [sheetAgentList, setSheetAgentList] = useState<(AgentSetting & { assigned: boolean })[]>([])
+  const [checkedAgentIds, setCheckedAgentIds] = useState<Set<string>>(new Set())
+  const [savingAgents, setSavingAgents] = useState(false)
+  const [agentAssignmentError, setAgentAssignmentError] = useState<string | null>(null)
+
   const loadDetail = useCallback(async (sheetId: string) => {
     setLoadingDetail(true)
     setError(null)
@@ -126,6 +132,14 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
       if (!res.ok) throw new Error(data.error ?? 'Failed to load sheet')
       setDetail(data)
       setCycleFilter(data.sheet.current_cycle || 1)
+
+      const agentsRes = await fetch(`/api/whatsapp/admin/sheets/${sheetId}/agents`)
+      const agentsData = await agentsRes.json()
+      if (agentsRes.ok) {
+        const list: (AgentSetting & { assigned: boolean })[] = agentsData.agents ?? []
+        setSheetAgentList(list)
+        setCheckedAgentIds(new Set(list.filter(a => a.assigned).map(a => a.id)))
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load sheet')
     } finally {
@@ -174,6 +188,24 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
 
     const label = cycleFilter ? `cycle${cycleFilter}` : 'all-cycles'
     XLSX.writeFile(wb, `${detail.sheet.name}-${label}-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
+  async function handleSaveAgentAssignment() {
+    if (!selectedId) return
+    setSavingAgents(true)
+    setAgentAssignmentError(null)
+    try {
+      const res = await fetch(`/api/whatsapp/admin/sheets/${selectedId}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_ids: Array.from(checkedAgentIds) }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to save')
+    } catch (err) {
+      setAgentAssignmentError(err instanceof Error ? err.message : 'Failed to save')
+    } finally {
+      setSavingAgents(false)
+    }
   }
 
   async function handleRandomize() {
@@ -409,6 +441,59 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                   <StatCard label="Current Cycle" value={detail.sheet.current_cycle} />
                   <StatCard label="Answered (all cycles)" value={detail.assignments.filter(a => a.response_status === 'answered').length} />
                   <StatCard label="First Responses" value={detail.contacts.filter(c => c.first_response_at).length} />
+                </div>
+
+                <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: MUTED, ...fontDisplay, letterSpacing: '0.05em', marginBottom: 12 }}>
+                    ASSIGNED AGENTS
+                    <span style={{ marginLeft: 8, fontWeight: 400, color: checkedAgentIds.size === 0 ? NEON : MUTED }}>
+                      {checkedAgentIds.size === 0 ? '(All active agents)' : `(${checkedAgentIds.size} specific)`}
+                    </span>
+                  </div>
+                  {agentAssignmentError && (
+                    <div style={{ color: '#ff8080', fontSize: 12, marginBottom: 10 }}>{agentAssignmentError}</div>
+                  )}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                    {sheetAgentList.map(a => (
+                      <label key={a.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+                        borderRadius: 6, border: `1px solid ${checkedAgentIds.has(a.id) ? NEON_BORDER : BORDER}`,
+                        background: checkedAgentIds.has(a.id) ? NEON_DIM : 'transparent',
+                        fontSize: 12, color: checkedAgentIds.has(a.id) ? '#fff' : MUTED, cursor: 'pointer',
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={checkedAgentIds.has(a.id)}
+                          onChange={() => setCheckedAgentIds(prev => {
+                            const next = new Set(prev)
+                            if (next.has(a.id)) next.delete(a.id); else next.add(a.id)
+                            return next
+                          })}
+                          style={{ accentColor: NEON }}
+                        />
+                        {a.full_name}
+                        {!a.whatsapp_active && <span style={{ color: MUTED, fontSize: 10, marginLeft: 4 }}>(inactive)</span>}
+                      </label>
+                    ))}
+                    {sheetAgentList.length === 0 && (
+                      <span style={{ fontSize: 12, color: MUTED }}>No agents found.</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button
+                      onClick={handleSaveAgentAssignment}
+                      disabled={savingAgents}
+                      style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: NEON,
+                               color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer', ...fontDisplay }}
+                    >
+                      {savingAgents ? 'Saving…' : 'Save Assignment'}
+                    </button>
+                    <span style={{ fontSize: 11, color: MUTED }}>
+                      {checkedAgentIds.size === 0
+                        ? 'No agents checked → all active agents receive contacts on randomize'
+                        : `Only checked agents receive contacts from this sheet`}
+                    </span>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>

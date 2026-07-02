@@ -46,7 +46,13 @@ async function patchAssignment(id: string, body: Record<string, unknown>) {
   return data
 }
 
-export default function WhatsAppClient({ initialAssignments }: { initialAssignments: Assignment[] }) {
+export default function WhatsAppClient({
+  initialAssignments,
+  assignedSheets = [],
+}: {
+  initialAssignments: Assignment[]
+  assignedSheets?: Sheet[]
+}) {
   const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -221,7 +227,15 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
     return [...map.values()]
   }, [newAssignments])
 
-  const [activeSheetId, setActiveSheetId] = useState<string | null>(newSheets[0]?.id ?? null)
+  // Merge assignedSheets (admin-assigned, may be empty of contacts) with newSheets (live data)
+  const allSheets = useMemo(() => {
+    const map = new Map<string, Sheet>()
+    for (const s of assignedSheets) map.set(s.id, s)
+    for (const s of newSheets) map.set(s.id, s) // live data takes priority
+    return [...map.values()]
+  }, [assignedSheets, newSheets])
+
+  const [activeSheetId, setActiveSheetId] = useState<string | null>(allSheets[0]?.id ?? null)
   const [messageText, setMessageText] = useState('')
   const [copied, setCopied] = useState(false)
   const [numbersCopied, setNumbersCopied] = useState(false)
@@ -235,9 +249,9 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
   const mediaInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!activeSheetId && newSheets.length > 0) setActiveSheetId(newSheets[0].id)
-    if (activeSheetId && !newSheets.some(s => s.id === activeSheetId)) setActiveSheetId(newSheets[0]?.id ?? null)
-  }, [newSheets, activeSheetId])
+    if (!activeSheetId && allSheets.length > 0) setActiveSheetId(allSheets[0].id)
+    if (activeSheetId && !allSheets.some(s => s.id === activeSheetId)) setActiveSheetId(allSheets[0]?.id ?? null)
+  }, [allSheets, activeSheetId])
 
   // Photo is scoped to the active sheet's send session — clear it when switching sheets
   useEffect(() => {
@@ -585,15 +599,15 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
               </div>
             )}
 
-            {!isRefilling && newSheets.length === 0 && (
+            {!isRefilling && allSheets.length === 0 && (
               <EmptyState text={refillDone ? 'You\'ve finished all clients for this sheet!' : 'No new contacts assigned right now.'} />
             )}
 
-            {newSheets.length > 0 && (
+            {allSheets.length > 0 && (
               <>
-                {newSheets.length > 1 && (
+                {allSheets.length > 1 && (
                   <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                    {newSheets.map(s => (
+                    {allSheets.map(s => (
                       <button key={s.id} onClick={() => setActiveSheetId(s.id)} style={{
                         padding: '6px 12px', borderRadius: 6, border: `1px solid ${s.id === activeSheetId ? NEON_BORDER : BORDER}`,
                         background: s.id === activeSheetId ? NEON_DIM : 'transparent',
@@ -603,6 +617,24 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                   </div>
                 )}
 
+                {!isRefilling && newForActiveSheet.length === 0 && activeSheetId && (
+                  <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                    <div style={{ color: MUTED, fontSize: 14, marginBottom: 16 }}>
+                      {refillDone ? 'You\'ve finished all clients for this sheet!' : 'No contacts loaded for this sheet yet.'}
+                    </div>
+                    {!refillDone && (
+                      <button
+                        onClick={() => refill(activeSheetId)}
+                        style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: NEON,
+                                 color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer', ...fontDisplay }}
+                      >
+                        Get Contacts
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {newForActiveSheet.length > 0 && (<>
                 <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
                   <label style={{ fontSize: 13, fontWeight: 600, color: '#fff', ...fontDisplay, display: 'block', marginBottom: 10 }}>Message Text</label>
                   <textarea value={messageText} onChange={e => setMessageText(e.target.value)}
@@ -865,6 +897,7 @@ export default function WhatsAppClient({ initialAssignments }: { initialAssignme
                 ) : (
                   <EmptyState text="All new contacts in this sheet have been sent." />
                 )}
+                </>)}
               </>
             )}
           </>

@@ -42,11 +42,40 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   if (sheetErr || !sheet) return NextResponse.json({ error: 'Sheet not found' }, { status: 404 })
 
-  const [{ data: agents, error: agentsErr }, { data: contacts, error: contactsErr }, { data: existing, error: existingErr }] = await Promise.all([
-    adminClient.from('profiles').select('id').eq('company_id', sheet.company_id).eq('role', 'agent').eq('whatsapp_active', true),
+  // Check for sheet-specific agent assignments first
+  const { data: sheetAgents } = await adminClient
+    .from('whatsapp_sheet_agents')
+    .select('agent_id')
+    .eq('sheet_id', id)
+
+  const [{ data: contacts, error: contactsErr }, { data: existing, error: existingErr }] = await Promise.all([
     adminClient.from('whatsapp_contacts').select('id').eq('sheet_id', id),
     adminClient.from('whatsapp_assignments').select('contact_id, agent_id').eq('sheet_id', id),
   ])
+
+  let agents: { id: string }[] | null = null
+  let agentsErr: { message: string } | null = null
+
+  if (sheetAgents && sheetAgents.length > 0) {
+    // Sheet has specific agent assignments — use only those agents
+    const { data, error } = await adminClient
+      .from('profiles')
+      .select('id')
+      .in('id', sheetAgents.map(r => r.agent_id))
+      .eq('role', 'agent')
+    agents = data
+    agentsErr = error
+  } else {
+    // Legacy sheet — fall back to all whatsapp_active agents
+    const { data, error } = await adminClient
+      .from('profiles')
+      .select('id')
+      .eq('company_id', sheet.company_id)
+      .eq('role', 'agent')
+      .eq('whatsapp_active', true)
+    agents = data
+    agentsErr = error
+  }
 
   if (agentsErr) return NextResponse.json({ error: agentsErr.message }, { status: 500 })
   if (contactsErr) return NextResponse.json({ error: contactsErr.message }, { status: 500 })

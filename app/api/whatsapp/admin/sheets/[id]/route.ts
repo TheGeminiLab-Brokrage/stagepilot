@@ -49,7 +49,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   if (assignmentsErr) return NextResponse.json({ error: assignmentsErr.message }, { status: 500 })
 
-  return NextResponse.json({ sheet, contacts: contacts ?? [], assignments: assignments ?? [] })
+  const { data: assignedAgents } = await adminClient
+    .from('whatsapp_sheet_agents')
+    .select('agent_id, agent:profiles!agent_id(id, full_name)')
+    .eq('sheet_id', id)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const assigned_agents = (assignedAgents ?? []).map((r: any) => {
+    const a = Array.isArray(r.agent) ? r.agent[0] : r.agent
+    return { id: a?.id ?? r.agent_id, full_name: a?.full_name ?? '' }
+  })
+
+  return NextResponse.json({ sheet, contacts: contacts ?? [], assignments: assignments ?? [], assigned_agents })
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
