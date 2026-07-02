@@ -332,6 +332,10 @@ export default function WhatsAppClient({
     () => newAssignments.filter(a => a.sheet.id === activeSheetId),
     [newAssignments, activeSheetId]
   )
+  const oldForActiveSheet = useMemo(
+    () => oldAssignments.filter(a => a.sheet.id === activeSheetId),
+    [oldAssignments, activeSheetId]
+  )
   const current = newForActiveSheet.find(a => a.id === selectedAssignmentId) ?? newForActiveSheet[0]
   const currentNumbers = useMemo(() => current ? parsePhoneNumbers(current.contact.phone) : [], [current])
   const totalBatches = Math.max(1, Math.ceil(newForActiveSheet.length / BATCH_SIZE))
@@ -511,8 +515,8 @@ export default function WhatsAppClient({
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-          <TabButton active={tab === 'new'} onClick={() => setTab('new')} label={`New (${newAssignments.length})`} />
-          <TabButton active={tab === 'old'} onClick={() => setTab('old')} label={`Old (${oldAssignments.length})`} />
+          <TabButton active={tab === 'new'} onClick={() => setTab('new')} label={`New (${newForActiveSheet.length})`} />
+          <TabButton active={tab === 'old'} onClick={() => setTab('old')} label={`Old (${oldForActiveSheet.length})`} />
           <TabButton active={tab === 'login'} onClick={() => setTab('login')} label="Login" />
         </div>
 
