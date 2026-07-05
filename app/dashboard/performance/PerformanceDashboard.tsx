@@ -284,9 +284,11 @@ export default function PerformanceDashboard({
     const atDoneDeal          = stageCounts['done deal'] ?? 0
     const lostLeads           = inStage(['lost deal'])
 
-    // % stuck = (count at this stage - count at next stage) / count at this stage
-    const gapRate = (base: number, next: number) =>
-      base > 0 ? Math.max(0, Math.round((base - next) / base * 100)) : 0
+    // % stuck = count at this stage / (count at this stage + count at next stage)
+    const gapRate = (base: number, next: number) => {
+      const total = base + next
+      return total > 0 ? Math.round(base / total * 100) : 0
+    }
 
     // GAP(A) = % of Interested leads that didn't make it to Potential
     const gapA = gapRate(atInterested, atPotential)
