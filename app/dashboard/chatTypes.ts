@@ -15,3 +15,12 @@ export type ChatMessageRow = {
   created_at: string
   read_at: string | null
 }
+
+export type TaskListSummary = {
+  id: string
+  title: string
+  createdAt: string
+  itemsTotal: number
+  itemsRemaining: number
+  mode: 'recipient' | 'owner'
+}

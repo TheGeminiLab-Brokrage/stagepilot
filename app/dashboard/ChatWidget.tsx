@@ -4,20 +4,24 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/language-context'
 import ChatPanel from './ChatPanel'
+import type { ChatRole } from './chatTypes'
 
 const NEON = '#D7FF00'
 
 export default function ChatWidget({
   currentUserId,
   companyId,
+  role,
 }: {
   currentUserId: string
   companyId: string
+  role: ChatRole
 }) {
   const t = useT()
   const [isOpen, setIsOpen] = useState(false)
   const [unreadTotal, setUnreadTotal] = useState(0)
   const [unreadBySender, setUnreadBySender] = useState<Record<string, number>>({})
+  const [pendingTaskListCount, setPendingTaskListCount] = useState(0)
 
   useEffect(() => {
     const supabase = createClient()
@@ -57,6 +61,62 @@ export default function ChatWidget({
     }
   }, [currentUserId])
 
+  useEffect(() => {
+    if (role === 'super_admin') return
+    const supabase = createClient()
+
+    async function loadPendingTaskLists() {
+      const { data: recipientRows } = await supabase
+        .from('task_list_recipients')
+        .select('task_list_id')
+        .eq('recipient_id', currentUserId)
+
+      const listIds = (recipientRows ?? []).map(r => r.task_list_id)
+      if (listIds.length === 0) {
+        setPendingTaskListCount(0)
+        return
+      }
+
+      const { data: items } = await supabase
+        .from('task_list_items')
+        .select('id, task_list_id')
+        .in('task_list_id', listIds)
+
+      const itemIds = (items ?? []).map(i => i.id)
+      const { data: completions } = await supabase
+        .from('task_list_item_completions')
+        .select('task_list_item_id')
+        .eq('recipient_id', currentUserId)
+        .in('task_list_item_id', itemIds)
+
+      const completedSet = new Set((completions ?? []).map(c => c.task_list_item_id))
+      const listsWithRemaining = new Set(
+        (items ?? []).filter(i => !completedSet.has(i.id)).map(i => i.task_list_id)
+      )
+      setPendingTaskListCount(listsWithRemaining.size)
+    }
+
+    loadPendingTaskLists()
+
+    const channel = supabase
+      .channel(`task-inbox-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'task_list_recipients', filter: `recipient_id=eq.${currentUserId}` },
+        loadPendingTaskLists
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'task_list_item_completions', filter: `recipient_id=eq.${currentUserId}` },
+        loadPendingTaskLists
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [currentUserId, role])
+
   function handleThreadRead(contactId: string, count: number) {
     setUnreadTotal(t => Math.max(0, t - count))
     setUnreadBySender(prev => {
@@ -68,7 +128,12 @@ export default function ChatWidget({
     })
   }
 
+  function handleTaskListCompleted() {
+    setPendingTaskListCount(n => Math.max(0, n - 1))
+  }
+
   const badgeText = unreadTotal > 9 ? t('chatUnreadBadgeOverflow') : String(unreadTotal)
+  const taskBadgeText = pendingTaskListCount > 9 ? t('chatUnreadBadgeOverflow') : String(pendingTaskListCount)
 
   return (
     <>
@@ -126,14 +191,41 @@ export default function ChatWidget({
             {badgeText}
           </span>
         )}
+
+        {pendingTaskListCount > 0 && (
+          <span
+            title={t('taskListPendingTooltip')}
+            style={{
+              position: 'absolute',
+              top: -4,
+              left: -4,
+              minWidth: 20,
+              height: 20,
+              padding: '0 5px',
+              borderRadius: 10,
+              background: NEON,
+              color: '#000',
+              fontSize: 11,
+              fontWeight: 700,
+              fontFamily: "'Space Grotesk', sans-serif",
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {taskBadgeText}
+          </span>
+        )}
       </button>
 
       {isOpen && (
         <ChatPanel
           currentUserId={currentUserId}
           companyId={companyId}
+          role={role}
           unreadBySender={unreadBySender}
           onThreadRead={handleThreadRead}
+          onTaskListCompleted={handleTaskListCompleted}
           onClose={() => setIsOpen(false)}
         />
       )}

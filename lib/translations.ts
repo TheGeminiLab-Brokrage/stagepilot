@@ -306,6 +306,27 @@ const en = {
   chatSendButton: 'Send',
   chatBackToContacts: 'Back',
   chatUnreadBadgeOverflow: '9+',
+
+  // ── Task lists ────────────────────────────────────────────────────────────
+  taskListCreateButton: '+ New List',
+  taskListPendingTooltip: 'Task lists',
+  taskListModalTitle: 'New Task List',
+  taskListTitlePlaceholder: 'List title, e.g. To Do List',
+  taskListItemsLabel: 'Items',
+  taskListItemPlaceholder: 'Task item…',
+  taskListAddItemButton: '+ Add item',
+  taskListRemoveItemAria: 'Remove item',
+  taskListRecipientsLabel: 'Send to',
+  taskListRecipientsSearchPlaceholder: 'Search people…',
+  taskListNoRecipientsSelected: 'Select at least one recipient',
+  taskListSubmitButton: 'Send List',
+  taskListSubmitting: 'Sending…',
+  taskListCreateError: 'Could not create the list. Please try again.',
+  taskListEmptyChecklist: 'All tasks complete.',
+  taskListItemCompleteAria: 'Mark complete',
+  taskListProgressOf: 'of',
+  taskListProgressCompletedSuffix: 'completed',
+  taskListOwnerEmptyRecipients: 'No one has been assigned to this list.',
 }
 
 const ar: typeof en = {
@@ -615,6 +636,27 @@ const ar: typeof en = {
   chatSendButton: 'إرسال',
   chatBackToContacts: 'رجوع',
   chatUnreadBadgeOverflow: '+9',
+
+  // ── Task lists ────────────────────────────────────────────────────────────
+  taskListCreateButton: '+ قائمة جديدة',
+  taskListPendingTooltip: 'قوائم المهام',
+  taskListModalTitle: 'قائمة مهام جديدة',
+  taskListTitlePlaceholder: 'عنوان القائمة، مثال: قائمة المهام',
+  taskListItemsLabel: 'المهام',
+  taskListItemPlaceholder: 'بند المهمة…',
+  taskListAddItemButton: '+ إضافة بند',
+  taskListRemoveItemAria: 'إزالة البند',
+  taskListRecipientsLabel: 'إرسال إلى',
+  taskListRecipientsSearchPlaceholder: 'البحث عن شخص…',
+  taskListNoRecipientsSelected: 'اختر مستلمًا واحدًا على الأقل',
+  taskListSubmitButton: 'إرسال القائمة',
+  taskListSubmitting: 'جارٍ الإرسال…',
+  taskListCreateError: 'تعذر إنشاء القائمة. حاول مرة أخرى.',
+  taskListEmptyChecklist: 'تم إنجاز جميع المهام.',
+  taskListItemCompleteAria: 'وضع علامة مكتمل',
+  taskListProgressOf: 'من',
+  taskListProgressCompletedSuffix: 'مكتمل',
+  taskListOwnerEmptyRecipients: 'لم يتم تعيين أحد لهذه القائمة.',
 }
 
 export const translations = { en, ar }

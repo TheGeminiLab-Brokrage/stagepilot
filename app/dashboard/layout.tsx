@@ -50,7 +50,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </div>
 
       {CHAT_ELIGIBLE_ROLES.includes(role) && profile?.company_id && (
-        <ChatWidget currentUserId={user.id} companyId={profile.company_id} />
+        <ChatWidget
+          currentUserId={user.id}
+          companyId={profile.company_id}
+          role={role as 'agent' | 'team_leader' | 'super_admin'}
+        />
       )}
     </LanguageWrapper>
   )

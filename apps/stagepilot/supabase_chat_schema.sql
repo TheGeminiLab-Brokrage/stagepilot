@@ -30,17 +30,32 @@ alter table public.chat_messages enable row level security;
 -- HELPER FUNCTIONS
 -- =============================================
 
--- Is target_id one of the 3 chat-eligible roles, in the caller's company?
--- security definer (mirrors my_role()/my_team() style) so it can read a
--- counterpart's profile row even when the caller's own profiles RLS
--- policies wouldn't otherwise expose it to them directly.
+-- Is target a valid chat partner for the caller? super_admin talks to
+-- everyone; everyone talks to super_admin; team_leaders talk to each other
+-- cross-team; otherwise partner must share the caller's team_name (this is
+-- also how an agent reaches their own team_leader, since a team_leader's
+-- team_name is set to their own full_name — see create-user route).
+create or replace function public.is_chat_partner_of(target_role text, target_team text)
+returns boolean language sql stable security definer as $$
+  select public.my_role() = 'super_admin'
+      or target_role = 'super_admin'
+      or (public.my_role() = 'team_leader' and target_role = 'team_leader')
+      or target_team = public.my_team()
+$$;
+
+-- Is target_id one of the 3 chat-eligible roles, in the caller's company,
+-- and a valid chat partner per is_chat_partner_of? security definer (mirrors
+-- my_role()/my_team() style) so it can read a counterpart's profile row even
+-- when the caller's own profiles RLS policies wouldn't otherwise expose it
+-- to them directly.
 create or replace function public.is_chat_eligible(target_id uuid)
 returns boolean language sql stable security definer as $$
   select exists (
-    select 1 from public.profiles
-    where id = target_id
-      and role in ('agent', 'team_leader', 'super_admin')
-      and company_id = public.my_company_id()
+    select 1 from public.profiles target
+    where target.id = target_id
+      and target.role in ('agent', 'team_leader', 'super_admin')
+      and target.company_id = public.my_company_id()
+      and public.is_chat_partner_of(target.role, target.team_name)
   )
 $$;
 
@@ -115,12 +130,16 @@ create index chat_messages_recipient_created_idx on public.chat_messages (recipi
 -- touching the existing policy, and never exposes
 -- trainee/exam/property_viewer rows to anyone new, nor lets those
 -- excluded roles see anyone new (their my_role() won't match).
+-- is_chat_partner_of() further scopes the roster to team-mates, one's own
+-- team_leader, other team_leaders, and super_admin (see is_chat_eligible
+-- above for the full rationale).
 create policy "chat: eligible roles see company roster"
   on public.profiles for select
   using (
     company_id = public.my_company_id()
     and public.my_role() in ('agent', 'team_leader', 'super_admin')
     and role in ('agent', 'team_leader', 'super_admin')
+    and public.is_chat_partner_of(role, team_name)
   );
 
 -- =============================================

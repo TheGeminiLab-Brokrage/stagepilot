@@ -5,8 +5,8 @@ const SHEET_ID = '1VkX4fDmV-jP8RDotUUX66QntZy760EdFixiOyXqXnk0'
 const SHEET_GID = '858376122'
 const COMPANY_ID = '99128fef-60d3-44d9-b213-d7909a3a7499'
 const ALL_AGENTS = [
-  'Ahmed Mustafa', 'Mariam Ahmed', 'Mohamed Sayed', 'Nourhan Ayman',
-  'Kareem Mohammed', 'Fady Fawzy', 'Mohamed Shabaan', 'Taher',
+  'Mariam Ahmed', 'Mohamed Sayed', 'Nourhan Ayman',
+  'Fady Fawzy', 'Mohamed Shabaan',
   'Yasmine', 'Hadeer', 'Shahd', 'Amira',
 ]
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
