@@ -4,19 +4,14 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/language-context'
 import ChatPanel from './ChatPanel'
-import type { ChatRole } from './chatTypes'
 
 const NEON = '#D7FF00'
 
 export default function ChatWidget({
   currentUserId,
-  role,
-  teamName,
   companyId,
 }: {
   currentUserId: string
-  role: ChatRole
-  teamName: string | null
   companyId: string
 }) {
   const t = useT()
@@ -137,8 +132,6 @@ export default function ChatWidget({
         <ChatPanel
           currentUserId={currentUserId}
           companyId={companyId}
-          role={role}
-          teamName={teamName}
           unreadBySender={unreadBySender}
           onThreadRead={handleThreadRead}
           onClose={() => setIsOpen(false)}

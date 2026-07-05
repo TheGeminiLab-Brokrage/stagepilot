@@ -4,44 +4,45 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/language-context'
 import ChatThread from './ChatThread'
-import type { ChatContact, ChatRole } from './chatTypes'
+import type { ChatContact } from './chatTypes'
 
 const NEON = '#D7FF00'
 const CARD = 'rgba(255,255,255,0.03)'
 const BORDER = 'rgba(255,255,255,0.08)'
 const MUTED = 'rgba(255,255,255,0.4)'
 
-function groupContacts(contacts: ChatContact[], myTeamName: string | null, myRole: ChatRole) {
-  const leadership = contacts.filter(
-    c => c.role === 'super_admin' || (c.role === 'team_leader' && !!myTeamName && c.full_name === myTeamName)
-  )
-  const team =
-    myRole === 'agent' ? contacts.filter(c => c.role === 'agent' && c.team_name === myTeamName) : []
-  const leadershipIds = new Set(leadership.map(c => c.id))
-  const teamIds = new Set(team.map(c => c.id))
-  const rest = contacts.filter(c => !leadershipIds.has(c.id) && !teamIds.has(c.id))
-  return { leadership, team, rest }
+function sortContacts(contacts: ChatContact[], lastMessageAt: Record<string, string>) {
+  const pinned = contacts
+    .filter(c => c.role === 'super_admin')
+    .sort((a, b) => a.full_name.localeCompare(b.full_name))
+
+  const rest = contacts.filter(c => c.role !== 'super_admin')
+  const withHistory = rest
+    .filter(c => lastMessageAt[c.id])
+    .sort((a, b) => new Date(lastMessageAt[b.id]).getTime() - new Date(lastMessageAt[a.id]).getTime())
+  const withoutHistory = rest
+    .filter(c => !lastMessageAt[c.id])
+    .sort((a, b) => a.full_name.localeCompare(b.full_name))
+
+  return [...pinned, ...withHistory, ...withoutHistory]
 }
 
 export default function ChatPanel({
   currentUserId,
   companyId,
-  role,
-  teamName,
   unreadBySender,
   onThreadRead,
   onClose,
 }: {
   currentUserId: string
   companyId: string
-  role: ChatRole
-  teamName: string | null
   unreadBySender: Record<string, number>
   onThreadRead: (contactId: string, count: number) => void
   onClose: () => void
 }) {
   const t = useT()
   const [contacts, setContacts] = useState<ChatContact[]>([])
+  const [lastMessageAt, setLastMessageAt] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<ChatContact | null>(null)
@@ -56,27 +57,60 @@ export default function ChatPanel({
 
   useEffect(() => {
     const supabase = createClient()
-    supabase
-      .from('profiles')
-      .select('id, full_name, role, team_name')
-      .eq('company_id', companyId)
-      .in('role', ['agent', 'team_leader', 'super_admin'])
-      .neq('id', currentUserId)
-      .order('full_name', { ascending: true })
-      .then(({ data }) => {
-        setContacts((data ?? []) as ChatContact[])
-        setLoading(false)
-      })
+
+    async function loadContacts() {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, role, team_name')
+        .eq('company_id', companyId)
+        .in('role', ['agent', 'team_leader', 'super_admin'])
+        .neq('id', currentUserId)
+        .order('full_name', { ascending: true })
+      setContacts((data ?? []) as ChatContact[])
+      setLoading(false)
+    }
+
+    async function loadLastMessageTimes() {
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('sender_id, recipient_id, created_at')
+        .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
+        .order('created_at', { ascending: false })
+
+      const map: Record<string, string> = {}
+      for (const row of data ?? []) {
+        const counterpartId = row.sender_id === currentUserId ? row.recipient_id : row.sender_id
+        if (!(counterpartId in map)) map[counterpartId] = row.created_at
+      }
+      setLastMessageAt(map)
+    }
+
+    loadContacts()
+    loadLastMessageTimes()
+
+    const channel = supabase
+      .channel(`chat-panel-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `recipient_id=eq.${currentUserId}` },
+        payload => {
+          const row = payload.new as { sender_id: string; created_at: string }
+          setLastMessageAt(prev => ({ ...prev, [row.sender_id]: row.created_at }))
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [companyId, currentUserId])
 
-  const filtered = contacts.filter(c => c.full_name.toLowerCase().includes(search.toLowerCase()))
-  const { leadership, team, rest } = groupContacts(filtered, teamName, role)
+  function handleMessageSent(contactId: string, timestamp: string) {
+    setLastMessageAt(prev => ({ ...prev, [contactId]: timestamp }))
+  }
 
-  const sections: { label: string; items: ChatContact[] }[] = [
-    { label: t('chatSectionLeadership'), items: leadership },
-    { label: t('chatSectionTeam'), items: team },
-    { label: t('chatSectionCompany'), items: rest },
-  ].filter(s => s.items.length > 0)
+  const filtered = contacts.filter(c => c.full_name.toLowerCase().includes(search.toLowerCase()))
+  const ordered = sortContacts(filtered, lastMessageAt)
 
   return (
     <div
@@ -119,6 +153,7 @@ export default function ChatPanel({
             contact={selected}
             onBack={() => setSelected(null)}
             onMessagesRead={onThreadRead}
+            onMessageSent={handleMessageSent}
           />
         ) : (
           <div className="flex flex-col h-full">
@@ -139,42 +174,32 @@ export default function ChatPanel({
             <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2">
               {loading ? (
                 <div className="text-xs" style={{ color: MUTED }}>…</div>
-              ) : sections.length === 0 ? (
+              ) : ordered.length === 0 ? (
                 <div className="text-xs" style={{ color: MUTED }}>{t('chatEmptyContacts')}</div>
               ) : (
-                sections.map(section => (
-                  <div key={section.label} className="mb-3">
-                    <div
-                      className="text-xs font-semibold uppercase mb-1"
-                      style={{ color: MUTED, letterSpacing: '0.06em', fontFamily: "'Space Grotesk', sans-serif" }}
+                ordered.map(c => {
+                  const unread = unreadBySender[c.id] ?? 0
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setSelected(c)}
+                      className="w-full flex items-center justify-between px-2 py-1.5 rounded-md text-sm text-left"
+                      style={{ color: 'white', fontFamily: "'Montserrat', sans-serif" }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
-                      {section.label}
-                    </div>
-                    {section.items.map(c => {
-                      const unread = unreadBySender[c.id] ?? 0
-                      return (
-                        <button
-                          key={c.id}
-                          onClick={() => setSelected(c)}
-                          className="w-full flex items-center justify-between px-2 py-1.5 rounded-md text-sm text-left"
-                          style={{ color: 'white', fontFamily: "'Montserrat', sans-serif" }}
-                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      <span className="truncate">{c.full_name}</span>
+                      {unread > 0 && (
+                        <span
+                          className="text-xs font-semibold px-1.5 rounded-full"
+                          style={{ background: NEON, color: '#000' }}
                         >
-                          <span className="truncate">{c.full_name}</span>
-                          {unread > 0 && (
-                            <span
-                              className="text-xs font-semibold px-1.5 rounded-full"
-                              style={{ background: NEON, color: '#000' }}
-                            >
-                              {unread}
-                            </span>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-                ))
+                          {unread}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })
               )}
             </div>
           </div>

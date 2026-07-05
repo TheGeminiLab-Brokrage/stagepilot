@@ -16,7 +16,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, role, team_name, company_id')
+    .select('full_name, role, company_id')
     .eq('id', user.id)
     .single()
 
@@ -50,12 +50,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </div>
 
       {CHAT_ELIGIBLE_ROLES.includes(role) && profile?.company_id && (
-        <ChatWidget
-          currentUserId={user.id}
-          role={role as 'agent' | 'team_leader' | 'super_admin'}
-          teamName={profile.team_name ?? null}
-          companyId={profile.company_id}
-        />
+        <ChatWidget currentUserId={user.id} companyId={profile.company_id} />
       )}
     </LanguageWrapper>
   )

@@ -305,9 +305,6 @@ const en = {
   chatMessagePlaceholder: 'Type a message…',
   chatSendButton: 'Send',
   chatBackToContacts: 'Back',
-  chatSectionLeadership: 'Leadership',
-  chatSectionTeam: 'Your Team',
-  chatSectionCompany: 'Everyone Else',
   chatUnreadBadgeOverflow: '9+',
 }
 
@@ -617,9 +614,6 @@ const ar: typeof en = {
   chatMessagePlaceholder: 'اكتب رسالة…',
   chatSendButton: 'إرسال',
   chatBackToContacts: 'رجوع',
-  chatSectionLeadership: 'الإدارة',
-  chatSectionTeam: 'فريقك',
-  chatSectionCompany: 'الجميع',
   chatUnreadBadgeOverflow: '+9',
 }
 

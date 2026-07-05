@@ -16,12 +16,14 @@ export default function ChatThread({
   contact,
   onBack,
   onMessagesRead,
+  onMessageSent,
 }: {
   currentUserId: string
   companyId: string
   contact: ChatContact
   onBack: () => void
   onMessagesRead: (contactId: string, count: number) => void
+  onMessageSent: (contactId: string, timestamp: string) => void
 }) {
   const t = useT()
   const supabase = createClient()
@@ -115,7 +117,9 @@ export default function ChatThread({
       .single()
 
     if (!error && data) {
-      setMessages(prev => [...prev, data as ChatMessageRow])
+      const row = data as ChatMessageRow
+      setMessages(prev => [...prev, row])
+      onMessageSent(contact.id, row.created_at)
     }
     setSending(false)
   }
