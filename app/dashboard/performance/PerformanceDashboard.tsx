@@ -15,6 +15,7 @@ type Call = {
   agent_id: string
   team_name: string | null
   agent_full_name: string | null
+  from_stage?: string | null
 }
 
 type CrmRow = Record<string, unknown>
@@ -117,6 +118,15 @@ function Gauge({ value, max }: { value: number; max: number }) {
   )
 }
 
+function StageBadge({ stage }: { stage: string | null | undefined }) {
+  const color = stage ? STAGE_COLORS[stage] : undefined
+  return (
+    <span style={{ background: color ? color + '22' : 'rgba(255,255,255,0.06)', color: color ?? 'rgba(255,255,255,0.5)', border: `1px solid ${color ?? 'rgba(255,255,255,0.1)'}44`, borderRadius: 5, padding: '2px 8px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>
+      {stage ? (STAGE_LABELS[stage] ?? stage) : '—'}
+    </span>
+  )
+}
+
 const cardStyle = { background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', borderRadius: 12 }
 const chipStyle = (active: boolean) => ({ padding: '5px 14px', borderRadius: 6, border: active ? '1px solid rgba(215,255,0,0.6)' : '1px solid rgba(255,255,255,0.12)', background: active ? 'rgba(215,255,0,0.1)' : 'transparent', color: active ? '#D7FF00' : 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", transition: 'all 0.15s' })
 
@@ -143,7 +153,7 @@ export default function PerformanceDashboard({
   const [hiddenStages, setHiddenStages]       = useState<Set<string>>(new Set())
   const [stageDropdownOpen, setStageDropdownOpen] = useState(false)
   const [crmData, setCrmData]                 = useState<CrmDataState>(crmExport ?? null)
-  const [drawer, setDrawer]                   = useState<{ title: string; leads: Call[] } | null>(null)
+  const [drawer, setDrawer]                   = useState<{ title: string; leads: Call[]; showTransition?: boolean } | null>(null)
 
   // Called by CrmStatusChanges whenever data is parsed (drop, upload, or loaded from DB)
   function handleCrmDataChange(data: CrmRow[], dateFrom: string, dateTo: string) {
@@ -154,10 +164,11 @@ export default function PerformanceDashboard({
   const crmDerivedCalls = useMemo((): Call[] | null => {
     if (!crmData?.data?.length) return null
 
-    const latest = new Map<string, { status: string; createdAt: number; changedBy: string; entityName: string }>()
+    const latest = new Map<string, { status: string; fromStatus: string; createdAt: number; changedBy: string; entityName: string }>()
     for (const row of crmData.data) {
       const entityId   = String(row['ENTITY ID'] ?? row['ENTITY_ID'] ?? row['entity_id'] ?? row['ID'] ?? '').trim()
       const toStatus   = decodeStatus(String(row['TO STATUS']  ?? row['TO_STATUS']  ?? row['to_status']  ?? '').trim())
+      const fromStatus = decodeStatus(String(row['FROM STATUS'] ?? row['FROM_STATUS'] ?? row['from_status'] ?? '').trim())
       const createdAt  = new Date(String(row['CREATED AT'] ?? row['CREATED_AT'] ?? row['created_at'] ?? '')).getTime()
       const changedBy  = String(row['CHANGED BY'] ?? row['CHANGED_BY'] ?? row['changed_by'] ?? '')
       const entityName = decodeStatus(String(row['ENTITY NAME'] ?? row['ENTITY_NAME'] ?? row['entity_name'] ?? '').trim())
@@ -165,7 +176,7 @@ export default function PerformanceDashboard({
       if (!entityId || !toStatus) continue
       const existing = latest.get(entityId)
       if (!existing || (!isNaN(createdAt) && createdAt > existing.createdAt)) {
-        latest.set(entityId, { status: toStatus, createdAt, changedBy, entityName })
+        latest.set(entityId, { status: toStatus, fromStatus, createdAt, changedBy, entityName })
       }
     }
 
@@ -173,13 +184,14 @@ export default function PerformanceDashboard({
       console.log('[CRM debug] 0 leads derived — first row keys:', Object.keys(crmData.data[0]))
     }
 
-    return [...latest.entries()].map(([entityId, { status, changedBy, entityName }]) => ({
+    return [...latest.entries()].map(([entityId, { status, fromStatus, changedBy, entityName }]) => ({
       id:             entityId,
       client_name:    entityName || null,
       campaign:       null,
       stage:          CRM_STATUS_MAP[status.toLowerCase()] ?? status.toLowerCase(),
       stage_corrected:null,
       agent_stage:    null,
+      from_stage:     fromStatus ? (CRM_STATUS_MAP[fromStatus.toLowerCase()] ?? fromStatus.toLowerCase()) : null,
       uploaded_at:    crmData.dateFrom,
       agent_id:       changedBy,
       team_name:      null,
@@ -265,22 +277,28 @@ export default function PerformanceDashboard({
   const metrics = useMemo(() => {
     const inStage = (stages: string[]) => stages.reduce((sum, s) => sum + (stageCounts[s] ?? 0), 0)
     const dropped             = inStage(DROPPED_STAGES)
-    const atPotentialOrBeyond = inStage(['potential to close', 'meeting scheduled', 'meeting done', 'done deal'])
     const atInterested        = stageCounts['interested / follow up'] ?? 0
-    const atInterestedOrBeyond= atInterested + atPotentialOrBeyond
-    const atMeetingOrBeyond   = inStage(['meeting scheduled', 'meeting done', 'done deal'])
-    const atMeetingDoneOrDeal = inStage(['meeting done', 'done deal'])
-    const atDoneDeal          = inStage(['done deal'])
+    const atPotential         = stageCounts['potential to close'] ?? 0
+    const atMeetingScheduled  = stageCounts['meeting scheduled'] ?? 0
+    const atMeetingDone       = stageCounts['meeting done'] ?? 0
+    const atDoneDeal          = stageCounts['done deal'] ?? 0
     const lostLeads           = inStage(['lost deal'])
 
-    // GAP(A) = Interested → Potential to Close conversion rate
-    const gapA = atInterestedOrBeyond > 0 ? Math.round(atPotentialOrBeyond  / atInterestedOrBeyond * 100) : 0
-    // GAP(B) = Potential → Meeting Scheduled conversion rate
-    const gapB = atPotentialOrBeyond  > 0 ? Math.round(atMeetingOrBeyond    / atPotentialOrBeyond  * 100) : 0
-    // GAP(C) = Meeting Scheduled → Meeting Done conversion rate
-    const gapC = atMeetingOrBeyond    > 0 ? Math.round(atMeetingDoneOrDeal  / atMeetingOrBeyond    * 100) : 0
-    // GAP(D) = Meeting Done → Done Deal conversion rate
-    const gapD = atMeetingDoneOrDeal  > 0 ? Math.round(atDoneDeal           / atMeetingDoneOrDeal  * 100) : 0
+    const potentialOrBeyond    = atPotential + atMeetingScheduled + atMeetingDone + atDoneDeal
+    const meetingSchedOrBeyond = atMeetingScheduled + atMeetingDone + atDoneDeal
+    const meetingDoneOrBeyond  = atMeetingDone + atDoneDeal
+
+    const gapRate = (base: number, advanced: number) =>
+      base > 0 ? Math.max(0, Math.round((base - advanced) / base * 100)) : 0
+
+    // GAP(A) = % of Interested leads stuck (not yet advanced to Potential or beyond)
+    const gapA = gapRate(atInterested, potentialOrBeyond)
+    // GAP(B) = % of Potential leads stuck (not yet advanced to Meeting Scheduled or beyond)
+    const gapB = gapRate(atPotential, meetingSchedOrBeyond)
+    // GAP(C) = % of Meeting-Scheduled leads stuck (not yet advanced to Meeting Done or beyond)
+    const gapC = gapRate(atMeetingScheduled, meetingDoneOrBeyond)
+    // GAP(D) = % of Meeting-Done leads stuck (not yet advanced to Done Deal)
+    const gapD = gapRate(atMeetingDone, atDoneDeal)
 
     const directToMeeting = isUsingCrm
       ? (crmData?.data ?? []).filter(row => {
@@ -337,8 +355,8 @@ export default function PerformanceDashboard({
 
   const toggleStage = (stage: string) => setHiddenStages(prev => { const next = new Set(prev); next.has(stage) ? next.delete(stage) : next.add(stage); return next })
 
-  function openDrawer(title: string, stages: string[]) {
-    setDrawer({ title, leads: filtered.filter(c => stages.includes(effectiveStage(c))) })
+  function openDrawer(title: string, stages: string[], opts?: { showTransition?: boolean }) {
+    setDrawer({ title, leads: filtered.filter(c => stages.includes(effectiveStage(c))), showTransition: opts?.showTransition })
   }
 
   const kpiCards = [
@@ -481,6 +499,9 @@ export default function PerformanceDashboard({
                   </Pie>
                   {donutData.length > 0 && (
                     <Tooltip
+                      position={{ x: 300, y: 140 }}
+                      allowEscapeViewBox={{ x: true, y: true }}
+                      wrapperStyle={{ zIndex: 20 }}
                       contentStyle={{ background: '#111', border: '1px solid rgba(215,255,0,0.2)', borderRadius: 8, fontSize: 12, color: '#fff' }}
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       formatter={(value: any, name: any) => [`${value} (${donutData.find((d: { name: string }) => d.name === name)?.pct ?? 0}%)`, STAGE_LABELS[name] ?? name]}
@@ -500,7 +521,7 @@ export default function PerformanceDashboard({
           {/* Right: Leads Dropped */}
           <div style={{ ...cardStyle, padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <p style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif" }}>Leads Dropped</p>
-            <div onClick={() => openDrawer('Leads Dropped', ['not interested', 'low budget'])} style={{ display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
+            <div onClick={() => openDrawer('Leads Dropped', ['not interested', 'low budget'], { showTransition: true })} style={{ display: 'flex', justifyContent: 'center', cursor: 'pointer' }}>
               <Gauge value={metrics.dropped} max={total} />
             </div>
             {campaigns.length > 0 && (
@@ -567,7 +588,14 @@ export default function PerformanceDashboard({
                       <th style={{ padding: '8px 16px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>ID</th>
                       {isUsingCrm && <th style={{ padding: '8px 12px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</th>}
                       <th style={{ padding: '8px 12px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Agent</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Stage</th>
+                      {drawer.showTransition ? (
+                        <>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>From Stage</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>To Stage</th>
+                        </>
+                      ) : (
+                        <th style={{ padding: '8px 12px', textAlign: 'left', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Stage</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -584,11 +612,14 @@ export default function PerformanceDashboard({
                         <td style={{ padding: '10px 12px', color: 'rgba(255,255,255,0.6)', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {c.agent_full_name ?? c.agent_id ?? '—'}
                         </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{ background: STAGE_COLORS[effectiveStage(c)] ? STAGE_COLORS[effectiveStage(c)] + '22' : 'rgba(255,255,255,0.06)', color: STAGE_COLORS[effectiveStage(c)] ?? 'rgba(255,255,255,0.5)', border: `1px solid ${STAGE_COLORS[effectiveStage(c)] ?? 'rgba(255,255,255,0.1)'}44`, borderRadius: 5, padding: '2px 8px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                            {STAGE_LABELS[effectiveStage(c)] ?? effectiveStage(c)}
-                          </span>
-                        </td>
+                        {drawer.showTransition ? (
+                          <>
+                            <td style={{ padding: '10px 12px' }}><StageBadge stage={c.from_stage} /></td>
+                            <td style={{ padding: '10px 12px' }}><StageBadge stage={effectiveStage(c)} /></td>
+                          </>
+                        ) : (
+                          <td style={{ padding: '10px 12px' }}><StageBadge stage={effectiveStage(c)} /></td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
