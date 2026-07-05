@@ -439,7 +439,7 @@ export default function PerformanceDashboard({
         {/* Main 3-column layout */}
         <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 260px', gap: 16 }}>
           {/* Left: Lost Leads */}
-          <div onClick={() => openDrawer('Lost Leads — Lost Deal', ['lost deal'])} style={{ ...cardStyle, padding: '16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <div onClick={() => openDrawer('Lost Leads — Lost Deal', ['lost deal'], { showTransition: true })} style={{ ...cardStyle, padding: '16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 1.3 }}>Lost<br />Leads</p>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', minHeight: 140 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{metrics.lostLeads}</span>
