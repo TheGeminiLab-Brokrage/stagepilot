@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/language-context'
 import ChatPanel from './ChatPanel'
@@ -21,7 +21,9 @@ export default function ChatWidget({
   const [isOpen, setIsOpen] = useState(false)
   const [unreadTotal, setUnreadTotal] = useState(0)
   const [unreadBySender, setUnreadBySender] = useState<Record<string, number>>({})
-  const [pendingTaskListCount, setPendingTaskListCount] = useState(0)
+  const [unreadByGroup, setUnreadByGroup] = useState<Record<string, number>>({})
+  const [pendingTicketCount, setPendingTicketCount] = useState(0)
+  const myGroupIdsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     const supabase = createClient()
@@ -62,53 +64,110 @@ export default function ChatWidget({
   }, [currentUserId])
 
   useEffect(() => {
-    if (role === 'super_admin') return
     const supabase = createClient()
 
-    async function loadPendingTaskLists() {
-      const { data: recipientRows } = await supabase
-        .from('task_list_recipients')
-        .select('task_list_id')
-        .eq('recipient_id', currentUserId)
+    async function loadGroupUnread() {
+      const { data: memberRows } = await supabase
+        .from('chat_group_members')
+        .select('group_id')
+        .eq('member_id', currentUserId)
 
-      const listIds = (recipientRows ?? []).map(r => r.task_list_id)
-      if (listIds.length === 0) {
-        setPendingTaskListCount(0)
+      const groupIds = (memberRows ?? []).map(r => r.group_id)
+      myGroupIdsRef.current = new Set(groupIds)
+      if (groupIds.length === 0) {
+        setUnreadByGroup({})
         return
       }
 
-      const { data: items } = await supabase
-        .from('task_list_items')
-        .select('id, task_list_id')
-        .in('task_list_id', listIds)
+      const { data: readRows } = await supabase
+        .from('chat_group_read_state')
+        .select('group_id, last_read_at')
+        .eq('member_id', currentUserId)
+        .in('group_id', groupIds)
+      const readMap: Record<string, string> = {}
+      for (const r of readRows ?? []) readMap[r.group_id] = r.last_read_at
 
-      const itemIds = (items ?? []).map(i => i.id)
-      const { data: completions } = await supabase
-        .from('task_list_item_completions')
-        .select('task_list_item_id')
-        .eq('recipient_id', currentUserId)
-        .in('task_list_item_id', itemIds)
+      const { data: msgRows } = await supabase
+        .from('chat_group_messages')
+        .select('group_id, sender_id, created_at')
+        .in('group_id', groupIds)
 
-      const completedSet = new Set((completions ?? []).map(c => c.task_list_item_id))
-      const listsWithRemaining = new Set(
-        (items ?? []).filter(i => !completedSet.has(i.id)).map(i => i.task_list_id)
-      )
-      setPendingTaskListCount(listsWithRemaining.size)
+      const counts: Record<string, number> = {}
+      for (const m of msgRows ?? []) {
+        if (m.sender_id === currentUserId) continue
+        const readAt = readMap[m.group_id]
+        if (!readAt || new Date(m.created_at) > new Date(readAt)) {
+          counts[m.group_id] = (counts[m.group_id] ?? 0) + 1
+        }
+      }
+      setUnreadByGroup(counts)
     }
 
-    loadPendingTaskLists()
+    loadGroupUnread()
 
-    const channel = supabase
-      .channel(`task-inbox-${currentUserId}`)
+    // Postgres realtime filters only support simple equality, so an
+    // "is this group_id in my membership set" check can't be expressed
+    // server-side — subscribe unfiltered and check client-side instead
+    // (same workaround ChatThread.tsx uses for the 1:1 recipient case).
+    const messagesChannel = supabase
+      .channel(`chat-group-inbox-${currentUserId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'task_list_recipients', filter: `recipient_id=eq.${currentUserId}` },
-        loadPendingTaskLists
+        { event: 'INSERT', schema: 'public', table: 'chat_group_messages' },
+        payload => {
+          const row = payload.new as { group_id: string; sender_id: string }
+          if (row.sender_id === currentUserId) return
+          if (!myGroupIdsRef.current.has(row.group_id)) return
+          setUnreadByGroup(prev => ({ ...prev, [row.group_id]: (prev[row.group_id] ?? 0) + 1 }))
+        }
+      )
+      .subscribe()
+
+    const membersChannel = supabase
+      .channel(`chat-group-membership-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_group_members', filter: `member_id=eq.${currentUserId}` },
+        payload => {
+          const row = payload.new as { group_id: string }
+          myGroupIdsRef.current.add(row.group_id)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(messagesChannel)
+      supabase.removeChannel(membersChannel)
+    }
+  }, [currentUserId])
+
+  useEffect(() => {
+    if (role === 'super_admin') return
+    const supabase = createClient()
+
+    async function loadPendingTickets() {
+      const { count } = await supabase
+        .from('ticket_assignees')
+        .select('id', { count: 'exact', head: true })
+        .eq('assignee_id', currentUserId)
+        .eq('status', 'open')
+
+      setPendingTicketCount(count ?? 0)
+    }
+
+    loadPendingTickets()
+
+    const channel = supabase
+      .channel(`ticket-inbox-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'ticket_assignees', filter: `assignee_id=eq.${currentUserId}` },
+        loadPendingTickets
       )
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'task_list_item_completions', filter: `recipient_id=eq.${currentUserId}` },
-        loadPendingTaskLists
+        { event: 'UPDATE', schema: 'public', table: 'ticket_assignees', filter: `assignee_id=eq.${currentUserId}` },
+        loadPendingTickets
       )
       .subscribe()
 
@@ -128,12 +187,23 @@ export default function ChatWidget({
     })
   }
 
-  function handleTaskListCompleted() {
-    setPendingTaskListCount(n => Math.max(0, n - 1))
+  function handleGroupRead(groupId: string) {
+    setUnreadByGroup(prev => {
+      if (!(groupId in prev)) return prev
+      const next = { ...prev }
+      delete next[groupId]
+      return next
+    })
   }
 
-  const badgeText = unreadTotal > 9 ? t('chatUnreadBadgeOverflow') : String(unreadTotal)
-  const taskBadgeText = pendingTaskListCount > 9 ? t('chatUnreadBadgeOverflow') : String(pendingTaskListCount)
+  function handleTicketStatusChanged(delta: number) {
+    setPendingTicketCount(n => Math.max(0, n + delta))
+  }
+
+  const groupUnreadTotal = Object.values(unreadByGroup).reduce((a, b) => a + b, 0)
+  const combinedUnreadTotal = unreadTotal + groupUnreadTotal
+  const badgeText = combinedUnreadTotal > 9 ? t('chatUnreadBadgeOverflow') : String(combinedUnreadTotal)
+  const ticketBadgeText = pendingTicketCount > 9 ? t('chatUnreadBadgeOverflow') : String(pendingTicketCount)
 
   return (
     <>
@@ -168,7 +238,7 @@ export default function ChatWidget({
           />
         </svg>
 
-        {unreadTotal > 0 && (
+        {combinedUnreadTotal > 0 && (
           <span
             style={{
               position: 'absolute',
@@ -192,9 +262,9 @@ export default function ChatWidget({
           </span>
         )}
 
-        {pendingTaskListCount > 0 && (
+        {pendingTicketCount > 0 && (
           <span
-            title={t('taskListPendingTooltip')}
+            title={t('ticketPendingTooltip')}
             style={{
               position: 'absolute',
               top: -4,
@@ -213,7 +283,7 @@ export default function ChatWidget({
               justifyContent: 'center',
             }}
           >
-            {taskBadgeText}
+            {ticketBadgeText}
           </span>
         )}
       </button>
@@ -224,8 +294,10 @@ export default function ChatWidget({
           companyId={companyId}
           role={role}
           unreadBySender={unreadBySender}
+          unreadByGroup={unreadByGroup}
           onThreadRead={handleThreadRead}
-          onTaskListCompleted={handleTaskListCompleted}
+          onGroupRead={handleGroupRead}
+          onTicketStatusChanged={handleTicketStatusChanged}
           onClose={() => setIsOpen(false)}
         />
       )}
