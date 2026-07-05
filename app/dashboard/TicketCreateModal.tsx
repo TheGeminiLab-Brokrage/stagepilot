@@ -176,7 +176,8 @@ export default function TicketCreateModal({
         className="flex flex-col"
         style={{
           width: 380,
-          maxHeight: '80vh',
+          maxWidth: 'calc(100vw - 32px)',
+          maxHeight: 'calc(100vh - 32px)',
           background: 'rgba(10,10,10,0.98)',
           border: `1px solid ${BORDER}`,
           borderRadius: 12,
@@ -243,8 +244,9 @@ export default function TicketCreateModal({
                 type="date"
                 value={dueDate}
                 onChange={e => setDueDate(e.target.value)}
-                className="w-full text-sm px-3 py-1.5 rounded-md outline-none"
-                style={{ background: CARD, border: `1px solid ${BORDER}`, color: 'white', fontFamily: "'Montserrat', sans-serif" }}
+                onClick={e => (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.()}
+                className="w-full text-sm px-3 py-1.5 rounded-md outline-none tgl-date-input"
+                style={{ background: CARD, border: `1px solid ${BORDER}`, color: 'white', fontFamily: "'Montserrat', sans-serif", cursor: 'pointer' }}
               />
             </div>
           </div>
