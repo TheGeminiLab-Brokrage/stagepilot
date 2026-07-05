@@ -4,6 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import LogoutButton from './LogoutButton'
 import Navbar from './Navbar'
 import LanguageWrapper from './LanguageWrapper'
+import ChatWidget from './ChatWidget'
+
+const CHAT_ELIGIBLE_ROLES = ['agent', 'team_leader', 'super_admin']
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -13,7 +16,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, role, team_name')
+    .select('full_name, role, team_name, company_id')
     .eq('id', user.id)
     .single()
 
@@ -46,7 +49,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </main>
       </div>
 
-
+      {CHAT_ELIGIBLE_ROLES.includes(role) && profile?.company_id && (
+        <ChatWidget
+          currentUserId={user.id}
+          role={role as 'agent' | 'team_leader' | 'super_admin'}
+          teamName={profile.team_name ?? null}
+          companyId={profile.company_id}
+        />
+      )}
     </LanguageWrapper>
   )
 }

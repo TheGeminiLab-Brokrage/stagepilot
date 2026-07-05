@@ -109,6 +109,9 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
   const [detail, setDetail] = useState<SheetDetail | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [cycleFilter, setCycleFilter] = useState<number | null>(null)
+  const [agentFilter, setAgentFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sentFilter, setSentFilter] = useState(false)
   const [randomizing, setRandomizing] = useState(false)
   const [confirmRandomize, setConfirmRandomize] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
@@ -283,14 +286,41 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
     })
   }, [detail, cycleFilter])
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
-  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const showStart = rows.length > 0 ? (page - 1) * PAGE_SIZE + 1 : 0
-  const showEnd = Math.min(page * PAGE_SIZE, rows.length)
+  const cycleAgents = useMemo(() => {
+    const seen = new Set<string>()
+    const out: Agent[] = []
+    for (const { agent } of rows) {
+      if (agent && !seen.has(agent.id)) { seen.add(agent.id); out.push(agent) }
+    }
+    return out.sort((a, b) => a.full_name.localeCompare(b.full_name))
+  }, [rows])
+
+  const filteredRows = useMemo(() => {
+    return rows.filter(({ agent, assignment }) => {
+      if (sentFilter && !assignment?.sent_at) return false
+      if (agentFilter !== 'all' && agent?.id !== agentFilter) return false
+      if (statusFilter !== 'all') {
+        const s = assignment?.response_status ?? 'pending'
+        if (s !== statusFilter) return false
+      }
+      return true
+    })
+  }, [rows, agentFilter, statusFilter, sentFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
+  const pageRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const showStart = filteredRows.length > 0 ? (page - 1) * PAGE_SIZE + 1 : 0
+  const showEnd = Math.min(page * PAGE_SIZE, filteredRows.length)
 
   useEffect(() => {
     setPage(1)
-  }, [cycleFilter, detail?.sheet.id])
+  }, [cycleFilter, detail?.sheet.id, agentFilter, statusFilter, sentFilter])
+
+  useEffect(() => {
+    setAgentFilter('all')
+    setStatusFilter('all')
+    setSentFilter(false)
+  }, [detail?.sheet.id])
 
   return (
     <div style={{ minHeight: '100vh', background: '#000', ...font }}>
@@ -441,6 +471,12 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                   <StatCard label="Current Cycle" value={detail.sheet.current_cycle} />
                   <StatCard label="Answered (all cycles)" value={detail.assignments.filter(a => a.response_status === 'answered').length} />
                   <StatCard label="First Responses" value={detail.contacts.filter(c => c.first_response_at).length} />
+                  <StatCard
+                    label="Messages Sent (cycle)"
+                    value={rows.filter(r => r.assignment?.sent_at != null).length}
+                    onClick={() => setSentFilter(f => !f)}
+                    active={sentFilter}
+                  />
                 </div>
 
                 <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16, marginBottom: 16 }}>
@@ -497,14 +533,32 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 12, color: MUTED, ...fontDisplay }}>Viewing cycle</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: MUTED, ...fontDisplay }}>Cycle</span>
                     <select value={cycleFilter ?? ''} onChange={e => setCycleFilter(Number(e.target.value))} disabled={cycles.length === 0} style={{
-                      background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, borderRadius: 6,
-                      padding: '6px 10px', color: '#fff', fontSize: 12, ...font,
+                      background: '#111', border: `1px solid ${BORDER}`, borderRadius: 6,
+                      padding: '6px 10px', color: '#fff', fontSize: 12, ...font, colorScheme: 'dark',
                     }}>
                       {cycles.length === 0 && <option value="">—</option>}
                       {cycles.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <span style={{ fontSize: 12, color: MUTED, ...fontDisplay }}>Agent</span>
+                    <select value={agentFilter} onChange={e => setAgentFilter(e.target.value)} style={{
+                      background: '#111', border: `1px solid ${BORDER}`, borderRadius: 6,
+                      padding: '6px 10px', color: '#fff', fontSize: 12, ...font, colorScheme: 'dark',
+                    }}>
+                      <option value="all">All agents</option>
+                      {cycleAgents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+                    </select>
+                    <span style={{ fontSize: 12, color: MUTED, ...fontDisplay }}>Status</span>
+                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{
+                      background: '#111', border: `1px solid ${BORDER}`, borderRadius: 6,
+                      padding: '6px 10px', color: '#fff', fontSize: 12, ...font, colorScheme: 'dark',
+                    }}>
+                      <option value="all">All statuses</option>
+                      <option value="answered">Answered</option>
+                      <option value="not_answered">No Answer</option>
+                      <option value="pending">Pending</option>
                     </select>
                   </div>
 
@@ -605,7 +659,10 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, flexWrap: 'wrap', gap: 10 }}>
                   <span style={{ fontSize: 12, color: MUTED }}>
-                    {rows.length > 0 ? `Showing ${showStart}–${showEnd} of ${rows.length} contacts` : 'No contacts'}
+                    {filteredRows.length > 0 ? `Showing ${showStart}–${showEnd} of ${filteredRows.length} contacts` : 'No contacts'}
+                    {(agentFilter !== 'all' || statusFilter !== 'all') && rows.length !== filteredRows.length && (
+                      <span style={{ marginLeft: 6, color: NEON }}>(filtered from {rows.length})</span>
+                    )}
                   </span>
                   {totalPages > 1 && (
                     <Pager page={page} totalPages={totalPages} onPageChange={setPage} />
@@ -628,11 +685,19 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
   )
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({ label, value, onClick, active }: { label: string; value: number; onClick?: () => void; active?: boolean }) {
   return (
-    <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '12px 18px', minWidth: 130 }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: active ? NEON_DIM : CARD,
+        border: `1px solid ${active ? NEON_BORDER : BORDER}`,
+        borderRadius: 10, padding: '12px 18px', minWidth: 130,
+        cursor: onClick ? 'pointer' : 'default',
+      }}
+    >
       <div style={{ fontSize: 20, fontWeight: 700, color: NEON, ...fontDisplay }}>{value}</div>
-      <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 11, color: active ? '#fff' : MUTED, marginTop: 2 }}>{label}</div>
     </div>
   )
 }

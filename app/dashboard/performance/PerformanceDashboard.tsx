@@ -284,16 +284,17 @@ export default function PerformanceDashboard({
     const atDoneDeal          = stageCounts['done deal'] ?? 0
     const lostLeads           = inStage(['lost deal'])
 
-    const gapRate = (base: number, advanced: number) =>
-      base > 0 ? Math.max(0, Math.round((base - advanced) / base * 100)) : 0
+    // % stuck = (count at this stage - count at next stage) / count at this stage
+    const gapRate = (base: number, next: number) =>
+      base > 0 ? Math.max(0, Math.round((base - next) / base * 100)) : 0
 
-    // GAP(A) = % of Interested leads stuck (not yet advanced to Potential)
+    // GAP(A) = % of Interested leads that didn't make it to Potential
     const gapA = gapRate(atInterested, atPotential)
-    // GAP(B) = % of Potential leads stuck (not yet advanced to Meeting Scheduled)
+    // GAP(B) = % of Potential leads that didn't make it to Meeting Scheduled
     const gapB = gapRate(atPotential, atMeetingScheduled)
-    // GAP(C) = % of Meeting-Scheduled leads stuck (not yet advanced to Meeting Done)
+    // GAP(C) = % of Meeting-Scheduled leads that didn't make it to Meeting Done
     const gapC = gapRate(atMeetingScheduled, atMeetingDone)
-    // GAP(D) = % of Meeting-Done leads stuck (not yet advanced to Done Deal)
+    // GAP(D) = % of Meeting-Done leads that didn't make it to Done Deal
     const gapD = gapRate(atMeetingDone, atDoneDeal)
 
     const directToMeeting = isUsingCrm

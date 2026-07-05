@@ -295,6 +295,20 @@ const en = {
   clientStageTitle: 'Client Stage',
   stageDirectToMeeting: 'Direct to Meeting',
   clientStageConfirm: 'Confirm Stage',
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  chatIconTooltip: 'Chat',
+  chatPanelTitle: 'Messages',
+  chatEmptyContacts: 'No contacts yet.',
+  chatEmptyThread: 'No messages yet — say hello.',
+  chatSearchPlaceholder: 'Search people…',
+  chatMessagePlaceholder: 'Type a message…',
+  chatSendButton: 'Send',
+  chatBackToContacts: 'Back',
+  chatSectionLeadership: 'Leadership',
+  chatSectionTeam: 'Your Team',
+  chatSectionCompany: 'Everyone Else',
+  chatUnreadBadgeOverflow: '9+',
 }
 
 const ar: typeof en = {
@@ -593,6 +607,20 @@ const ar: typeof en = {
   clientStageTitle: 'مرحلة العميل',
   stageDirectToMeeting: 'توجيه للاجتماع',
   clientStageConfirm: 'تأكيد المرحلة',
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  chatIconTooltip: 'الدردشة',
+  chatPanelTitle: 'الرسائل',
+  chatEmptyContacts: 'لا يوجد جهات اتصال بعد.',
+  chatEmptyThread: 'لا توجد رسائل بعد — ابدأ المحادثة.',
+  chatSearchPlaceholder: 'البحث عن شخص…',
+  chatMessagePlaceholder: 'اكتب رسالة…',
+  chatSendButton: 'إرسال',
+  chatBackToContacts: 'رجوع',
+  chatSectionLeadership: 'الإدارة',
+  chatSectionTeam: 'فريقك',
+  chatSectionCompany: 'الجميع',
+  chatUnreadBadgeOverflow: '+9',
 }
 
 export const translations = { en, ar }

@@ -1,7 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { createSupabaseAuthState, clearSession } from '@/lib/whatsapp/session'
-import { getBaileysVersion } from '@/lib/whatsapp/version'
-import qrcode from 'qrcode'
 
 // Allow up to 60s — enough time for the user to scan the QR code
 export const maxDuration = 60
@@ -11,6 +8,11 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return new Response('Unauthorized', { status: 401 })
 
+  const evoUrl = process.env.EVOLUTION_API_URL!
+  const evoKey = process.env.EVOLUTION_API_KEY!
+  // Agent's Supabase UID is the Evolution API instance name
+  const instanceName = user.id
+
   const encoder = new TextEncoder()
   const send = (ctrl: ReadableStreamDefaultController, data: object) => {
     try { ctrl.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`)) } catch { /* stream closed */ }
@@ -18,71 +20,68 @@ export async function GET() {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const { default: makeWASocket, DisconnectReason } =
-        await import('@whiskeysockets/baileys')
-      const { default: pino } = await import('pino')
-      const logger = pino({ level: 'silent' })
+      // Create instance if it doesn't exist yet (idempotent — safe to call on reconnect)
+      await fetch(`${evoUrl}/instance/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: evoKey },
+        body: JSON.stringify({ instanceName, qrcode: true }),
+      }).catch(() => {})
 
-      const { state, saveCreds } = await createSupabaseAuthState(user.id)
-      const version = await getBaileysVersion()
+      let done = false
 
-      const socket = makeWASocket({
-        version,
-        auth: state,
-        logger,
-        printQRInTerminal: false,
-        browser: ['StagePilot', 'Chrome', '120.0.0'],
-        getMessage: async () => undefined,
-      })
+      // Close stream just before Vercel's 60s hard limit
+      const timeout = setTimeout(() => {
+        done = true
+        send(controller, { error: 'timeout' })
+        try { controller.close() } catch { /* already closed */ }
+      }, 55000)
 
-      // Track the latest save so we can await it before confirming connection
-      let lastSave: Promise<void> = Promise.resolve()
-      socket.ev.on('creds.update', () => { lastSave = saveCreds() })
+      while (!done) {
+        // Check if the socket is already open (e.g. reconnecting while already linked)
+        const stateRes = await fetch(`${evoUrl}/instance/connectionState/${instanceName}`, {
+          headers: { apikey: evoKey },
+        }).catch(() => null)
 
-      await new Promise<void>((resolve) => {
-        socket.ev.on('connection.update', async ({ connection, qr, lastDisconnect }) => {
-          if (qr) {
-            try {
-              const url = await qrcode.toDataURL(qr, { width: 300, margin: 2 })
-              send(controller, { qr: url })
-            } catch { /* ignore */ }
-          }
-
-          if (connection === 'open') {
-            // Wait for the credential save to finish before telling the client
-            // they're connected — otherwise a page reload before the DB write
-            // commits will show the QR screen again.
-            await lastSave.catch(() => {})
-            const phone = socket.user?.id?.split('@')[0]?.split(':')[0] ?? null
-            send(controller, { connected: true, phone })
-            resolve()
-          }
-
-          if (connection === 'close') {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const code = (lastDisconnect?.error as any)?.output?.statusCode
-            if (code === DisconnectReason.loggedOut) {
-              await clearSession(user.id)
-              // Tell client this was a real logout so it stops retrying
-              send(controller, { error: 'loggedout' })
-            } else {
-              // Transient close (network hiccup, server restart, etc.) —
-              // tell client to reconnect and get a fresh QR
-              send(controller, { error: 'timeout' })
+        if (stateRes?.ok) {
+          const stateData = await stateRes.json().catch(() => ({}))
+          if (stateData?.instance?.state === 'open') {
+            // Fetch ownerJid to get the linked phone number
+            const listRes = await fetch(
+              `${evoUrl}/instance/fetchInstances?instanceName=${instanceName}`,
+              { headers: { apikey: evoKey } }
+            ).catch(() => null)
+            let phone: string | null = null
+            if (listRes?.ok) {
+              const list = await listRes.json().catch(() => [])
+              const inst = Array.isArray(list) ? list[0] : list
+              // ownerJid: "201234567890@s.whatsapp.net" → "201234567890"
+              phone = inst?.ownerJid?.split('@')[0] ?? inst?.instance?.owner ?? null
             }
-            resolve()
+            clearTimeout(timeout)
+            done = true
+            send(controller, { connected: true, phone })
+            try { controller.close() } catch { /* already closed */ }
+            break
           }
-        })
+        }
 
-        // Timeout just before Vercel's 60s limit
-        setTimeout(() => {
-          send(controller, { error: 'timeout' })
-          resolve()
-        }, 55000)
-      })
+        // Not connected yet — request the current QR code
+        const qrRes = await fetch(`${evoUrl}/instance/connect/${instanceName}`, {
+          headers: { apikey: evoKey },
+        }).catch(() => null)
 
-      try { socket.end(new Error('stream done')) } catch { /* ignore */ }
-      try { controller.close() } catch { /* already closed */ }
+        if (qrRes?.ok) {
+          const qrData = await qrRes.json().catch(() => ({}))
+          // Evolution API returns the QR as a base64 data URL
+          const base64 = qrData?.base64 ?? qrData?.qrcode?.base64
+          if (base64) {
+            send(controller, { qr: base64 })
+          }
+        }
+
+        // Poll every 3s — WhatsApp QR codes are valid for ~30s
+        await new Promise(r => setTimeout(r, 3000))
+      }
     },
   })
 
