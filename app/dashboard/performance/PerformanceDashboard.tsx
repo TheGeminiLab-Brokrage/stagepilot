@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
+import type { PieSectorDataItem } from 'recharts'
 import CrmStatusChanges from '../admin/reports/CrmStatusChanges'
 
 type Call = {
@@ -154,6 +155,7 @@ export default function PerformanceDashboard({
   const [stageDropdownOpen, setStageDropdownOpen] = useState(false)
   const [crmData, setCrmData]                 = useState<CrmDataState>(crmExport ?? null)
   const [drawer, setDrawer]                   = useState<{ title: string; leads: Call[]; showTransition?: boolean } | null>(null)
+  const [tooltipAnchor, setTooltipAnchor]     = useState<{ x: number; y: number }>({ x: 300, y: 140 })
 
   // Called by CrmStatusChanges whenever data is parsed (drop, upload, or loaded from DB)
   function handleCrmDataChange(data: CrmRow[], dateFrom: string, dateTo: string) {
@@ -491,6 +493,13 @@ export default function PerformanceDashboard({
                     cx={170} cy={170} innerRadius={90} outerRadius={128} dataKey="value" startAngle={90} endAngle={-270} strokeWidth={0}
                     label={donutData.length > 0 ? CustomDonutLabel : undefined}
                     labelLine={donutData.length > 0 ? { stroke: 'rgba(255,255,255,0.18)', strokeWidth: 1 } : false}
+                    onMouseEnter={(data: PieSectorDataItem) => {
+                      const cx = data.cx ?? 170
+                      const outerRadius = data.outerRadius ?? 128
+                      const midAngle = data.midAngle ?? 0
+                      const isRight = Math.cos(-midAngle * (Math.PI / 180)) >= 0
+                      setTooltipAnchor({ x: isRight ? cx + outerRadius + 2 : cx - outerRadius - 88, y: 140 })
+                    }}
                   >
                     {(donutData.length > 0 ? donutData : [{ color: 'rgba(255,255,255,0.06)' }]).map((entry, idx) => (
                       <Cell key={idx} fill={entry.color} />
@@ -498,7 +507,7 @@ export default function PerformanceDashboard({
                   </Pie>
                   {donutData.length > 0 && (
                     <Tooltip
-                      position={{ x: 300, y: 140 }}
+                      position={tooltipAnchor}
                       allowEscapeViewBox={{ x: true, y: true }}
                       wrapperStyle={{ zIndex: 20 }}
                       contentStyle={{ background: '#111', border: '1px solid rgba(215,255,0,0.2)', borderRadius: 8, fontSize: 12, color: '#fff' }}
