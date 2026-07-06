@@ -7,6 +7,8 @@ export type ChatContact = {
   team_name: string | null
 }
 
+export type ChatAttachmentKind = 'voice'
+
 export type ChatMessageRow = {
   id: string
   sender_id: string
@@ -14,6 +16,9 @@ export type ChatMessageRow = {
   body: string
   created_at: string
   read_at: string | null
+  attachment_path: string | null
+  attachment_kind: ChatAttachmentKind | null
+  attachment_duration_seconds: number | null
 }
 
 export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent'
@@ -64,6 +69,9 @@ export type ChatGroupMessageRow = {
   sender_id: string
   body: string
   created_at: string
+  attachment_path: string | null
+  attachment_kind: ChatAttachmentKind | null
+  attachment_duration_seconds: number | null
 }
 
 export type ChatGroupMember = {

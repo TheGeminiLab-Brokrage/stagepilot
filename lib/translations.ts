@@ -306,6 +306,13 @@ const en = {
   chatSendButton: 'Send',
   chatBackToContacts: 'Back',
   chatUnreadBadgeOverflow: '9+',
+  chatRecordVoiceNoteAria: 'Record voice note',
+  chatStopRecordingAria: 'Stop recording',
+  chatVoiceNoteRemoveAria: 'Discard voice note',
+  chatVoiceNoteUploading: 'Uploading…',
+  chatMicPermissionError: 'Could not access the microphone. Check your browser permissions.',
+  chatVoiceNoteUploadError: 'Voice note failed to send. Try again.',
+  chatVoiceNoteAudioAria: 'Voice note',
 
   // ── Tickets ───────────────────────────────────────────────────────────────
   tasksTabLabel: 'Tasks',
@@ -673,6 +680,13 @@ const ar: typeof en = {
   chatSendButton: 'إرسال',
   chatBackToContacts: 'رجوع',
   chatUnreadBadgeOverflow: '+9',
+  chatRecordVoiceNoteAria: 'تسجيل ملاحظة صوتية',
+  chatStopRecordingAria: 'إيقاف التسجيل',
+  chatVoiceNoteRemoveAria: 'إزالة الملاحظة الصوتية',
+  chatVoiceNoteUploading: 'جارٍ الرفع…',
+  chatMicPermissionError: 'تعذر الوصول إلى الميكروفون. تحقق من أذونات المتصفح.',
+  chatVoiceNoteUploadError: 'فشل إرسال الملاحظة الصوتية. حاول مرة أخرى.',
+  chatVoiceNoteAudioAria: 'ملاحظة صوتية',
 
   // ── Tickets ───────────────────────────────────────────────────────────────
   tasksTabLabel: 'المهام',
