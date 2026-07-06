@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent as R
 import './property.css'
 import { generatePropertyMessage } from '@/lib/property-message'
 import { useUndoStack, setWithUndo } from '@/lib/use-undo-stack'
+import { useT } from '@/lib/language-context'
 
 type Property = {
   city: string
@@ -353,6 +354,7 @@ function MultiCombobox({ value, onChange, options, placeholder }: {
 }
 
 export default function PropertyDashboardClient() {
+  const t = useT()
   const [rawData, setRawData] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
@@ -898,9 +900,9 @@ export default function PropertyDashboardClient() {
 
         {selectedRows.size > 0 && (
           <div className="ph-selection-bar">
-            <span>{selectedRows.size} وحدة محددة</span>
-            <button className="ph-btn-reset" onClick={clearRowSelection}>مسح التحديد</button>
-            <button className="ph-picker-copy-btn" onClick={handleGenerateSelectedMessage}>📋 إنشاء رسالة مجمعة</button>
+            <span>{selectedRows.size} {t('pvUnitsSelectedLabel')}</span>
+            <button className="ph-btn-reset" onClick={clearRowSelection}>{t('pvClearSelection')}</button>
+            <button className="ph-picker-copy-btn" onClick={handleGenerateSelectedMessage}>📋 {t('pvGenerateMessage')}</button>
           </div>
         )}
 
@@ -961,8 +963,8 @@ export default function PropertyDashboardClient() {
                                   <>
                                     <div className="ph-picker-section-row">
                                       <div className="ph-picker-section">تفاصيل</div>
-                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, avFields)}>الكل</button>
-                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, [])}>لا شيء</button>
+                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, avFields)}>{t('pvSelectAll')}</button>
+                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, [])}>{t('pvDeselectAll')}</button>
                                     </div>
                                     {avFields.map(field => (
                                       <label key={field} className="ph-picker-option">
@@ -982,8 +984,8 @@ export default function PropertyDashboardClient() {
                                   <>
                                     <div className="ph-picker-section-row">
                                       <div className="ph-picker-section">أنظمة السداد</div>
-                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, allPlans)}>الكل</button>
-                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, [])}>لا شيء</button>
+                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, allPlans)}>{t('pvSelectAll')}</button>
+                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, [])}>{t('pvDeselectAll')}</button>
                                     </div>
                                     {allPlans.map((plan, pi) => (
                                       <label key={pi} className="ph-picker-option">
@@ -1015,7 +1017,7 @@ export default function PropertyDashboardClient() {
                     checked={selectedRows.has(idx)}
                     onClick={e => e.stopPropagation()}
                     onChange={() => toggleRowSelection(idx)}
-                    title="إضافة للرسالة المجمعة"
+                    title={t('pvAddToMessageTitle')}
                   />
                 </div>
               )
@@ -1044,7 +1046,7 @@ export default function PropertyDashboardClient() {
                     checked={selectedRows.has(idx)}
                     onClick={e => e.stopPropagation()}
                     onChange={() => toggleRowSelection(idx)}
-                    title="إضافة للرسالة المجمعة"
+                    title={t('pvAddToMessageTitle')}
                   />
                   <div className="ph-list-project">
                     <div className="name">{r.project}</div>
@@ -1079,8 +1081,8 @@ export default function PropertyDashboardClient() {
                                 <>
                                   <div className="ph-picker-section-row">
                                     <div className="ph-picker-section">تفاصيل</div>
-                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, avFields)}>الكل</button>
-                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, [])}>لا شيء</button>
+                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, avFields)}>{t('pvSelectAll')}</button>
+                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, [])}>{t('pvDeselectAll')}</button>
                                   </div>
                                   {avFields.map(field => (
                                     <label key={field} className="ph-picker-option">
@@ -1100,8 +1102,8 @@ export default function PropertyDashboardClient() {
                                 <>
                                   <div className="ph-picker-section-row">
                                     <div className="ph-picker-section">أنظمة السداد</div>
-                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, allPlans)}>الكل</button>
-                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, [])}>لا شيء</button>
+                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, allPlans)}>{t('pvSelectAll')}</button>
+                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, [])}>{t('pvDeselectAll')}</button>
                                   </div>
                                   {allPlans.map((plan, pi) => (
                                     <label key={pi} className="ph-picker-option">
@@ -1198,8 +1200,8 @@ export default function PropertyDashboardClient() {
                     </div>
 
                     <div className="ph-modal-select-all-row">
-                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, getAvailableFields(r))}>تحديد الكل</button>
-                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, [])}>إلغاء تحديد الكل</button>
+                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, getAvailableFields(r))}>{t('pvSelectAll')}</button>
+                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, [])}>{t('pvDeselectAll')}</button>
                     </div>
                     <div className="ph-modal-grid">
                       {/* Checkable fields */}
@@ -1288,8 +1290,8 @@ export default function PropertyDashboardClient() {
                       <div className="ph-modal-section">
                         <h4>💳 Payment Plans</h4>
                         <div className="ph-modal-select-all-row">
-                          <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlanSelected, modalPlanSelected, plans)}>تحديد الكل</button>
-                          <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlanSelected, modalPlanSelected, [])}>إلغاء تحديد الكل</button>
+                          <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlanSelected, modalPlanSelected, plans)}>{t('pvSelectAll')}</button>
+                          <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlanSelected, modalPlanSelected, [])}>{t('pvDeselectAll')}</button>
                         </div>
                         <div className="ph-modal-plan-check">
                           {plans.map((p, i) => (

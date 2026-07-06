@@ -1248,7 +1248,10 @@
 .ph-modal-select-all-row {
   display: flex;
   gap: 8px;
-  margin-bottom: 10px;
+  background: #1a1a1a;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
 }
 
 .ph-picker-select-all {

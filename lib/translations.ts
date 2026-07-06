@@ -301,6 +301,7 @@ const en = {
   messagesTabLabel: 'Messages',
   chatEmptyContacts: 'No contacts yet.',
   chatEmptyThread: 'No messages yet — say hello.',
+  chatSelectConversationEmptyState: 'Select a conversation to start chatting.',
   chatSearchPlaceholder: 'Search people…',
   chatMessagePlaceholder: 'Type a message…',
   chatSendButton: 'Send',
@@ -313,6 +314,11 @@ const en = {
   chatMicPermissionError: 'Could not access the microphone. Check your browser permissions.',
   chatVoiceNoteUploadError: 'Voice note failed to send. Try again.',
   chatVoiceNoteAudioAria: 'Voice note',
+  chatAttachImageAria: 'Attach photo',
+  chatImageRemoveAria: 'Discard photo',
+  chatImageUploading: 'Uploading photo…',
+  chatImageUploadError: 'Photo failed to send. Try again.',
+  chatImageAttachmentAria: 'Photo',
 
   // ── Tickets ───────────────────────────────────────────────────────────────
   tasksTabLabel: 'Tasks',
@@ -371,6 +377,14 @@ const en = {
   chatGroupManageError: 'Could not update members. Please try again.',
   chatGroupEmptyMessages: 'No messages yet — say hello.',
   chatManageMembersButton: 'Manage members',
+
+  // ── Find a Property — selection controls ─────────────────────────────────
+  pvSelectAll: 'Select All',
+  pvDeselectAll: 'Deselect All',
+  pvClearSelection: 'Clear',
+  pvGenerateMessage: 'Generate Message',
+  pvUnitsSelectedLabel: 'selected',
+  pvAddToMessageTitle: 'Add to combined message',
 }
 
 const ar: typeof en = {
@@ -675,6 +689,7 @@ const ar: typeof en = {
   messagesTabLabel: 'الرسائل',
   chatEmptyContacts: 'لا يوجد جهات اتصال بعد.',
   chatEmptyThread: 'لا توجد رسائل بعد — ابدأ المحادثة.',
+  chatSelectConversationEmptyState: 'اختر محادثة لبدء الدردشة.',
   chatSearchPlaceholder: 'البحث عن شخص…',
   chatMessagePlaceholder: 'اكتب رسالة…',
   chatSendButton: 'إرسال',
@@ -687,6 +702,11 @@ const ar: typeof en = {
   chatMicPermissionError: 'تعذر الوصول إلى الميكروفون. تحقق من أذونات المتصفح.',
   chatVoiceNoteUploadError: 'فشل إرسال الملاحظة الصوتية. حاول مرة أخرى.',
   chatVoiceNoteAudioAria: 'ملاحظة صوتية',
+  chatAttachImageAria: 'إرفاق صورة',
+  chatImageRemoveAria: 'إزالة الصورة',
+  chatImageUploading: 'جارٍ رفع الصورة…',
+  chatImageUploadError: 'فشل إرسال الصورة. حاول مرة أخرى.',
+  chatImageAttachmentAria: 'صورة',
 
   // ── Tickets ───────────────────────────────────────────────────────────────
   tasksTabLabel: 'المهام',
@@ -745,6 +765,14 @@ const ar: typeof en = {
   chatGroupManageError: 'تعذر تحديث الأعضاء. حاول مرة أخرى.',
   chatGroupEmptyMessages: 'لا توجد رسائل بعد — ابدأ المحادثة.',
   chatManageMembersButton: 'إدارة الأعضاء',
+
+  // ── Find a Property — selection controls ─────────────────────────────────
+  pvSelectAll: 'تحديد الكل',
+  pvDeselectAll: 'إلغاء تحديد الكل',
+  pvClearSelection: 'مسح التحديد',
+  pvGenerateMessage: 'إنشاء رسالة مجمعة',
+  pvUnitsSelectedLabel: 'وحدة محددة',
+  pvAddToMessageTitle: 'إضافة للرسالة المجمعة',
 }
 
 export const translations = { en, ar }

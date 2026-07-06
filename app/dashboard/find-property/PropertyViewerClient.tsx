@@ -9,6 +9,7 @@ import { analyzeColumns, mergeColumnMeta, type ColumnMeta } from '@/lib/column-a
 import { fmt, fmtFull } from '@/lib/property-utils'
 import { generateViewerMessage, colEmoji } from '@/lib/property-message'
 import { useUndoStack, setWithUndo } from '@/lib/use-undo-stack'
+import { useT } from '@/lib/language-context'
 import './property.css'
 
 const PAGE_SIZE = 24
@@ -390,6 +391,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
   userId: string
   companyId: string
 }) {
+  const t = useT()
   const supabase = useMemo(() => createClient(), [])
   const [phase, setPhase] = useState<'loading' | 'empty' | 'loaded'>('loading')
   const [sheets, setSheets] = useState<SheetRecord[]>([])
@@ -1130,9 +1132,9 @@ export default function PropertyViewerClient({ userId, companyId }: {
 
           {selectedRows.size > 0 && (
             <div className="ph-selection-bar">
-              <span>{selectedRows.size} selected</span>
-              <button className="ph-btn-reset" onClick={clearRowSelection}>Clear</button>
-              <button className="ph-picker-copy-btn" onClick={handleGenerateSelectedMessage}>📋 Generate Message</button>
+              <span>{selectedRows.size} {t('pvUnitsSelectedLabel')}</span>
+              <button className="ph-btn-reset" onClick={clearRowSelection}>{t('pvClearSelection')}</button>
+              <button className="ph-picker-copy-btn" onClick={handleGenerateSelectedMessage}>📋 {t('pvGenerateMessage')}</button>
             </div>
           )}
 
@@ -1169,7 +1171,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                         checked={selectedRows.has(idx)}
                         onClick={e => e.stopPropagation()}
                         onChange={() => toggleRowSelection(idx)}
-                        title="Add to combined message"
+                        title={t('pvAddToMessageTitle')}
                       />
                       <div className="ph-card-top" style={{ background: 'linear-gradient(180deg, rgba(215,255,0,0.04) 0%, transparent 100%)' }}>
                         {showBadge && (
@@ -1258,7 +1260,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                           checked={selectedRows.has(idx)}
                           onClick={e => e.stopPropagation()}
                           onChange={() => toggleRowSelection(idx)}
-                          title="Add to combined message"
+                          title={t('pvAddToMessageTitle')}
                         />
                         {listCols.map(col => (
                           <div key={col.key} style={{ flex: 1, minWidth: 80 }}>
@@ -1369,8 +1371,8 @@ export default function PropertyViewerClient({ userId, companyId }: {
                   return (
                     <>
                       <div className="ph-modal-select-all-row">
-                        <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, allFieldKeys)}>Select All</button>
-                        <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, [])}>Deselect All</button>
+                        <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, allFieldKeys)}>{t('pvSelectAll')}</button>
+                        <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, [])}>{t('pvDeselectAll')}</button>
                       </div>
                       <div className="ph-modal-grid">
                         {visibleCols.map(col => {
@@ -1396,8 +1398,8 @@ export default function PropertyViewerClient({ userId, companyId }: {
                         <div className="ph-modal-section">
                           <h4>💳 Payment Plans</h4>
                           <div className="ph-modal-select-all-row">
-                            <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlans, modalPlans, plansFromRow)}>Select All</button>
-                            <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlans, modalPlans, [])}>Deselect All</button>
+                            <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlans, modalPlans, plansFromRow)}>{t('pvSelectAll')}</button>
+                            <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlans, modalPlans, [])}>{t('pvDeselectAll')}</button>
                           </div>
                           <div className="ph-modal-plan-check">
                             {plansFromRow.map((p, i) => (
