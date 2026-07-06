@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/language-context'
 import type { ChatGroupMember, ChatGroupSummary } from './chatTypes'
@@ -116,7 +117,9 @@ export default function ChatGroupManageMembersModal({
     onMembersChanged(group.id, selectedIds.size + 1)
   }
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -133,7 +136,8 @@ export default function ChatGroupManageMembersModal({
         className="flex flex-col"
         style={{
           width: 380,
-          maxHeight: '80vh',
+          maxWidth: 'calc(100vw - 32px)',
+          maxHeight: 'calc(100vh - 32px)',
           background: 'rgba(10,10,10,0.98)',
           border: `1px solid ${BORDER}`,
           borderRadius: 12,
@@ -199,6 +203,7 @@ export default function ChatGroupManageMembersModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

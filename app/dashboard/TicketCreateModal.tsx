@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/language-context'
 import type { ChatRole, TicketPriority, TicketSummary } from './chatTypes'
@@ -159,7 +160,9 @@ export default function TicketCreateModal({
     })
   }
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -353,6 +356,7 @@ export default function TicketCreateModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
