@@ -23,5 +23,5 @@ export default async function FindPropertyPage() {
     )
   }
 
-  return <PropertyDashboardClient />
+  return <PropertyDashboardClient userId={user.id} />
 }

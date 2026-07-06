@@ -94,6 +94,30 @@ function saveConfig(userId: string, config: ViewConfig) {
   } catch { /* ignore */ }
 }
 
+type SavedSelection = { fields: string[]; plans: string[] }
+
+function loadSelection(userId: string, rowId: string | number | undefined): SavedSelection | null {
+  if (rowId === undefined) return null
+  try {
+    const raw = localStorage.getItem(`pv_field_selection_${userId}`)
+    if (!raw) return null
+    const map = JSON.parse(raw) as Record<string, SavedSelection>
+    return map[String(rowId)] ?? null
+  } catch {
+    return null
+  }
+}
+
+function saveSelection(userId: string, rowId: string | number | undefined, fields: string[], plans: string[]) {
+  if (rowId === undefined) return
+  try {
+    const raw = localStorage.getItem(`pv_field_selection_${userId}`)
+    const map = raw ? (JSON.parse(raw) as Record<string, SavedSelection>) : {}
+    map[String(rowId)] = { fields, plans }
+    localStorage.setItem(`pv_field_selection_${userId}`, JSON.stringify(map))
+  } catch { /* ignore */ }
+}
+
 function isPriceLikeColumn(col: ColumnMeta): boolean {
   return col.type === 'numeric' && /price|value|cost|total|amount/i.test(col.label)
 }
@@ -398,6 +422,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [columns, setColumns] = useState<ColumnMeta[]>([])
   const [rows, setRows] = useState<RawRow[]>([])
   const [rowSheetIds, setRowSheetIds] = useState<string[]>([])
+  const [rowIds, setRowIds] = useState<(string | number)[]>([])
   const [selectedSheetIds, setSelectedSheetIds] = useState<Set<string>>(new Set())
   const [tabsBySheetId, setTabsBySheetId] = useState<Record<string, string[]>>({})
   const [selectedTabsBySheetId, setSelectedTabsBySheetId] = useState<Record<string, Set<string>>>({})
@@ -444,17 +469,18 @@ export default function PropertyViewerClient({ userId, companyId }: {
 
       const { data: propRows } = await supabase
         .from('property_rows')
-        .select('sheet_id, data')
+        .select('id, sheet_id, data')
         .order('id', { ascending: true })
 
       const typedSheets = sheetRows as SheetRecord[]
       const merged = mergeColumnMeta(typedSheets.map(s => s.columns as ColumnMeta[]))
-      const allRows = (propRows ?? []).map((r: { sheet_id: string; data: RawRow }) => r.data)
-      const allSheetIds = (propRows ?? []).map((r: { sheet_id: string; data: RawRow }) => r.sheet_id)
+      const allRows = (propRows ?? []).map((r: { id: string | number; sheet_id: string; data: RawRow }) => r.data)
+      const allSheetIds = (propRows ?? []).map((r: { id: string | number; sheet_id: string; data: RawRow }) => r.sheet_id)
+      const allRowIds = (propRows ?? []).map((r: { id: string | number; sheet_id: string; data: RawRow }) => r.id)
       const cfg = loadConfig(userId, merged)
 
       const tabsMap: Record<string, string[]> = {}
-      ;(propRows ?? []).forEach((r: { sheet_id: string; data: RawRow }) => {
+      ;(propRows ?? []).forEach((r: { id: string | number; sheet_id: string; data: RawRow }) => {
         const tab = r.data?.__tab
         if (tab && typeof tab === 'string') {
           if (!tabsMap[r.sheet_id]) tabsMap[r.sheet_id] = []
@@ -466,6 +492,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
       setColumns(merged)
       setRows(allRows)
       setRowSheetIds(allSheetIds)
+      setRowIds(allRowIds)
       setTabsBySheetId(tabsMap)
       applyConfig(cfg, merged)
       setPhase('loaded')
@@ -538,9 +565,11 @@ export default function PropertyViewerClient({ userId, companyId }: {
         if (sheetErr || !sheetRecord) { setUploadError('Failed to save sheet.'); continue }
 
         const CHUNK = 500
+        const insertedIds: (string | number)[] = []
         for (let i = 0; i < allRows.length; i += CHUNK) {
           const chunk = allRows.slice(i, i + CHUNK).map(r => ({ sheet_id: sheetRecord.id, user_id: userId, company_id: companyId, data: r }))
-          await supabase.from('property_rows').insert(chunk)
+          const { data: inserted } = await supabase.from('property_rows').insert(chunk).select('id')
+          insertedIds.push(...(inserted ?? []).map((r: { id: string | number }) => r.id))
         }
 
         const newSheet = sheetRecord as SheetRecord
@@ -554,6 +583,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
         })
         setRows(prev => [...prev, ...allRows])
         setRowSheetIds(prev => [...prev, ...Array(allRows.length).fill(sheetRecord.id)])
+        setRowIds(prev => [...prev, ...insertedIds])
         if (hasMultipleTabs) {
           setTabsBySheetId(prev => ({ ...prev, [sheetRecord.id]: parsed.map(s => s.sheetName) }))
         }
@@ -582,6 +612,11 @@ export default function PropertyViewerClient({ userId, companyId }: {
     setPreviewCopied(false)
   }
 
+  function rowIdFor(row: RawRow): string | number | undefined {
+    const idx = rows.indexOf(row)
+    return idx >= 0 ? rowIds[idx] : undefined
+  }
+
   // Initialise modal field/plan selection whenever a new card is opened
   useEffect(() => {
     if (selectedIdx === null) { setModalFields([]); setModalPlans([]); setCopiedModal(false); return }
@@ -592,9 +627,16 @@ export default function PropertyViewerClient({ userId, companyId }: {
       .filter(col => col.key !== pk)
       .filter(col => { const v = row[col.key]; return v != null && v !== '' && String(v) !== '—' })
       .map(col => col.key)
-    setModalFields(allNonEmpty)
     const plansStr = pk ? String(row[pk] ?? '') : ''
-    setModalPlans(plansStr.split('|').map(s => s.trim()).filter(Boolean))
+    const allPlans = plansStr.split('|').map(s => s.trim()).filter(Boolean)
+    const saved = loadSelection(userId, rowIdFor(row))
+    if (saved) {
+      setModalFields(saved.fields.filter(f => allNonEmpty.includes(f)))
+      setModalPlans(saved.plans.filter(p => allPlans.includes(p)))
+    } else {
+      setModalFields(allNonEmpty)
+      setModalPlans(allPlans)
+    }
     setCopiedModal(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIdx])
@@ -611,6 +653,16 @@ export default function PropertyViewerClient({ userId, companyId }: {
     const msg = generateViewerMessage(row, columns, config, selectedKeys)
     setPreviewLines(msg.split('\n'))
     setPreviewCopied(false)
+  }
+
+  function updateModalFields(next: string[]) {
+    setWithUndo(record, setModalFields, modalFields, next)
+    if (selectedProperty) saveSelection(userId, rowIdFor(selectedProperty), next, modalPlans)
+  }
+
+  function updateModalPlans(next: string[]) {
+    setWithUndo(record, setModalPlans, modalPlans, next)
+    if (selectedProperty) saveSelection(userId, rowIdFor(selectedProperty), modalFields, next)
   }
 
   function toggleSheet(sheetId: string) {
@@ -640,15 +692,16 @@ export default function PropertyViewerClient({ userId, companyId }: {
     setSelectedTabsBySheetId(prev => { const n = { ...prev }; delete n[sheetId]; return n })
     if (openTabDropdownId === sheetId) { setOpenTabDropdownId(null); setDropdownPos(null) }
     if (nextSheets.length === 0) {
-      setRows([]); setRowSheetIds([]); setColumns([]); setConfig(null); setFilters({}); setPhase('empty')
+      setRows([]); setRowSheetIds([]); setRowIds([]); setColumns([]); setConfig(null); setFilters({}); setPhase('empty')
       return
     }
-    const { data: propRows } = await supabase.from('property_rows').select('sheet_id, data').order('id', { ascending: true })
-    const allRows = (propRows ?? []).map((r: { sheet_id: string; data: RawRow }) => r.data)
-    const allSheetIds = (propRows ?? []).map((r: { sheet_id: string; data: RawRow }) => r.sheet_id)
+    const { data: propRows } = await supabase.from('property_rows').select('id, sheet_id, data').order('id', { ascending: true })
+    const allRows = (propRows ?? []).map((r: { id: string | number; sheet_id: string; data: RawRow }) => r.data)
+    const allSheetIds = (propRows ?? []).map((r: { id: string | number; sheet_id: string; data: RawRow }) => r.sheet_id)
+    const allRowIds = (propRows ?? []).map((r: { id: string | number; sheet_id: string; data: RawRow }) => r.id)
     const merged = mergeColumnMeta(nextSheets.map(s => s.columns as ColumnMeta[]))
     const cfg = loadConfig(userId, merged)
-    setRows(allRows); setRowSheetIds(allSheetIds); setColumns(merged); applyConfig(cfg, merged)
+    setRows(allRows); setRowSheetIds(allSheetIds); setRowIds(allRowIds); setColumns(merged); applyConfig(cfg, merged)
   }
 
   // Derived data
@@ -1318,8 +1371,8 @@ export default function PropertyViewerClient({ userId, companyId }: {
                   return (
                     <>
                       <div className="ph-modal-select-all-row">
-                        <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, allFieldKeys)}>{t('pvSelectAll')}</button>
-                        <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, [])}>{t('pvDeselectAll')}</button>
+                        <button type="button" className="ph-picker-select-all" onClick={() => updateModalFields(allFieldKeys)}>{t('pvSelectAll')}</button>
+                        <button type="button" className="ph-picker-select-all" onClick={() => updateModalFields([])}>{t('pvDeselectAll')}</button>
                       </div>
                       <div className="ph-modal-grid">
                         {visibleCols.map(col => {
@@ -1331,7 +1384,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                                 type="checkbox"
                                 className="ph-modal-field-check"
                                 checked={modalFields.includes(col.key)}
-                                onChange={() => setWithUndo(record, setModalFields, modalFields,
+                                onChange={() => updateModalFields(
                                   modalFields.includes(col.key) ? modalFields.filter(x => x !== col.key) : [...modalFields, col.key]
                                 )}
                               />
@@ -1345,8 +1398,8 @@ export default function PropertyViewerClient({ userId, companyId }: {
                         <div className="ph-modal-section">
                           <h4>💳 Payment Plans</h4>
                           <div className="ph-modal-select-all-row">
-                            <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlans, modalPlans, plansFromRow)}>{t('pvSelectAll')}</button>
-                            <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlans, modalPlans, [])}>{t('pvDeselectAll')}</button>
+                            <button type="button" className="ph-picker-select-all" onClick={() => updateModalPlans(plansFromRow)}>{t('pvSelectAll')}</button>
+                            <button type="button" className="ph-picker-select-all" onClick={() => updateModalPlans([])}>{t('pvDeselectAll')}</button>
                           </div>
                           <div className="ph-modal-plan-check">
                             {plansFromRow.map((p, i) => (
@@ -1354,7 +1407,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                                 <input
                                   type="checkbox"
                                   checked={modalPlans.includes(p)}
-                                  onChange={() => setWithUndo(record, setModalPlans, modalPlans,
+                                  onChange={() => updateModalPlans(
                                     modalPlans.includes(p) ? modalPlans.filter(x => x !== p) : [...modalPlans, p]
                                   )}
                                 />

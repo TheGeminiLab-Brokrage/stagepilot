@@ -75,6 +75,32 @@ const DEFAULT_FILTERS: Filters = {
   delivery: [], discount: [], extras: [],
 }
 
+type SavedSelection = { fields: string[]; plans: string[] }
+
+function unitKey(r: Property): string {
+  return `${r.project}::${r.code}::${r.phase}::${r.floor}`
+}
+
+function loadSelection(userId: string, key: string): SavedSelection | null {
+  try {
+    const raw = localStorage.getItem(`pv_dashboard_selection_${userId}`)
+    if (!raw) return null
+    const map = JSON.parse(raw) as Record<string, SavedSelection>
+    return map[key] ?? null
+  } catch {
+    return null
+  }
+}
+
+function saveSelection(userId: string, key: string, fields: string[], plans: string[]) {
+  try {
+    const raw = localStorage.getItem(`pv_dashboard_selection_${userId}`)
+    const map = raw ? (JSON.parse(raw) as Record<string, SavedSelection>) : {}
+    map[key] = { fields, plans }
+    localStorage.setItem(`pv_dashboard_selection_${userId}`, JSON.stringify(map))
+  } catch { /* ignore */ }
+}
+
 function fmt(n: unknown): string {
   if (n === null || n === undefined || n === '') return '—'
   const num = parseFloat(String(n))
@@ -353,7 +379,7 @@ function MultiCombobox({ value, onChange, options, placeholder }: {
   )
 }
 
-export default function PropertyDashboardClient() {
+export default function PropertyDashboardClient({ userId }: { userId: string }) {
   const t = useT()
   const [rawData, setRawData] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
@@ -640,8 +666,16 @@ export default function PropertyDashboardClient() {
     if (selectedIdx === null) { setModalPlanSelected([]); setModalFields([]); return }
     const prop = sorted[selectedIdx]
     if (!prop) return
-    setModalPlanSelected(String(prop.plans || '').split('|').map(s => s.trim()).filter(Boolean))
-    setModalFields(getAvailableFields(prop))
+    const allPlans = String(prop.plans || '').split('|').map(s => s.trim()).filter(Boolean)
+    const availableFields = getAvailableFields(prop)
+    const saved = loadSelection(userId, unitKey(prop))
+    if (saved) {
+      setModalPlanSelected(saved.plans.filter(p => allPlans.includes(p)))
+      setModalFields(saved.fields.filter(f => availableFields.includes(f)))
+    } else {
+      setModalPlanSelected(allPlans)
+      setModalFields(availableFields)
+    }
   }, [selectedIdx]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCopy = useCallback((e: ReactMouseEvent, r: Property, idx: number) => {
@@ -674,6 +708,16 @@ export default function PropertyDashboardClient() {
     setPreviewLines(msg.split('\n'))
     setPreviewCopied(false)
   }, [modalPlanSelected, modalFields])
+
+  const updateModalFields = useCallback((next: string[]) => {
+    setWithUndo(record, setModalFields, modalFields, next)
+    if (selectedProperty) saveSelection(userId, unitKey(selectedProperty), next, modalPlanSelected)
+  }, [record, modalFields, modalPlanSelected, selectedProperty, userId])
+
+  const updateModalPlans = useCallback((next: string[]) => {
+    setWithUndo(record, setModalPlanSelected, modalPlanSelected, next)
+    if (selectedProperty) saveSelection(userId, unitKey(selectedProperty), modalFields, next)
+  }, [record, modalPlanSelected, modalFields, selectedProperty, userId])
 
   const handlePage = useCallback((p: number) => {
     if (p < 1 || p > totalPages) return
@@ -1156,8 +1200,8 @@ export default function PropertyDashboardClient() {
                     </div>
 
                     <div className="ph-modal-select-all-row">
-                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, getAvailableFields(r))}>{t('pvSelectAll')}</button>
-                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, [])}>{t('pvDeselectAll')}</button>
+                      <button type="button" className="ph-picker-select-all" onClick={() => updateModalFields(getAvailableFields(r))}>{t('pvSelectAll')}</button>
+                      <button type="button" className="ph-picker-select-all" onClick={() => updateModalFields([])}>{t('pvDeselectAll')}</button>
                     </div>
                     <div className="ph-modal-grid">
                       {/* Checkable fields */}
@@ -1170,7 +1214,7 @@ export default function PropertyDashboardClient() {
                         return (
                           <label key={field} className="ph-modal-field ph-modal-field-selectable">
                             <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes(field)}
-                              onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes(field) ? modalFields.filter(x => x !== field) : [...modalFields, field])} />
+                              onChange={() => updateModalFields(modalFields.includes(field) ? modalFields.filter(x => x !== field) : [...modalFields, field])} />
                             <div className="f-label">{label}</div>
                             <div className="f-value">{val}</div>
                           </label>
@@ -1182,7 +1226,7 @@ export default function PropertyDashboardClient() {
                       {r.area ? (
                         <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('area')}
-                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('area') ? modalFields.filter(x => x !== 'area') : [...modalFields, 'area'])} />
+                            onChange={() => updateModalFields(modalFields.includes('area') ? modalFields.filter(x => x !== 'area') : [...modalFields, 'area'])} />
                           <div className="f-label">Area</div>
                           <div className="f-value">{r.area} m²</div>
                         </label>
@@ -1202,7 +1246,7 @@ export default function PropertyDashboardClient() {
                       {r.delivery ? (
                         <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('delivery')}
-                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('delivery') ? modalFields.filter(x => x !== 'delivery') : [...modalFields, 'delivery'])} />
+                            onChange={() => updateModalFields(modalFields.includes('delivery') ? modalFields.filter(x => x !== 'delivery') : [...modalFields, 'delivery'])} />
                           <div className="f-label">Delivery</div>
                           <div className="f-value">{r.delivery}</div>
                         </label>
@@ -1210,7 +1254,7 @@ export default function PropertyDashboardClient() {
                       {parseFloat(String(r.discount)) > 0 ? (
                         <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('discount')}
-                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('discount') ? modalFields.filter(x => x !== 'discount') : [...modalFields, 'discount'])} />
+                            onChange={() => updateModalFields(modalFields.includes('discount') ? modalFields.filter(x => x !== 'discount') : [...modalFields, 'discount'])} />
                           <div className="f-label">Cash Discount</div>
                           <div className="f-value" style={{ color: '#22c55e' }}>{parseFloat(String(r.discount)) > 99 ? 'EGP ' + fmtFull(r.discount) : r.discount + '%'}</div>
                         </label>
@@ -1218,7 +1262,7 @@ export default function PropertyDashboardClient() {
                       {parseFloat(String(r.maint)) > 0 ? (
                         <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('maint')}
-                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('maint') ? modalFields.filter(x => x !== 'maint') : [...modalFields, 'maint'])} />
+                            onChange={() => updateModalFields(modalFields.includes('maint') ? modalFields.filter(x => x !== 'maint') : [...modalFields, 'maint'])} />
                           <div className="f-label">Maintenance</div>
                           <div className="f-value">{r.maint}%</div>
                         </label>
@@ -1226,7 +1270,7 @@ export default function PropertyDashboardClient() {
                       {r.parking && String(r.parking) !== '—' ? (
                         <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('parking')}
-                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('parking') ? modalFields.filter(x => x !== 'parking') : [...modalFields, 'parking'])} />
+                            onChange={() => updateModalFields(modalFields.includes('parking') ? modalFields.filter(x => x !== 'parking') : [...modalFields, 'parking'])} />
                           <div className="f-label">Parking</div>
                           <div className="f-value">{r.parking}</div>
                         </label>
@@ -1235,7 +1279,7 @@ export default function PropertyDashboardClient() {
                       {r.price ? (
                         <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('price')}
-                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('price') ? modalFields.filter(x => x !== 'price') : [...modalFields, 'price'])} />
+                            onChange={() => updateModalFields(modalFields.includes('price') ? modalFields.filter(x => x !== 'price') : [...modalFields, 'price'])} />
                           <div className="f-label">Price (EGP)</div>
                           <div className="f-value">{fmtFull(r.price)}</div>
                         </label>
@@ -1246,8 +1290,8 @@ export default function PropertyDashboardClient() {
                       <div className="ph-modal-section">
                         <h4>💳 Payment Plans</h4>
                         <div className="ph-modal-select-all-row">
-                          <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlanSelected, modalPlanSelected, plans)}>{t('pvSelectAll')}</button>
-                          <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlanSelected, modalPlanSelected, [])}>{t('pvDeselectAll')}</button>
+                          <button type="button" className="ph-picker-select-all" onClick={() => updateModalPlans(plans)}>{t('pvSelectAll')}</button>
+                          <button type="button" className="ph-picker-select-all" onClick={() => updateModalPlans([])}>{t('pvDeselectAll')}</button>
                         </div>
                         <div className="ph-modal-plan-check">
                           {plans.map((p, i) => (
@@ -1255,7 +1299,7 @@ export default function PropertyDashboardClient() {
                               <input
                                 type="checkbox"
                                 checked={modalPlanSelected.includes(p)}
-                                onChange={() => setWithUndo(record, setModalPlanSelected, modalPlanSelected,
+                                onChange={() => updateModalPlans(
                                   modalPlanSelected.includes(p) ? modalPlanSelected.filter(x => x !== p) : [...modalPlanSelected, p]
                                 )}
                               />
