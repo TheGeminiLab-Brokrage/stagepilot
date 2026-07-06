@@ -27,8 +27,15 @@
 -- DROP OLD TASK-LIST FEATURE
 -- =============================================
 
-alter publication supabase_realtime drop table if exists public.task_list_recipients;
-alter publication supabase_realtime drop table if exists public.task_list_item_completions;
+do $$
+begin
+  if exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'task_list_recipients') then
+    alter publication supabase_realtime drop table public.task_list_recipients;
+  end if;
+  if exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'task_list_item_completions') then
+    alter publication supabase_realtime drop table public.task_list_item_completions;
+  end if;
+end $$;
 
 drop table if exists public.task_list_item_completions cascade;
 drop table if exists public.task_list_recipients cascade;
