@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/language-context'
 import type { TicketAssigneeRow, TicketAttachment, TicketSummary } from './chatTypes'
@@ -82,6 +83,8 @@ export default function TicketDetailView({
   }, [ticket.id, ticket.mode, ticket.attachmentCount])
 
   const priorityColor = PRIORITY_COLOR[ticket.priority]
+  const photoAttachments = attachments.filter(a => a.kind === 'photo')
+  const voiceAttachments = attachments.filter(a => a.kind === 'voice')
 
   return (
     <div className="flex flex-col h-full">
@@ -120,7 +123,7 @@ export default function TicketDetailView({
           </p>
         )}
 
-        {attachments.length > 0 && (
+        {photoAttachments.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <span
               className="text-xs font-semibold uppercase"
@@ -129,7 +132,7 @@ export default function TicketDetailView({
               {t('ticketAttachmentsLabel')}
             </span>
             <div className="flex flex-wrap gap-2">
-              {attachments.map(a => (
+              {photoAttachments.map(a => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={a.id}
@@ -141,6 +144,20 @@ export default function TicketDetailView({
                 />
               ))}
             </div>
+          </div>
+        )}
+
+        {voiceAttachments.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <span
+              className="text-xs font-semibold uppercase"
+              style={{ color: MUTED, letterSpacing: '0.06em', fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              {t('ticketVoiceNotesLabel')}
+            </span>
+            {voiceAttachments.map(a => (
+              <audio key={a.id} controls src={a.url} style={{ height: 32, width: '100%' }} />
+            ))}
           </div>
         )}
 
@@ -191,7 +208,7 @@ export default function TicketDetailView({
         )}
       </div>
 
-      {lightbox && (
+      {lightbox && typeof document !== 'undefined' && createPortal(
         <div
           onClick={() => setLightbox(null)}
           style={{
@@ -208,7 +225,8 @@ export default function TicketDetailView({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={lightbox} alt={t('ticketViewAttachmentAria')} style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: 8 }} />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

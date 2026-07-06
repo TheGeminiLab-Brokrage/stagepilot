@@ -344,6 +344,11 @@ const en = {
   ticketAttachmentsLabel: 'Photos',
   ticketAttachmentUploadError: 'Some photos failed to upload.',
   ticketViewAttachmentAria: 'View photo',
+  ticketRecordVoiceNoteButton: '🎤 Record voice note',
+  ticketStopRecordingButton: '⏹ Stop',
+  ticketVoiceNoteRemoveAria: 'Remove voice note',
+  ticketMicPermissionError: 'Could not access the microphone. Check your browser permissions.',
+  ticketVoiceNotesLabel: 'Voice Notes',
 
   // ── Chat groups ───────────────────────────────────────────────────────────
   chatCreateGroupButton: '+ New Group',
@@ -706,6 +711,11 @@ const ar: typeof en = {
   ticketAttachmentsLabel: 'الصور',
   ticketAttachmentUploadError: 'فشل تحميل بعض الصور.',
   ticketViewAttachmentAria: 'عرض الصورة',
+  ticketRecordVoiceNoteButton: '🎤 تسجيل ملاحظة صوتية',
+  ticketStopRecordingButton: '⏹ إيقاف',
+  ticketVoiceNoteRemoveAria: 'إزالة الملاحظة الصوتية',
+  ticketMicPermissionError: 'تعذر الوصول إلى الميكروفون. تحقق من أذونات المتصفح.',
+  ticketVoiceNotesLabel: 'الملاحظات الصوتية',
 
   // ── Chat groups ───────────────────────────────────────────────────────────
   chatCreateGroupButton: '+ مجموعة جديدة',

@@ -44,8 +44,14 @@ export default function TicketCreateModal({
   const [assigneeSearch, setAssigneeSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [photos, setPhotos] = useState<File[]>([])
+  const [voiceNotes, setVoiceNotes] = useState<{ blob: Blob; url: string }[]>([])
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordingChunksRef = useRef<Blob[]>([])
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -54,6 +60,13 @@ export default function TicketCreateModal({
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
+      mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop())
+    }
+  }, [])
 
   useEffect(() => {
     const supabase = createClient()
@@ -104,6 +117,51 @@ export default function TicketCreateModal({
     setPhotos(prev => prev.filter((_, i) => i !== index))
   }
 
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : ''
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+      recordingChunksRef.current = []
+
+      recorder.ondataavailable = e => {
+        if (e.data.size > 0) recordingChunksRef.current.push(e.data)
+      }
+      recorder.onstop = () => {
+        const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        setVoiceNotes(prev => [...prev, { blob, url: URL.createObjectURL(blob) }])
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      mediaRecorderRef.current = recorder
+      recorder.start()
+      setIsRecording(true)
+      setRecordingSeconds(0)
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000)
+    } catch {
+      setError(t('ticketMicPermissionError'))
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop()
+    setIsRecording(false)
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+  }
+
+  function removeVoiceNote(index: number) {
+    setVoiceNotes(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function formatSeconds(total: number) {
+    const m = Math.floor(total / 60)
+    const s = total % 60
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
+
   const filteredCandidates = candidates.filter(c => c.full_name.toLowerCase().includes(assigneeSearch.toLowerCase()))
   const canSubmit = title.trim().length > 0 && selectedIds.size > 0 && !submitting
 
@@ -132,8 +190,10 @@ export default function TicketCreateModal({
     }
 
     let attachmentCount = 0
-    if (photos.length > 0) {
+    const totalAttachments = photos.length + voiceNotes.length
+    if (totalAttachments > 0) {
       const supabase = createClient()
+
       for (const file of photos) {
         const path = `${companyId}/${data.ticket.id}/${crypto.randomUUID()}-${file.name}`
         const { error: uploadError } = await supabase.storage.from('ticket-attachments').upload(path, file)
@@ -143,14 +203,34 @@ export default function TicketCreateModal({
         }
         const { error: insertError } = await supabase
           .from('ticket_attachments')
-          .insert({ ticket_id: data.ticket.id, storage_path: path, uploaded_by: currentUserId })
+          .insert({ ticket_id: data.ticket.id, storage_path: path, uploaded_by: currentUserId, kind: 'photo' })
         if (insertError) {
           console.error('Ticket attachment row insert failed:', insertError.message)
           continue
         }
         attachmentCount++
       }
-      if (attachmentCount < photos.length) {
+
+      for (const note of voiceNotes) {
+        const path = `${companyId}/${data.ticket.id}/${crypto.randomUUID()}.webm`
+        const { error: uploadError } = await supabase.storage
+          .from('ticket-attachments')
+          .upload(path, note.blob, { contentType: note.blob.type || 'audio/webm' })
+        if (uploadError) {
+          console.error('Ticket voice note upload failed:', uploadError.message)
+          continue
+        }
+        const { error: insertError } = await supabase
+          .from('ticket_attachments')
+          .insert({ ticket_id: data.ticket.id, storage_path: path, uploaded_by: currentUserId, kind: 'voice' })
+        if (insertError) {
+          console.error('Ticket attachment row insert failed:', insertError.message)
+          continue
+        }
+        attachmentCount++
+      }
+
+      if (attachmentCount < totalAttachments) {
         window.alert(t('ticketAttachmentUploadError'))
       }
     }
@@ -334,6 +414,37 @@ export default function TicketCreateModal({
                         fontSize: 11,
                         lineHeight: 1,
                       }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              className="text-xs font-semibold self-start px-2 py-1 rounded"
+              style={{
+                background: isRecording ? 'rgba(255,59,48,0.15)' : 'rgba(215,255,0,0.1)',
+                color: isRecording ? '#FF3B30' : NEON,
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              {isRecording ? `${t('ticketStopRecordingButton')} (${formatSeconds(recordingSeconds)})` : t('ticketRecordVoiceNoteButton')}
+            </button>
+            {voiceNotes.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                {voiceNotes.map((note, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <audio controls src={note.url} style={{ height: 32, flex: 1 }} />
+                    <button
+                      onClick={() => removeVoiceNote(i)}
+                      aria-label={t('ticketVoiceNoteRemoveAria')}
+                      className="text-sm px-1"
+                      style={{ color: MUTED }}
                     >
                       ×
                     </button>

@@ -26,9 +26,12 @@ export type TicketAssigneeRow = {
   status: TicketStatus
 }
 
+export type TicketAttachmentKind = 'photo' | 'voice'
+
 export type TicketAttachment = {
   id: string
   url: string
+  kind: TicketAttachmentKind
 }
 
 export type TicketSummary = {

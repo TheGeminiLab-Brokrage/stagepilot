@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
   const { data: attachments } = await supabase
     .from('ticket_attachments')
-    .select('id, storage_path')
+    .select('id, storage_path, kind')
     .eq('ticket_id', ticketId)
 
   if (!attachments || attachments.length === 0) {
@@ -37,9 +37,11 @@ export async function GET(request: NextRequest) {
         .from('ticket-attachments')
         .createSignedUrl(a.storage_path, 3600)
       if (error || !data?.signedUrl) return null
-      return { id: a.id, url: data.signedUrl }
+      return { id: a.id, url: data.signedUrl, kind: a.kind as 'photo' | 'voice' }
     })
   )
 
-  return NextResponse.json({ attachments: signed.filter((a): a is { id: string; url: string } => a !== null) })
+  return NextResponse.json({
+    attachments: signed.filter((a): a is { id: string; url: string; kind: 'photo' | 'voice' } => a !== null),
+  })
 }

@@ -94,6 +94,7 @@ create table public.ticket_attachments (
   id            uuid primary key default uuid_generate_v4(),
   ticket_id     uuid not null references public.tickets(id) on delete cascade,
   storage_path  text not null,
+  kind          text not null default 'photo' check (kind in ('photo','voice')),
   uploaded_by   uuid not null references public.profiles(id) on delete cascade,
   created_at    timestamptz not null default now()
 );
