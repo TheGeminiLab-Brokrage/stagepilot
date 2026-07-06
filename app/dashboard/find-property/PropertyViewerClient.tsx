@@ -168,17 +168,16 @@ function ConfigPanel({
   onSave: (c: ViewConfig) => void
   onClose: () => void
 }) {
-  const [draft, setDraft] = useState<ViewConfig>({ ...config })
   const filterableKeys = columns.filter(c => c.type !== 'text').map(c => c.key)
   const numericKeys = columns.filter(c => c.type === 'numeric').map(c => c.key)
 
   function toggleFilter(key: string) {
-    setDraft(d => ({
-      ...d,
-      filterColumns: d.filterColumns.includes(key)
-        ? d.filterColumns.filter(k => k !== key)
-        : [...d.filterColumns, key],
-    }))
+    onSave({
+      ...config,
+      filterColumns: config.filterColumns.includes(key)
+        ? config.filterColumns.filter(k => k !== key)
+        : [...config.filterColumns, key],
+    })
   }
 
   const inputStyle = {
@@ -248,8 +247,8 @@ function ConfigPanel({
               </label>
               <select
                 style={inputStyle}
-                value={draft.titleColumn}
-                onChange={e => setDraft(d => ({ ...d, titleColumn: e.target.value }))}
+                value={config.titleColumn}
+                onChange={e => onSave({ ...config, titleColumn: e.target.value })}
               >
                 <option value="">— None —</option>
                 {columns.map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
@@ -261,8 +260,8 @@ function ConfigPanel({
               </label>
               <select
                 style={inputStyle}
-                value={draft.subtitleColumn}
-                onChange={e => setDraft(d => ({ ...d, subtitleColumn: e.target.value }))}
+                value={config.subtitleColumn}
+                onChange={e => onSave({ ...config, subtitleColumn: e.target.value })}
               >
                 <option value="">— None —</option>
                 {columns.map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
@@ -274,8 +273,8 @@ function ConfigPanel({
               </label>
               <select
                 style={inputStyle}
-                value={draft.badgeColumn}
-                onChange={e => setDraft(d => ({ ...d, badgeColumn: e.target.value }))}
+                value={config.badgeColumn}
+                onChange={e => onSave({ ...config, badgeColumn: e.target.value })}
               >
                 <option value="">— None —</option>
                 {columns.map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
@@ -294,7 +293,7 @@ function ConfigPanel({
                 <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '5px 0' }}>
                   <input
                     type="checkbox"
-                    checked={draft.filterColumns.includes(key)}
+                    checked={config.filterColumns.includes(key)}
                     onChange={() => toggleFilter(key)}
                     style={{ accentColor: '#d7ff00', width: 15, height: 15, cursor: 'pointer' }}
                   />
@@ -314,16 +313,16 @@ function ConfigPanel({
           <div style={{ display: 'flex', gap: 10 }}>
             <select
               style={{ ...inputStyle, flex: 2 }}
-              value={draft.sortColumn}
-              onChange={e => setDraft(d => ({ ...d, sortColumn: e.target.value }))}
+              value={config.sortColumn}
+              onChange={e => onSave({ ...config, sortColumn: e.target.value })}
             >
               <option value="">— No sort —</option>
               {numericKeys.map(k => <option key={k} value={k}>{colLabel(k)}</option>)}
             </select>
             <select
               style={{ ...inputStyle, flex: 1 }}
-              value={draft.sortDir}
-              onChange={e => setDraft(d => ({ ...d, sortDir: e.target.value as 'asc' | 'desc' }))}
+              value={config.sortDir}
+              onChange={e => onSave({ ...config, sortDir: e.target.value as 'asc' | 'desc' })}
             >
               <option value="asc">↑ Low → High</option>
               <option value="desc">↓ High → Low</option>
@@ -344,8 +343,8 @@ function ConfigPanel({
               </label>
               <select
                 style={inputStyle}
-                value={draft.msgPriceCol ?? ''}
-                onChange={e => setDraft(d => ({ ...d, msgPriceCol: e.target.value || undefined }))}
+                value={config.msgPriceCol ?? ''}
+                onChange={e => onSave({ ...config, msgPriceCol: e.target.value || undefined })}
               >
                 <option value="">— Auto-detect —</option>
                 {columns.filter(c => c.type === 'numeric').map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
@@ -357,8 +356,8 @@ function ConfigPanel({
               </label>
               <select
                 style={inputStyle}
-                value={draft.msgAreaCol ?? ''}
-                onChange={e => setDraft(d => ({ ...d, msgAreaCol: e.target.value || undefined }))}
+                value={config.msgAreaCol ?? ''}
+                onChange={e => onSave({ ...config, msgAreaCol: e.target.value || undefined })}
               >
                 <option value="">— Auto-detect —</option>
                 {columns.filter(c => c.type === 'numeric').map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
@@ -370,8 +369,8 @@ function ConfigPanel({
               </label>
               <select
                 style={inputStyle}
-                value={draft.msgPlansCol ?? ''}
-                onChange={e => setDraft(d => ({ ...d, msgPlansCol: e.target.value || undefined }))}
+                value={config.msgPlansCol ?? ''}
+                onChange={e => onSave({ ...config, msgPlansCol: e.target.value || undefined })}
               >
                 <option value="">— Auto-detect —</option>
                 {columns.map(c => <option key={c.key} value={c.key}>{colLabel(c.key)}</option>)}
@@ -383,25 +382,14 @@ function ConfigPanel({
         {/* Actions */}
         <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 8 }}>
           <button
-            onClick={() => { onSave(draft); onClose() }}
+            onClick={onClose}
             style={{
               flex: 1, background: '#d7ff00', color: '#000', border: 'none',
               borderRadius: 10, padding: '10px 0', fontSize: 14, fontWeight: 700,
               cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
             }}
           >
-            Save & Apply
-          </button>
-          <button
-            onClick={onClose}
-            style={{
-              flex: 1, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)',
-              border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10,
-              padding: '10px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}
-          >
-            Cancel
+            Close
           </button>
         </div>
       </div>
