@@ -994,8 +994,9 @@
 }
 
 .ph-modal-field-selectable {
+  display: block;
   padding-left: 28px;
-  cursor: default;
+  cursor: pointer;
 }
 
 .ph-modal-field-check {

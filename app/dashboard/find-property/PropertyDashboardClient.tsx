@@ -1168,24 +1168,24 @@ export default function PropertyDashboardClient() {
                         if (!val) return null
                         const label = field === 'code' ? 'Unit Code' : field === 'phase' ? 'Phase / Building' : 'Floor'
                         return (
-                          <div key={field} className="ph-modal-field ph-modal-field-selectable">
+                          <label key={field} className="ph-modal-field ph-modal-field-selectable">
                             <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes(field)}
                               onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes(field) ? modalFields.filter(x => x !== field) : [...modalFields, field])} />
                             <div className="f-label">{label}</div>
                             <div className="f-value">{val}</div>
-                          </div>
+                          </label>
                         )
                       })}
                       {/* Always-in-header fields — no checkbox */}
                       <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Bedrooms</div><div className="f-value">{r.beds || '—'}</div></div>
                       {/* Area */}
                       {r.area ? (
-                        <div className="ph-modal-field ph-modal-field-selectable">
+                        <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('area')}
                             onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('area') ? modalFields.filter(x => x !== 'area') : [...modalFields, 'area'])} />
                           <div className="f-label">Area</div>
                           <div className="f-value">{r.area} m²</div>
-                        </div>
+                        </label>
                       ) : null}
                       {parseFloat(String(r.garden)) > 0 && (
                         <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Garden Area</div><div className="f-value">{r.garden} m²</div></div>
@@ -1200,45 +1200,45 @@ export default function PropertyDashboardClient() {
                       </div>
                       {/* Checkable detail fields */}
                       {r.delivery ? (
-                        <div className="ph-modal-field ph-modal-field-selectable">
+                        <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('delivery')}
                             onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('delivery') ? modalFields.filter(x => x !== 'delivery') : [...modalFields, 'delivery'])} />
                           <div className="f-label">Delivery</div>
                           <div className="f-value">{r.delivery}</div>
-                        </div>
+                        </label>
                       ) : <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Delivery</div><div className="f-value">—</div></div>}
                       {parseFloat(String(r.discount)) > 0 ? (
-                        <div className="ph-modal-field ph-modal-field-selectable">
+                        <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('discount')}
                             onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('discount') ? modalFields.filter(x => x !== 'discount') : [...modalFields, 'discount'])} />
                           <div className="f-label">Cash Discount</div>
                           <div className="f-value" style={{ color: '#22c55e' }}>{parseFloat(String(r.discount)) > 99 ? 'EGP ' + fmtFull(r.discount) : r.discount + '%'}</div>
-                        </div>
+                        </label>
                       ) : <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Cash Discount</div><div className="f-value" style={{ color: '#22c55e' }}>—</div></div>}
                       {parseFloat(String(r.maint)) > 0 ? (
-                        <div className="ph-modal-field ph-modal-field-selectable">
+                        <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('maint')}
                             onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('maint') ? modalFields.filter(x => x !== 'maint') : [...modalFields, 'maint'])} />
                           <div className="f-label">Maintenance</div>
                           <div className="f-value">{r.maint}%</div>
-                        </div>
+                        </label>
                       ) : <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Maintenance</div><div className="f-value">—</div></div>}
                       {r.parking && String(r.parking) !== '—' ? (
-                        <div className="ph-modal-field ph-modal-field-selectable">
+                        <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('parking')}
                             onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('parking') ? modalFields.filter(x => x !== 'parking') : [...modalFields, 'parking'])} />
                           <div className="f-label">Parking</div>
                           <div className="f-value">{r.parking}</div>
-                        </div>
+                        </label>
                       ) : <div className="ph-modal-field ph-modal-field-fixed"><div className="f-label">Parking</div><div className="f-value">—</div></div>}
                       {/* Price — checkable, shown in grid for completeness */}
                       {r.price ? (
-                        <div className="ph-modal-field ph-modal-field-selectable">
+                        <label className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('price')}
                             onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('price') ? modalFields.filter(x => x !== 'price') : [...modalFields, 'price'])} />
                           <div className="f-label">Price (EGP)</div>
                           <div className="f-value">{fmtFull(r.price)}</div>
-                        </div>
+                        </label>
                       ) : null}
                     </div>
 

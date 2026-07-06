@@ -1326,7 +1326,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                           const val = selectedProperty[col.key]
                           const display = col.type === 'numeric' ? fmtFull(val) : String(val ?? '')
                           return (
-                            <div key={col.key} className="ph-modal-field ph-modal-field-selectable">
+                            <label key={col.key} className="ph-modal-field ph-modal-field-selectable">
                               <input
                                 type="checkbox"
                                 className="ph-modal-field-check"
@@ -1337,7 +1337,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
                               />
                               <div className="f-label">{col.label}</div>
                               <div className="f-value">{display}</div>
-                            </div>
+                            </label>
                           )
                         })}
                       </div>
