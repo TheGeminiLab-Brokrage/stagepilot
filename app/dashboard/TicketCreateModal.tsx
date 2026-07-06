@@ -96,7 +96,8 @@ export default function TicketCreateModal({
 
   function addPhotos(files: FileList | null) {
     if (!files) return
-    setPhotos(prev => [...prev, ...Array.from(files)])
+    const newFiles = Array.from(files)
+    setPhotos(prev => [...prev, ...newFiles])
   }
 
   function removePhoto(index: number) {
