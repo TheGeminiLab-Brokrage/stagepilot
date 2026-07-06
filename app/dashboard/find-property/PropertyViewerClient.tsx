@@ -416,7 +416,6 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [copiedModal, setCopiedModal] = useState(false)
   const [previewLines, setPreviewLines] = useState<string[] | null>(null)
   const [previewCopied, setPreviewCopied] = useState(false)
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
   const { record, undo } = useUndoStack()
   const [showConfig, setShowConfig] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -611,33 +610,6 @@ export default function PropertyViewerClient({ userId, companyId }: {
     ]
     const msg = generateViewerMessage(row, columns, config, selectedKeys)
     setPreviewLines(msg.split('\n'))
-    setPreviewCopied(false)
-  }
-
-  function toggleRowSelection(idx: number) {
-    const next = new Set(selectedRows)
-    if (next.has(idx)) next.delete(idx); else next.add(idx)
-    setWithUndo(record, setSelectedRows, selectedRows, next)
-  }
-
-  function clearRowSelection() {
-    setWithUndo(record, setSelectedRows, selectedRows, new Set())
-  }
-
-  function handleGenerateSelectedMessage() {
-    if (!config) return
-    const pk = plansColKey(columns, config)
-    const rowsToUse = Array.from(selectedRows).sort((a, b) => a - b).map(i => afterSearch[i]).filter(Boolean)
-    if (rowsToUse.length === 0) return
-    const blocks = rowsToUse.map(row => {
-      const allKeys = columns
-        .filter(c => c.key !== pk)
-        .filter(c => { const v = row[c.key]; return v != null && v !== '' && String(v) !== '—' })
-        .map(c => c.key)
-      const selectedKeys = [...allKeys, ...(pk && row[pk] ? [pk] : [])]
-      return generateViewerMessage(row, columns, config, selectedKeys)
-    })
-    setPreviewLines(blocks.join('\n\n').split('\n'))
     setPreviewCopied(false)
   }
 
@@ -1130,14 +1102,6 @@ export default function PropertyViewerClient({ userId, companyId }: {
             </div>
           </div>
 
-          {selectedRows.size > 0 && (
-            <div className="ph-selection-bar">
-              <span>{selectedRows.size} {t('pvUnitsSelectedLabel')}</span>
-              <button className="ph-btn-reset" onClick={clearRowSelection}>{t('pvClearSelection')}</button>
-              <button className="ph-picker-copy-btn" onClick={handleGenerateSelectedMessage}>📋 {t('pvGenerateMessage')}</button>
-            </div>
-          )}
-
           {/* Results */}
           {afterSearch.length === 0 ? (
             <div className="ph-empty">
@@ -1165,14 +1129,6 @@ export default function PropertyViewerClient({ userId, companyId }: {
                 return (
                   <div key={idx}>
                     <div className="ph-property-card" onClick={() => setSelectedIdx(idx)} style={{ position: 'relative' }}>
-                      <input
-                        type="checkbox"
-                        className="ph-card-select-checkbox"
-                        checked={selectedRows.has(idx)}
-                        onClick={e => e.stopPropagation()}
-                        onChange={() => toggleRowSelection(idx)}
-                        title={t('pvAddToMessageTitle')}
-                      />
                       <div className="ph-card-top" style={{ background: 'linear-gradient(180deg, rgba(215,255,0,0.04) 0%, transparent 100%)' }}>
                         {showBadge && (
                           <div className="ph-type-badge" style={badgeStyle(badgeVal)}>{badgeVal}</div>
@@ -1246,7 +1202,6 @@ export default function PropertyViewerClient({ userId, companyId }: {
               return (
                 <div className="ph-list-view">
                   <div className="ph-list-row" style={{ cursor: 'default', opacity: 0.45, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '8px 16px', fontFamily: "'Space Grotesk', sans-serif" }}>
-                    <div style={{ width: 18 }} />
                     {listCols.map(col => <div key={col.key} style={{ flex: 1, minWidth: 80 }}>{col.label.toUpperCase()}</div>)}
                     <div style={{ width: 24 }} />
                   </div>
@@ -1254,14 +1209,6 @@ export default function PropertyViewerClient({ userId, companyId }: {
                     const idx = (page - 1) * PAGE_SIZE + i
                     return (
                       <div key={idx} className="ph-list-row" onClick={() => setSelectedIdx(idx)}>
-                        <input
-                          type="checkbox"
-                          className="ph-list-select-checkbox"
-                          checked={selectedRows.has(idx)}
-                          onClick={e => e.stopPropagation()}
-                          onChange={() => toggleRowSelection(idx)}
-                          title={t('pvAddToMessageTitle')}
-                        />
                         {listCols.map(col => (
                           <div key={col.key} style={{ flex: 1, minWidth: 80 }}>
                             {col.type === 'numeric' ? fmt(row[col.key]) : String(row[col.key] ?? '—')}

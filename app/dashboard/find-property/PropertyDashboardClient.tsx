@@ -374,7 +374,6 @@ export default function PropertyDashboardClient() {
   const [modalFields, setModalFields] = useState<string[]>([])
   const [previewLines, setPreviewLines] = useState<string[] | null>(null)
   const [previewCopied, setPreviewCopied] = useState(false)
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
   const { record, undo } = useUndoStack()
 
   useEffect(() => {
@@ -676,24 +675,6 @@ export default function PropertyDashboardClient() {
     setPreviewCopied(false)
   }, [modalPlanSelected, modalFields])
 
-  const toggleRowSelection = useCallback((idx: number) => {
-    const next = new Set(selectedRows)
-    if (next.has(idx)) next.delete(idx); else next.add(idx)
-    setWithUndo(record, setSelectedRows, selectedRows, next)
-  }, [selectedRows, record])
-
-  const clearRowSelection = useCallback(() => {
-    setWithUndo(record, setSelectedRows, selectedRows, new Set())
-  }, [selectedRows, record])
-
-  const handleGenerateSelectedMessage = useCallback(() => {
-    const rows = Array.from(selectedRows).sort((a, b) => a - b).map(i => sorted[i]).filter(Boolean)
-    if (rows.length === 0) return
-    const msg = rows.map(r => generatePropertyMessage(r)).join('\n\n')
-    setPreviewLines(msg.split('\n'))
-    setPreviewCopied(false)
-  }, [selectedRows, sorted])
-
   const handlePage = useCallback((p: number) => {
     if (p < 1 || p > totalPages) return
     setPage(p)
@@ -898,14 +879,6 @@ export default function PropertyDashboardClient() {
           </div>
         </div>
 
-        {selectedRows.size > 0 && (
-          <div className="ph-selection-bar">
-            <span>{selectedRows.size} {t('pvUnitsSelectedLabel')}</span>
-            <button className="ph-btn-reset" onClick={clearRowSelection}>{t('pvClearSelection')}</button>
-            <button className="ph-picker-copy-btn" onClick={handleGenerateSelectedMessage}>📋 {t('pvGenerateMessage')}</button>
-          </div>
-        )}
-
         {/* Results */}
         {sorted.length === 0 ? (
           <div className="ph-empty">
@@ -1011,14 +984,6 @@ export default function PropertyDashboardClient() {
                       </div>
                     </div>
                   </div>
-                  <input
-                    type="checkbox"
-                    className="ph-card-select-checkbox"
-                    checked={selectedRows.has(idx)}
-                    onClick={e => e.stopPropagation()}
-                    onChange={() => toggleRowSelection(idx)}
-                    title={t('pvAddToMessageTitle')}
-                  />
                 </div>
               )
             })}
@@ -1026,7 +991,6 @@ export default function PropertyDashboardClient() {
         ) : (
           <div className="ph-list-view">
             <div className="ph-list-row" style={{ cursor: 'default', opacity: 0.45, fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', padding: '8px 16px', fontFamily: "'Space Grotesk', sans-serif" }}>
-              <div style={{ width: 18 }} />
               <div className="ph-list-project">PROJECT / DEVELOPER</div>
               <div className="ph-list-city">CITY</div>
               <div className="ph-list-type">TYPE</div>
@@ -1040,14 +1004,6 @@ export default function PropertyDashboardClient() {
               const idx = (page - 1) * PAGE_SIZE + i
               return (
                 <div key={idx} className="ph-list-row" onClick={() => setSelectedIdx(idx)}>
-                  <input
-                    type="checkbox"
-                    className="ph-list-select-checkbox"
-                    checked={selectedRows.has(idx)}
-                    onClick={e => e.stopPropagation()}
-                    onChange={() => toggleRowSelection(idx)}
-                    title={t('pvAddToMessageTitle')}
-                  />
                   <div className="ph-list-project">
                     <div className="name">{r.project}</div>
                     <div className="dev">{r.developer}</div>

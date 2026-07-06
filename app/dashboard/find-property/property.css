@@ -1179,53 +1179,6 @@
   color: #fff;
 }
 
-/* WHOLE-CARD MULTI-SELECT CHECKBOX */
-.ph-card-select-checkbox {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  z-index: 2;
-  width: 18px;
-  height: 18px;
-  accent-color: #d7ff00;
-  cursor: pointer;
-}
-
-[dir="rtl"] .ph-card-select-checkbox {
-  left: auto;
-  right: 14px;
-}
-
-.ph-list-select-checkbox {
-  width: 16px;
-  height: 16px;
-  accent-color: #d7ff00;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.ph-selection-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: #141400;
-  border: 1px solid rgba(215, 255, 0, 0.3);
-  border-radius: 10px;
-  padding: 10px 16px;
-  margin-bottom: 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #d7ff00;
-  font-family: 'Space Grotesk', sans-serif;
-}
-
-.ph-selection-bar .ph-btn-reset,
-.ph-selection-bar .ph-picker-copy-btn {
-  width: auto;
-  margin: 0;
-  padding: 6px 14px;
-}
-
 /* SELECT ALL / DESELECT ALL ROWS */
 .ph-picker-section-row {
   display: flex;

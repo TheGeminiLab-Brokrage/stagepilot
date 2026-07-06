@@ -381,10 +381,6 @@ const en = {
   // ── Find a Property — selection controls ─────────────────────────────────
   pvSelectAll: 'Select All',
   pvDeselectAll: 'Deselect All',
-  pvClearSelection: 'Clear',
-  pvGenerateMessage: 'Generate Message',
-  pvUnitsSelectedLabel: 'selected',
-  pvAddToMessageTitle: 'Add to combined message',
 }
 
 const ar: typeof en = {
@@ -769,10 +765,6 @@ const ar: typeof en = {
   // ── Find a Property — selection controls ─────────────────────────────────
   pvSelectAll: 'تحديد الكل',
   pvDeselectAll: 'إلغاء تحديد الكل',
-  pvClearSelection: 'مسح التحديد',
-  pvGenerateMessage: 'إنشاء رسالة مجمعة',
-  pvUnitsSelectedLabel: 'وحدة محددة',
-  pvAddToMessageTitle: 'إضافة للرسالة المجمعة',
 }
 
 export const translations = { en, ar }
