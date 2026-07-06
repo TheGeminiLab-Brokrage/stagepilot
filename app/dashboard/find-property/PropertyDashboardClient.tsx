@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, type MouseEvent as ReactMouseEvent } from 'react'
 import './property.css'
 import { generatePropertyMessage } from '@/lib/property-message'
+import { useUndoStack, setWithUndo } from '@/lib/use-undo-stack'
 
 type Property = {
   city: string
@@ -371,6 +372,8 @@ export default function PropertyDashboardClient() {
   const [modalFields, setModalFields] = useState<string[]>([])
   const [previewLines, setPreviewLines] = useState<string[] | null>(null)
   const [previewCopied, setPreviewCopied] = useState(false)
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
+  const { record, undo } = useUndoStack()
 
   useEffect(() => {
     fetch('/property-data.json')
@@ -618,6 +621,18 @@ export default function PropertyDashboardClient() {
     return () => window.removeEventListener('keydown', handler)
   }, [selectedIdx])
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return
+      const active = document.activeElement
+      if (active instanceof HTMLInputElement && active.classList.contains('msg-preview-line')) return
+      e.preventDefault()
+      undo()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [undo])
+
   useEffect(() => { setCopiedModal(false) }, [selectedIdx])
 
   useEffect(() => {
@@ -658,6 +673,24 @@ export default function PropertyDashboardClient() {
     setPreviewLines(msg.split('\n'))
     setPreviewCopied(false)
   }, [modalPlanSelected, modalFields])
+
+  const toggleRowSelection = useCallback((idx: number) => {
+    const next = new Set(selectedRows)
+    if (next.has(idx)) next.delete(idx); else next.add(idx)
+    setWithUndo(record, setSelectedRows, selectedRows, next)
+  }, [selectedRows, record])
+
+  const clearRowSelection = useCallback(() => {
+    setWithUndo(record, setSelectedRows, selectedRows, new Set())
+  }, [selectedRows, record])
+
+  const handleGenerateSelectedMessage = useCallback(() => {
+    const rows = Array.from(selectedRows).sort((a, b) => a - b).map(i => sorted[i]).filter(Boolean)
+    if (rows.length === 0) return
+    const msg = rows.map(r => generatePropertyMessage(r)).join('\n\n')
+    setPreviewLines(msg.split('\n'))
+    setPreviewCopied(false)
+  }, [selectedRows, sorted])
 
   const handlePage = useCallback((p: number) => {
     if (p < 1 || p > totalPages) return
@@ -863,6 +896,14 @@ export default function PropertyDashboardClient() {
           </div>
         </div>
 
+        {selectedRows.size > 0 && (
+          <div className="ph-selection-bar">
+            <span>{selectedRows.size} وحدة محددة</span>
+            <button className="ph-btn-reset" onClick={clearRowSelection}>مسح التحديد</button>
+            <button className="ph-picker-copy-btn" onClick={handleGenerateSelectedMessage}>📋 إنشاء رسالة مجمعة</button>
+          </div>
+        )}
+
         {/* Results */}
         {sorted.length === 0 ? (
           <div className="ph-empty">
@@ -918,14 +959,18 @@ export default function PropertyDashboardClient() {
                                 <div className="ph-picker-title">محتوى الرسالة</div>
                                 {avFields.length > 0 && (
                                   <>
-                                    <div className="ph-picker-section">تفاصيل</div>
+                                    <div className="ph-picker-section-row">
+                                      <div className="ph-picker-section">تفاصيل</div>
+                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, avFields)}>الكل</button>
+                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, [])}>لا شيء</button>
+                                    </div>
                                     {avFields.map(field => (
                                       <label key={field} className="ph-picker-option">
                                         <input
                                           type="checkbox"
                                           checked={pickerFields.includes(field)}
-                                          onChange={() => setPickerFields(prev =>
-                                            prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+                                          onChange={() => setWithUndo(record, setPickerFields, pickerFields,
+                                            pickerFields.includes(field) ? pickerFields.filter(f => f !== field) : [...pickerFields, field]
                                           )}
                                         />
                                         <span>{FIELD_LABELS[field]}: {fieldValueLabel(r, field)}</span>
@@ -935,14 +980,18 @@ export default function PropertyDashboardClient() {
                                 )}
                                 {allPlans.length > 0 && (
                                   <>
-                                    <div className="ph-picker-section">أنظمة السداد</div>
+                                    <div className="ph-picker-section-row">
+                                      <div className="ph-picker-section">أنظمة السداد</div>
+                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, allPlans)}>الكل</button>
+                                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, [])}>لا شيء</button>
+                                    </div>
                                     {allPlans.map((plan, pi) => (
                                       <label key={pi} className="ph-picker-option">
                                         <input
                                           type="checkbox"
                                           checked={pickerPlans.includes(plan)}
-                                          onChange={() => setPickerPlans(prev =>
-                                            prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
+                                          onChange={() => setWithUndo(record, setPickerPlans, pickerPlans,
+                                            pickerPlans.includes(plan) ? pickerPlans.filter(p => p !== plan) : [...pickerPlans, plan]
                                           )}
                                         />
                                         <span>{plan}</span>
@@ -960,6 +1009,14 @@ export default function PropertyDashboardClient() {
                       </div>
                     </div>
                   </div>
+                  <input
+                    type="checkbox"
+                    className="ph-card-select-checkbox"
+                    checked={selectedRows.has(idx)}
+                    onClick={e => e.stopPropagation()}
+                    onChange={() => toggleRowSelection(idx)}
+                    title="إضافة للرسالة المجمعة"
+                  />
                 </div>
               )
             })}
@@ -967,6 +1024,7 @@ export default function PropertyDashboardClient() {
         ) : (
           <div className="ph-list-view">
             <div className="ph-list-row" style={{ cursor: 'default', opacity: 0.45, fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', padding: '8px 16px', fontFamily: "'Space Grotesk', sans-serif" }}>
+              <div style={{ width: 18 }} />
               <div className="ph-list-project">PROJECT / DEVELOPER</div>
               <div className="ph-list-city">CITY</div>
               <div className="ph-list-type">TYPE</div>
@@ -980,6 +1038,14 @@ export default function PropertyDashboardClient() {
               const idx = (page - 1) * PAGE_SIZE + i
               return (
                 <div key={idx} className="ph-list-row" onClick={() => setSelectedIdx(idx)}>
+                  <input
+                    type="checkbox"
+                    className="ph-list-select-checkbox"
+                    checked={selectedRows.has(idx)}
+                    onClick={e => e.stopPropagation()}
+                    onChange={() => toggleRowSelection(idx)}
+                    title="إضافة للرسالة المجمعة"
+                  />
                   <div className="ph-list-project">
                     <div className="name">{r.project}</div>
                     <div className="dev">{r.developer}</div>
@@ -1011,14 +1077,18 @@ export default function PropertyDashboardClient() {
                               <div className="ph-picker-title">محتوى الرسالة</div>
                               {avFields.length > 0 && (
                                 <>
-                                  <div className="ph-picker-section">تفاصيل</div>
+                                  <div className="ph-picker-section-row">
+                                    <div className="ph-picker-section">تفاصيل</div>
+                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, avFields)}>الكل</button>
+                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerFields, pickerFields, [])}>لا شيء</button>
+                                  </div>
                                   {avFields.map(field => (
                                     <label key={field} className="ph-picker-option">
                                       <input
                                         type="checkbox"
                                         checked={pickerFields.includes(field)}
-                                        onChange={() => setPickerFields(prev =>
-                                          prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+                                        onChange={() => setWithUndo(record, setPickerFields, pickerFields,
+                                          pickerFields.includes(field) ? pickerFields.filter(f => f !== field) : [...pickerFields, field]
                                         )}
                                       />
                                       <span>{FIELD_LABELS[field]}: {fieldValueLabel(r, field)}</span>
@@ -1028,14 +1098,18 @@ export default function PropertyDashboardClient() {
                               )}
                               {allPlans.length > 0 && (
                                 <>
-                                  <div className="ph-picker-section">أنظمة السداد</div>
+                                  <div className="ph-picker-section-row">
+                                    <div className="ph-picker-section">أنظمة السداد</div>
+                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, allPlans)}>الكل</button>
+                                    <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setPickerPlans, pickerPlans, [])}>لا شيء</button>
+                                  </div>
                                   {allPlans.map((plan, pi) => (
                                     <label key={pi} className="ph-picker-option">
                                       <input
                                         type="checkbox"
                                         checked={pickerPlans.includes(plan)}
-                                        onChange={() => setPickerPlans(prev =>
-                                          prev.includes(plan) ? prev.filter(p => p !== plan) : [...prev, plan]
+                                        onChange={() => setWithUndo(record, setPickerPlans, pickerPlans,
+                                          pickerPlans.includes(plan) ? pickerPlans.filter(p => p !== plan) : [...pickerPlans, plan]
                                         )}
                                       />
                                       <span>{plan}</span>
@@ -1123,6 +1197,10 @@ export default function PropertyDashboardClient() {
                       {r.ppsqm ? <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)', fontFamily: "'Montserrat', sans-serif" }}>{fmtFull(r.ppsqm)} EGP per m²</div> : null}
                     </div>
 
+                    <div className="ph-modal-select-all-row">
+                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, getAvailableFields(r))}>تحديد الكل</button>
+                      <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, [])}>إلغاء تحديد الكل</button>
+                    </div>
                     <div className="ph-modal-grid">
                       {/* Checkable fields */}
                       {(['code','phase','floor'] as const).map(field => {
@@ -1134,7 +1212,7 @@ export default function PropertyDashboardClient() {
                         return (
                           <div key={field} className="ph-modal-field ph-modal-field-selectable">
                             <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes(field)}
-                              onChange={() => setModalFields(prev => prev.includes(field) ? prev.filter(x => x !== field) : [...prev, field])} />
+                              onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes(field) ? modalFields.filter(x => x !== field) : [...modalFields, field])} />
                             <div className="f-label">{label}</div>
                             <div className="f-value">{val}</div>
                           </div>
@@ -1146,7 +1224,7 @@ export default function PropertyDashboardClient() {
                       {r.area ? (
                         <div className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('area')}
-                            onChange={() => setModalFields(prev => prev.includes('area') ? prev.filter(x => x !== 'area') : [...prev, 'area'])} />
+                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('area') ? modalFields.filter(x => x !== 'area') : [...modalFields, 'area'])} />
                           <div className="f-label">Area</div>
                           <div className="f-value">{r.area} m²</div>
                         </div>
@@ -1166,7 +1244,7 @@ export default function PropertyDashboardClient() {
                       {r.delivery ? (
                         <div className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('delivery')}
-                            onChange={() => setModalFields(prev => prev.includes('delivery') ? prev.filter(x => x !== 'delivery') : [...prev, 'delivery'])} />
+                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('delivery') ? modalFields.filter(x => x !== 'delivery') : [...modalFields, 'delivery'])} />
                           <div className="f-label">Delivery</div>
                           <div className="f-value">{r.delivery}</div>
                         </div>
@@ -1174,7 +1252,7 @@ export default function PropertyDashboardClient() {
                       {parseFloat(String(r.discount)) > 0 ? (
                         <div className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('discount')}
-                            onChange={() => setModalFields(prev => prev.includes('discount') ? prev.filter(x => x !== 'discount') : [...prev, 'discount'])} />
+                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('discount') ? modalFields.filter(x => x !== 'discount') : [...modalFields, 'discount'])} />
                           <div className="f-label">Cash Discount</div>
                           <div className="f-value" style={{ color: '#22c55e' }}>{parseFloat(String(r.discount)) > 99 ? 'EGP ' + fmtFull(r.discount) : r.discount + '%'}</div>
                         </div>
@@ -1182,7 +1260,7 @@ export default function PropertyDashboardClient() {
                       {parseFloat(String(r.maint)) > 0 ? (
                         <div className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('maint')}
-                            onChange={() => setModalFields(prev => prev.includes('maint') ? prev.filter(x => x !== 'maint') : [...prev, 'maint'])} />
+                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('maint') ? modalFields.filter(x => x !== 'maint') : [...modalFields, 'maint'])} />
                           <div className="f-label">Maintenance</div>
                           <div className="f-value">{r.maint}%</div>
                         </div>
@@ -1190,7 +1268,7 @@ export default function PropertyDashboardClient() {
                       {r.parking && String(r.parking) !== '—' ? (
                         <div className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('parking')}
-                            onChange={() => setModalFields(prev => prev.includes('parking') ? prev.filter(x => x !== 'parking') : [...prev, 'parking'])} />
+                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('parking') ? modalFields.filter(x => x !== 'parking') : [...modalFields, 'parking'])} />
                           <div className="f-label">Parking</div>
                           <div className="f-value">{r.parking}</div>
                         </div>
@@ -1199,7 +1277,7 @@ export default function PropertyDashboardClient() {
                       {r.price ? (
                         <div className="ph-modal-field ph-modal-field-selectable">
                           <input type="checkbox" className="ph-modal-field-check" checked={modalFields.includes('price')}
-                            onChange={() => setModalFields(prev => prev.includes('price') ? prev.filter(x => x !== 'price') : [...prev, 'price'])} />
+                            onChange={() => setWithUndo(record, setModalFields, modalFields, modalFields.includes('price') ? modalFields.filter(x => x !== 'price') : [...modalFields, 'price'])} />
                           <div className="f-label">Price (EGP)</div>
                           <div className="f-value">{fmtFull(r.price)}</div>
                         </div>
@@ -1209,14 +1287,18 @@ export default function PropertyDashboardClient() {
                     {plans.length > 0 && (
                       <div className="ph-modal-section">
                         <h4>💳 Payment Plans</h4>
+                        <div className="ph-modal-select-all-row">
+                          <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlanSelected, modalPlanSelected, plans)}>تحديد الكل</button>
+                          <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlanSelected, modalPlanSelected, [])}>إلغاء تحديد الكل</button>
+                        </div>
                         <div className="ph-modal-plan-check">
                           {plans.map((p, i) => (
                             <label key={i} className="ph-modal-plan-option">
                               <input
                                 type="checkbox"
                                 checked={modalPlanSelected.includes(p)}
-                                onChange={() => setModalPlanSelected(prev =>
-                                  prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]
+                                onChange={() => setWithUndo(record, setModalPlanSelected, modalPlanSelected,
+                                  modalPlanSelected.includes(p) ? modalPlanSelected.filter(x => x !== p) : [...modalPlanSelected, p]
                                 )}
                               />
                               <span>{p}</span>

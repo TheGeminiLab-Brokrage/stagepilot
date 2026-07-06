@@ -8,6 +8,7 @@ import { parseExcelFile, type RawRow } from '@/lib/excel-parser'
 import { analyzeColumns, mergeColumnMeta, type ColumnMeta } from '@/lib/column-analyzer'
 import { fmt, fmtFull } from '@/lib/property-utils'
 import { generateViewerMessage, colEmoji } from '@/lib/property-message'
+import { useUndoStack, setWithUndo } from '@/lib/use-undo-stack'
 import './property.css'
 
 const PAGE_SIZE = 24
@@ -92,6 +93,10 @@ function saveConfig(userId: string, config: ViewConfig) {
   } catch { /* ignore */ }
 }
 
+function isPriceLikeColumn(col: ColumnMeta): boolean {
+  return col.type === 'numeric' && /price|value|cost|total|amount/i.test(col.label)
+}
+
 function emptyFilters(columns: ColumnMeta[], filterColumns: string[]): FilterState {
   return Object.fromEntries(
     columns
@@ -116,8 +121,9 @@ function filterRows(rows: RawRow[], filters: FilterState, columns: ColumnMeta[])
       } else {
         const num = parseFloat(String(cell ?? '').replace(/,/g, ''))
         const fNum = f as NumericFilter
-        if (fNum.min !== '' && num < parseFloat(fNum.min)) return false
-        if (fNum.max !== '' && num > parseFloat(fNum.max)) return false
+        const unit = isPriceLikeColumn(col) ? 1e6 : 1
+        if (fNum.min !== '' && num < parseFloat(fNum.min) * unit) return false
+        if (fNum.max !== '' && num > parseFloat(fNum.max) * unit) return false
       }
     }
     return true
@@ -408,6 +414,8 @@ export default function PropertyViewerClient({ userId, companyId }: {
   const [copiedModal, setCopiedModal] = useState(false)
   const [previewLines, setPreviewLines] = useState<string[] | null>(null)
   const [previewCopied, setPreviewCopied] = useState(false)
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
+  const { record, undo } = useUndoStack()
   const [showConfig, setShowConfig] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -471,6 +479,18 @@ export default function PropertyViewerClient({ userId, companyId }: {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return
+      const active = document.activeElement
+      if (active instanceof HTMLInputElement && active.classList.contains('msg-preview-line')) return
+      e.preventDefault()
+      undo()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [undo])
 
   useEffect(() => {
     if (!openTabDropdownId) return
@@ -589,6 +609,33 @@ export default function PropertyViewerClient({ userId, companyId }: {
     ]
     const msg = generateViewerMessage(row, columns, config, selectedKeys)
     setPreviewLines(msg.split('\n'))
+    setPreviewCopied(false)
+  }
+
+  function toggleRowSelection(idx: number) {
+    const next = new Set(selectedRows)
+    if (next.has(idx)) next.delete(idx); else next.add(idx)
+    setWithUndo(record, setSelectedRows, selectedRows, next)
+  }
+
+  function clearRowSelection() {
+    setWithUndo(record, setSelectedRows, selectedRows, new Set())
+  }
+
+  function handleGenerateSelectedMessage() {
+    if (!config) return
+    const pk = plansColKey(columns, config)
+    const rowsToUse = Array.from(selectedRows).sort((a, b) => a - b).map(i => afterSearch[i]).filter(Boolean)
+    if (rowsToUse.length === 0) return
+    const blocks = rowsToUse.map(row => {
+      const allKeys = columns
+        .filter(c => c.key !== pk)
+        .filter(c => { const v = row[c.key]; return v != null && v !== '' && String(v) !== '—' })
+        .map(c => c.key)
+      const selectedKeys = [...allKeys, ...(pk && row[pk] ? [pk] : [])]
+      return generateViewerMessage(row, columns, config, selectedKeys)
+    })
+    setPreviewLines(blocks.join('\n\n').split('\n'))
     setPreviewCopied(false)
   }
 
@@ -983,21 +1030,23 @@ export default function PropertyViewerClient({ userId, companyId }: {
                 }
                 if (col.type === 'numeric') {
                   const currentVal = (filters[col.key] ?? { min: '', max: '' }) as NumericFilter
+                  const isPrice = isPriceLikeColumn(col)
                   return (
                     <div key={col.key} className="ph-filter-section">
-                      <h3>{col.label}</h3>
+                      <h3>{col.label}{isPrice ? ' (in Millions)' : ''}</h3>
                       <div className="ph-range-row">
                         <div>
                           <label className="ph-filter-label">Min</label>
-                          <input type="number" className="ph-input" placeholder={col.min != null ? String(Math.floor(col.min)) : '0'} value={currentVal.min}
+                          <input type="number" step={isPrice ? '0.1' : '1'} className="ph-input" placeholder={isPrice ? (col.min != null ? (col.min / 1e6).toFixed(1) : '0') : (col.min != null ? String(Math.floor(col.min)) : '0')} value={currentVal.min}
                             onChange={e => { setFilters(f => ({ ...f, [col.key]: { ...(f[col.key] as NumericFilter), min: e.target.value } })); setPage(1) }} />
                         </div>
                         <div>
                           <label className="ph-filter-label">Max</label>
-                          <input type="number" className="ph-input" placeholder={col.max != null ? String(Math.ceil(col.max)) : ''} value={currentVal.max}
+                          <input type="number" step={isPrice ? '0.1' : '1'} className="ph-input" placeholder={isPrice ? (col.max != null ? (col.max / 1e6).toFixed(1) : '') : (col.max != null ? String(Math.ceil(col.max)) : '')} value={currentVal.max}
                             onChange={e => { setFilters(f => ({ ...f, [col.key]: { ...(f[col.key] as NumericFilter), max: e.target.value } })); setPage(1) }} />
                         </div>
                       </div>
+                      {isPrice && <div className="ph-filter-hint">e.g. 1.2 = 1,200,000</div>}
                     </div>
                   )
                 }
@@ -1079,6 +1128,14 @@ export default function PropertyViewerClient({ userId, companyId }: {
             </div>
           </div>
 
+          {selectedRows.size > 0 && (
+            <div className="ph-selection-bar">
+              <span>{selectedRows.size} selected</span>
+              <button className="ph-btn-reset" onClick={clearRowSelection}>Clear</button>
+              <button className="ph-picker-copy-btn" onClick={handleGenerateSelectedMessage}>📋 Generate Message</button>
+            </div>
+          )}
+
           {/* Results */}
           {afterSearch.length === 0 ? (
             <div className="ph-empty">
@@ -1106,6 +1163,14 @@ export default function PropertyViewerClient({ userId, companyId }: {
                 return (
                   <div key={idx}>
                     <div className="ph-property-card" onClick={() => setSelectedIdx(idx)} style={{ position: 'relative' }}>
+                      <input
+                        type="checkbox"
+                        className="ph-card-select-checkbox"
+                        checked={selectedRows.has(idx)}
+                        onClick={e => e.stopPropagation()}
+                        onChange={() => toggleRowSelection(idx)}
+                        title="Add to combined message"
+                      />
                       <div className="ph-card-top" style={{ background: 'linear-gradient(180deg, rgba(215,255,0,0.04) 0%, transparent 100%)' }}>
                         {showBadge && (
                           <div className="ph-type-badge" style={badgeStyle(badgeVal)}>{badgeVal}</div>
@@ -1179,6 +1244,7 @@ export default function PropertyViewerClient({ userId, companyId }: {
               return (
                 <div className="ph-list-view">
                   <div className="ph-list-row" style={{ cursor: 'default', opacity: 0.45, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '8px 16px', fontFamily: "'Space Grotesk', sans-serif" }}>
+                    <div style={{ width: 18 }} />
                     {listCols.map(col => <div key={col.key} style={{ flex: 1, minWidth: 80 }}>{col.label.toUpperCase()}</div>)}
                     <div style={{ width: 24 }} />
                   </div>
@@ -1186,6 +1252,14 @@ export default function PropertyViewerClient({ userId, companyId }: {
                     const idx = (page - 1) * PAGE_SIZE + i
                     return (
                       <div key={idx} className="ph-list-row" onClick={() => setSelectedIdx(idx)}>
+                        <input
+                          type="checkbox"
+                          className="ph-list-select-checkbox"
+                          checked={selectedRows.has(idx)}
+                          onClick={e => e.stopPropagation()}
+                          onChange={() => toggleRowSelection(idx)}
+                          title="Add to combined message"
+                        />
                         {listCols.map(col => (
                           <div key={col.key} style={{ flex: 1, minWidth: 80 }}>
                             {col.type === 'numeric' ? fmt(row[col.key]) : String(row[col.key] ?? '—')}
@@ -1284,42 +1358,55 @@ export default function PropertyViewerClient({ userId, companyId }: {
                 {(() => {
                   const pk = plansColKey(columns, config)
                   const plansFromRow = pk ? String(selectedProperty[pk] ?? '').split('|').map(s => s.trim()).filter(Boolean) : []
+                  const visibleCols = columns
+                    .filter(col => col.key !== priceSpecCol?.key && col.key !== pk)
+                    .filter(col => {
+                      const val = selectedProperty[col.key]
+                      const display = col.type === 'numeric' ? fmtFull(val) : String(val ?? '')
+                      return display && display !== '—'
+                    })
+                  const allFieldKeys = visibleCols.map(col => col.key)
                   return (
                     <>
+                      <div className="ph-modal-select-all-row">
+                        <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, allFieldKeys)}>Select All</button>
+                        <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalFields, modalFields, [])}>Deselect All</button>
+                      </div>
                       <div className="ph-modal-grid">
-                        {columns
-                          .filter(col => col.key !== priceSpecCol?.key && col.key !== pk)
-                          .map(col => {
-                            const val = selectedProperty[col.key]
-                            const display = col.type === 'numeric' ? fmtFull(val) : String(val ?? '')
-                            if (!display || display === '—') return null
-                            return (
-                              <div key={col.key} className="ph-modal-field ph-modal-field-selectable">
-                                <input
-                                  type="checkbox"
-                                  className="ph-modal-field-check"
-                                  checked={modalFields.includes(col.key)}
-                                  onChange={() => setModalFields(prev =>
-                                    prev.includes(col.key) ? prev.filter(x => x !== col.key) : [...prev, col.key]
-                                  )}
-                                />
-                                <div className="f-label">{col.label}</div>
-                                <div className="f-value">{display}</div>
-                              </div>
-                            )
-                          })}
+                        {visibleCols.map(col => {
+                          const val = selectedProperty[col.key]
+                          const display = col.type === 'numeric' ? fmtFull(val) : String(val ?? '')
+                          return (
+                            <div key={col.key} className="ph-modal-field ph-modal-field-selectable">
+                              <input
+                                type="checkbox"
+                                className="ph-modal-field-check"
+                                checked={modalFields.includes(col.key)}
+                                onChange={() => setWithUndo(record, setModalFields, modalFields,
+                                  modalFields.includes(col.key) ? modalFields.filter(x => x !== col.key) : [...modalFields, col.key]
+                                )}
+                              />
+                              <div className="f-label">{col.label}</div>
+                              <div className="f-value">{display}</div>
+                            </div>
+                          )
+                        })}
                       </div>
                       {plansFromRow.length > 0 && (
                         <div className="ph-modal-section">
                           <h4>💳 Payment Plans</h4>
+                          <div className="ph-modal-select-all-row">
+                            <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlans, modalPlans, plansFromRow)}>Select All</button>
+                            <button type="button" className="ph-picker-select-all" onClick={() => setWithUndo(record, setModalPlans, modalPlans, [])}>Deselect All</button>
+                          </div>
                           <div className="ph-modal-plan-check">
                             {plansFromRow.map((p, i) => (
                               <label key={i} className="ph-modal-plan-option">
                                 <input
                                   type="checkbox"
                                   checked={modalPlans.includes(p)}
-                                  onChange={() => setModalPlans(prev =>
-                                    prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]
+                                  onChange={() => setWithUndo(record, setModalPlans, modalPlans,
+                                    modalPlans.includes(p) ? modalPlans.filter(x => x !== p) : [...modalPlans, p]
                                   )}
                                 />
                                 <span>{p}</span>
