@@ -49,6 +49,23 @@ drop function if exists public.owns_task_list(uuid);
 drop function if exists public.is_task_assignable(uuid);
 
 -- =============================================
+-- MAKE THIS SCRIPT SAFELY RE-RUNNABLE
+--
+-- If a previous attempt got partway through (e.g. failed on a later
+-- statement), the tables below may already exist. Drop them (cascade
+-- removes their own policies/indexes/trigger automatically, and drops
+-- them from the realtime publication too) so this script can always be
+-- run fresh from the top regardless of how far the last run got.
+-- =============================================
+
+drop table if exists public.ticket_attachments cascade;
+drop table if exists public.ticket_assignees cascade;
+drop table if exists public.tickets cascade;
+
+drop policy if exists "ticket photos: creator uploads" on storage.objects;
+drop policy if exists "ticket photos: creator or assignee reads" on storage.objects;
+
+-- =============================================
 -- TABLES
 -- =============================================
 

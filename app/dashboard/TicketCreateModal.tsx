@@ -130,19 +130,28 @@ export default function TicketCreateModal({
       return
     }
 
+    let attachmentCount = 0
     if (photos.length > 0) {
       const supabase = createClient()
-      let uploadFailed = false
       for (const file of photos) {
         const path = `${companyId}/${data.ticket.id}/${crypto.randomUUID()}-${file.name}`
         const { error: uploadError } = await supabase.storage.from('ticket-attachments').upload(path, file)
         if (uploadError) {
-          uploadFailed = true
+          console.error('Ticket photo upload failed:', uploadError.message)
           continue
         }
-        await supabase.from('ticket_attachments').insert({ ticket_id: data.ticket.id, storage_path: path, uploaded_by: currentUserId })
+        const { error: insertError } = await supabase
+          .from('ticket_attachments')
+          .insert({ ticket_id: data.ticket.id, storage_path: path, uploaded_by: currentUserId })
+        if (insertError) {
+          console.error('Ticket attachment row insert failed:', insertError.message)
+          continue
+        }
+        attachmentCount++
       }
-      if (uploadFailed) setError(t('ticketAttachmentUploadError'))
+      if (attachmentCount < photos.length) {
+        window.alert(t('ticketAttachmentUploadError'))
+      }
     }
 
     onCreated({
@@ -156,7 +165,7 @@ export default function TicketCreateModal({
       mode: 'owner',
       assigneeCount: data.ticket.assigneeCount,
       doneCount: 0,
-      attachmentCount: photos.length,
+      attachmentCount,
     })
   }
 
