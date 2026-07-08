@@ -12,6 +12,31 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 const DRIP_SIZE = 30
+const PAGE_SIZE = 1000
+
+// Supabase caps unpaginated .select() results at a default page size, and an
+// unbounded .not('id', 'in', ...) filter breaks down once the claimed-ID list
+// gets long. Paginate explicitly so large sheets/histories are never truncated.
+async function fetchAllIds(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: any,
+  table: string,
+  column: string,
+  filters: (q: any) => any // eslint-disable-line @typescript-eslint/no-explicit-any
+): Promise<string[]> {
+  const ids: string[] = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await filters(client.from(table).select(column))
+      .range(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    for (const row of data) ids.push(row[column] as string)
+    if (data.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+  return ids
+}
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -54,34 +79,35 @@ export async function POST(req: Request) {
     }
   }
 
-  // Get all contact_ids already claimed by any agent for this sheet
-  const { data: claimed } = await adminClient
-    .from('whatsapp_assignments')
-    .select('contact_id')
-    .eq('sheet_id', sheetId)
-
-  const claimedIds = (claimed ?? []).map(c => c.contact_id as string)
-
-  // Fetch contacts not yet assigned to any agent
-  let contactsQuery = adminClient
-    .from('whatsapp_contacts')
-    .select('id, phone, client_name')
-    .eq('sheet_id', sheetId)
-
-  if (claimedIds.length > 0) {
-    contactsQuery = contactsQuery.not('id', 'in', `(${claimedIds.join(',')})`)
+  let allContactIds: string[]
+  let claimedIds: string[]
+  try {
+    ;[allContactIds, claimedIds] = await Promise.all([
+      fetchAllIds(adminClient, 'whatsapp_contacts', 'id', q => q.eq('sheet_id', sheetId)),
+      fetchAllIds(adminClient, 'whatsapp_assignments', 'contact_id', q => q.eq('sheet_id', sheetId)),
+    ])
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load contacts'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 
-  const { data: available, error: availErr } = await contactsQuery
-  if (availErr) return NextResponse.json({ error: availErr.message }, { status: 500 })
+  const claimedSet = new Set(claimedIds)
+  const availableIds = allContactIds.filter(id => !claimedSet.has(id))
 
-  if (!available || available.length === 0) {
+  if (availableIds.length === 0) {
     return NextResponse.json({ assignments: [], done: true })
   }
 
-  const batch = shuffle(available).slice(0, DRIP_SIZE)
+  const chosenIds = shuffle(availableIds).slice(0, DRIP_SIZE)
 
-  const newRows = batch.map(contact => ({
+  const { data: batch, error: batchErr } = await adminClient
+    .from('whatsapp_contacts')
+    .select('id, phone, client_name')
+    .in('id', chosenIds)
+
+  if (batchErr) return NextResponse.json({ error: batchErr.message }, { status: 500 })
+
+  const newRows = (batch ?? []).map(contact => ({
     sheet_id: sheetId,
     contact_id: contact.id,
     agent_id: user.id,

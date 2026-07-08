@@ -424,14 +424,18 @@ export default function WhatsAppClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sheetId }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error ?? 'Failed to load more clients — try again')
+        return
+      }
       if (data.done || !data.assignments?.length) {
         setRefillDone(true)
       } else {
         setAssignments(prev => [...prev, ...data.assignments])
       }
     } catch {
-      // silent fail — agent can reload page to retry
+      setError('Failed to load more clients — try again')
     } finally {
       setIsRefilling(false)
     }
