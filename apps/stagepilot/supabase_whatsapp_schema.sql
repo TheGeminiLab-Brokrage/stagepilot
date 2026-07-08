@@ -98,3 +98,34 @@ create policy "admin sees company assignments"
 -- changing their role. Defaults to true so existing behavior is unchanged.
 alter table public.profiles
   add column whatsapp_active boolean not null default true;
+
+-- =============================================
+-- SHEET-TO-AGENT SCOPING (documented here for parity — this table already
+-- exists live in Supabase; use `if not exists` so re-running is a no-op)
+-- =============================================
+
+-- Scopes a sheet to specific agents. When a sheet has one or more rows here,
+-- only those agents may claim its contacts via the self-service refill
+-- endpoint; with no rows, refill falls back to any active agent in the
+-- company. Agent self-uploads insert exactly one row (themselves), making
+-- the sheet private to that agent.
+create table if not exists public.whatsapp_sheet_agents (
+  id          uuid primary key default uuid_generate_v4(),
+  sheet_id    uuid not null references public.whatsapp_sheets(id) on delete cascade,
+  agent_id    uuid not null references public.profiles(id) on delete cascade,
+  company_id  uuid not null references public.companies(id) on delete cascade,
+  created_at  timestamptz default now(),
+  unique (sheet_id, agent_id)
+);
+
+create index if not exists whatsapp_sheet_agents_sheet_idx on public.whatsapp_sheet_agents (sheet_id);
+create index if not exists whatsapp_sheet_agents_agent_idx on public.whatsapp_sheet_agents (agent_id);
+
+alter table public.whatsapp_sheet_agents enable row level security;
+
+create policy "company sees sheet agent scoping"
+  on public.whatsapp_sheet_agents for select
+  using (company_id = public.my_company_id());
+
+-- Service role (used by API routes) bypasses RLS by default — used for
+-- all inserts/deletes (admin agent-assignment UI, agent self-upload).

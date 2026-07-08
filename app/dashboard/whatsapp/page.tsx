@@ -37,13 +37,13 @@ export default async function WhatsAppPage() {
   const adminClient = createAdminClient()
   const { data: agentSheetRows } = await adminClient
     .from('whatsapp_sheet_agents')
-    .select('sheet_id, sheet:whatsapp_sheets!sheet_id(id, name, current_cycle)')
+    .select('sheet_id, sheet:whatsapp_sheets!sheet_id(id, name, current_cycle, uploaded_by)')
     .eq('agent_id', user.id)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const assignedSheets = (agentSheetRows ?? []).map((r: any) => {
     const s = Array.isArray(r.sheet) ? r.sheet[0] : r.sheet
-    return { id: s?.id ?? r.sheet_id, name: s?.name ?? '', current_cycle: s?.current_cycle ?? 0 }
+    return { id: s?.id ?? r.sheet_id, name: s?.name ?? '', current_cycle: s?.current_cycle ?? 0, own: s?.uploaded_by === user.id }
   }).filter((s: { name: string }) => s.name)
 
   return <WhatsAppClient initialAssignments={assignments} assignedSheets={assignedSheets} />

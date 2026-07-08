@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import * as XLSX from 'xlsx'
+import UploadSheetPanel, { type UploadedSheet } from './UploadSheetPanel'
 
 const NEON = '#D7FF00'
 const NEON_DIM = 'rgba(215,255,0,0.12)'
@@ -13,7 +14,7 @@ const font = { fontFamily: "'Montserrat', sans-serif" }
 const fontDisplay = { fontFamily: "'Space Grotesk', sans-serif" }
 
 interface Contact { id: string; phone: string; client_name: string | null }
-interface Sheet { id: string; name: string; current_cycle: number }
+interface Sheet { id: string; name: string; current_cycle: number; own?: boolean }
 interface Assignment {
   id: string
   cycle: number
@@ -33,11 +34,6 @@ function toWaNumber(n: string): string {
 // Cells can contain multiple numbers for the same client, e.g. "+201064442200, +20222871945"
 function parsePhoneNumbers(raw: string): string[] {
   return raw.split(/[,/;]+/).map(s => s.trim()).filter(Boolean)
-}
-
-// 4-byte (astral-plane) emoji like 😊 🏠 corrupt into "?" via wa.me?text= — only BMP is safe
-function hasAstralEmoji(text: string): boolean {
-  return /[\u{10000}-\u{10FFFF}]/u.test(text)
 }
 
 async function patchAssignment(id: string, body: Record<string, unknown>) {
@@ -237,13 +233,24 @@ export default function WhatsAppClient({
     return [...map.values()]
   }, [newAssignments])
 
+  // Sheets this agent uploaded themselves this session — authoritative "own" flag
+  // since assignedSheets (server-loaded) and newSheets (from assignments) may not carry it yet.
+  const [ownUploadedSheets, setOwnUploadedSheets] = useState<Sheet[]>([])
+  const [deletedSheetIds, setDeletedSheetIds] = useState<Set<string>>(new Set())
+  const [showUpload, setShowUpload] = useState(false)
+  const [deletingSheet, setDeletingSheet] = useState(false)
+
   // Merge assignedSheets (admin-assigned, may be empty of contacts) with newSheets (live data)
   const allSheets = useMemo(() => {
     const map = new Map<string, Sheet>()
     for (const s of assignedSheets) map.set(s.id, s)
-    for (const s of newSheets) map.set(s.id, s) // live data takes priority
-    return [...map.values()]
-  }, [assignedSheets, newSheets])
+    for (const s of newSheets) {
+      const existing = map.get(s.id)
+      map.set(s.id, { ...s, own: existing?.own ?? s.own }) // live data takes priority, but keep the own flag
+    }
+    for (const s of ownUploadedSheets) map.set(s.id, s) // session-fresh uploads, always authoritative
+    return [...map.values()].filter(s => !deletedSheetIds.has(s.id))
+  }, [assignedSheets, newSheets, ownUploadedSheets, deletedSheetIds])
 
   const [activeSheetId, setActiveSheetId] = useState<string | null>(allSheets[0]?.id ?? null)
 
@@ -270,6 +277,7 @@ export default function WhatsAppClient({
 
   const [copied, setCopied] = useState(false)
   const [showPasteHint, setShowPasteHint] = useState(false)
+  const [clipboardFailed, setClipboardFailed] = useState(false)
   const [numbersCopied, setNumbersCopied] = useState(false)
   const [numbersBatchIndex, setNumbersBatchIndex] = useState(0)
   const [lastCopiedBatch, setLastCopiedBatch] = useState<Assignment[]>([])
@@ -383,6 +391,7 @@ export default function WhatsAppClient({
   // Editable copy of the phone numbers — agent can correct a number before sending
   const [editableNumbers, setEditableNumbers] = useState<string[]>([])
   useEffect(() => { setEditableNumbers(currentNumbers) }, [current?.id])
+  useEffect(() => { setShowPasteHint(false); setClipboardFailed(false) }, [current?.id])
 
   const newSearchMatches = useMemo(() => {
     const q = toWaNumber(newSearch)
@@ -428,6 +437,33 @@ export default function WhatsAppClient({
     }
   }
 
+  function handleUploaded(sheet: UploadedSheet) {
+    setOwnUploadedSheets(prev => [{ id: sheet.id, name: sheet.name, current_cycle: sheet.current_cycle, own: true }, ...prev])
+    setActiveSheetId(sheet.id)
+    setTab('new')
+    setShowUpload(false)
+    refill(sheet.id)
+  }
+
+  async function deleteOwnSheet() {
+    const activeSheet = allSheets.find(s => s.id === activeSheetId)
+    if (!activeSheet?.own || !activeSheetId) return
+    if (!window.confirm(`Delete "${activeSheet.name}" and all its contacts? This can't be undone.`)) return
+    setDeletingSheet(true); setError(null)
+    try {
+      const res = await fetch(`/api/whatsapp/sheets/${activeSheetId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to delete sheet')
+      setDeletedSheetIds(prev => new Set(prev).add(activeSheetId))
+      setOwnUploadedSheets(prev => prev.filter(s => s.id !== activeSheetId))
+      setAssignments(prev => prev.filter(a => a.sheet.id !== activeSheetId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete sheet')
+    } finally {
+      setDeletingSheet(false)
+    }
+  }
+
   async function markSent() {
     if (!current) return
     setBusyId(current.id); setError(null)
@@ -445,17 +481,13 @@ export default function WhatsAppClient({
   }
 
   function openWhatsApp(number: string) {
-    if (hasAstralEmoji(messageText)) {
-      // Astral-plane emoji (😊 🏠 etc.) corrupt into "?" via ?text= — confirmed
-      // in two live tests. Clipboard fallback only; show paste hint so agent knows.
-      navigator.clipboard.writeText(messageText).catch(() => {})
-      setShowPasteHint(true)
-      setTimeout(() => setShowPasteHint(false), 6000)
-      window.open(`https://wa.me/${toWaNumber(number)}`, '_blank')
-    } else {
-      // Plain text / BMP-only message — pre-fill via URL so agent just taps Send.
-      window.open(`https://wa.me/${toWaNumber(number)}?text=${encodeURIComponent(messageText)}`, '_blank')
-    }
+    // No ?text= param — confirmed (again, on both wa.me and api.whatsapp.com) that
+    // real campaign-length messages (Arabic + multiple emoji + line breaks) get
+    // silently dropped rather than prefilled. Clipboard + manual paste is the only
+    // transport that reliably delivers the message intact regardless of length.
+    navigator.clipboard.writeText(messageText).catch(() => setClipboardFailed(true))
+    setShowPasteHint(true)
+    window.open(`https://wa.me/${toWaNumber(number)}`, '_blank')
   }
 
   async function copyMessage() {
@@ -543,20 +575,37 @@ export default function WhatsAppClient({
               Clients assigned to you by admin. Send to new contacts, then mark old ones as answered or not.
             </p>
           </div>
-          <button
-            onClick={downloadClientsExcel}
-            disabled={assignments.length === 0}
-            style={{
-              padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-              background: NEON_DIM, border: `1px solid ${NEON_BORDER}`,
-              color: NEON, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-              opacity: assignments.length === 0 ? 0.4 : 1,
-              ...fontDisplay,
-            }}
-          >
-            ↓ Download Clients
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button
+              onClick={() => setShowUpload(v => !v)}
+              style={{
+                padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: NEON_DIM, border: `1px solid ${NEON_BORDER}`,
+                color: NEON, cursor: 'pointer', whiteSpace: 'nowrap',
+                ...fontDisplay,
+              }}
+            >
+              ⭱ Upload My Sheet
+            </button>
+            <button
+              onClick={downloadClientsExcel}
+              disabled={assignments.length === 0}
+              style={{
+                padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: NEON_DIM, border: `1px solid ${NEON_BORDER}`,
+                color: NEON, cursor: 'pointer', whiteSpace: 'nowrap',
+                opacity: assignments.length === 0 ? 0.4 : 1,
+                ...fontDisplay,
+              }}
+            >
+              ↓ Download Clients
+            </button>
+          </div>
         </div>
+
+        {showUpload && (
+          <UploadSheetPanel endpoint="/api/whatsapp/sheets" onClose={() => setShowUpload(false)} onUploaded={handleUploaded} />
+        )}
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
           <TabButton active={tab === 'new'} onClick={() => setTab('new')} label={`New (${newForActiveSheet.length})`} />
@@ -653,6 +702,17 @@ export default function WhatsAppClient({
 
             {allSheets.length > 0 && (
               <>
+                {allSheets.find(s => s.id === activeSheetId)?.own && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                    <button onClick={deleteOwnSheet} disabled={deletingSheet} style={{
+                      padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(255,80,80,0.35)',
+                      background: 'rgba(255,80,80,0.08)', color: 'rgba(255,120,120,0.9)',
+                      fontSize: 12, cursor: 'pointer', ...fontDisplay,
+                    }}>
+                      {deletingSheet ? 'Deleting…' : '🗑 Delete This Sheet'}
+                    </button>
+                  </div>
+                )}
                 {allSheets.length > 1 && (
                   <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                     {allSheets.map(s => (
@@ -904,6 +964,11 @@ export default function WhatsAppClient({
                               to auto-send messages.
                             </div>
                           )}
+                          {!showPasteHint && messageText.trim() && (
+                            <div style={{ fontSize: 12, color: MUTED, background: 'rgba(255,255,255,0.03)', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px' }}>
+                              WhatsApp will open with an <strong style={{ color: '#fff' }}>empty</strong> chat — the message is copied to your clipboard, so click the text box and press <strong style={{ color: '#fff' }}>Ctrl+V</strong> to paste it, then send it yourself.
+                            </div>
+                          )}
                           {editableNumbers.map((num, i) => (
                             <button key={i} onClick={() => openWhatsApp(num)} disabled={!messageText.trim()} style={{
                               padding: '14px', borderRadius: 8, border: 'none',
@@ -914,8 +979,13 @@ export default function WhatsAppClient({
                             </button>
                           ))}
                           {showPasteHint && (
-                            <div style={{ fontSize: 12, color: '#92400e', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 12px' }}>
-                              Message copied — paste it in WhatsApp and tap <strong>Send</strong>.
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 13, color: '#92400e', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 6, padding: '10px 14px' }}>
+                              <span>
+                                {clipboardFailed
+                                  ? <>Couldn&apos;t copy automatically — click <strong>Copy Message</strong> below, then paste it (<strong>Ctrl+V</strong>) into the WhatsApp chat and send.</>
+                                  : <>Message copied — click the WhatsApp text box and press <strong>Ctrl+V</strong> to paste, then hit <strong>Send</strong> yourself.</>}
+                              </span>
+                              <button onClick={() => setShowPasteHint(false)} style={{ background: 'none', border: 'none', color: '#92400e', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }} aria-label="Dismiss">×</button>
                             </div>
                           )}
                         </>
