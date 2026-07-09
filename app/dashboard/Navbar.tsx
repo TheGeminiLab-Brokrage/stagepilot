@@ -36,6 +36,7 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
           { href: '/dashboard/performance', label: 'Performance' },
           { href: '/dashboard/admin/reports', label: t('navReports') },
           { href: '/dashboard', label: t('navTeamCalls') },
+          { href: '/dashboard/assessment', label: t('navAssessment') },
           { href: '/dashboard/admin', label: t('navAdmin') },
           { href: '/dashboard/admin/knowledge-base', label: t('navKnowledgeBase') },
           { href: '/dashboard/admin/whatsapp', label: 'WhatsApp' },
@@ -48,7 +49,9 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
             { href: '/dashboard/practice', label: t('navAiPractice') },
             { href: '/dashboard/exam', label: t('navExam') },
           ] : []),
+          { href: '/dashboard/assessment', label: t('navAssessment') },
           { href: '/dashboard/performance', label: 'Performance' },
+          ...(role === 'team_leader' ? [{ href: '/dashboard/admin/reports', label: t('navReports') }] : []),
           { href: '/dashboard', label: role === 'agent' ? t('navMyCalls') : t('navTeamCalls') },
           ...(role === 'agent' ? [
             { href: '/dashboard/upload', label: t('navUploadCall') },

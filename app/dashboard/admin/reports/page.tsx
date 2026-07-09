@@ -24,7 +24,7 @@ export default async function ReportsPage() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'super_admin') redirect('/dashboard')
+  if (!profile || !['super_admin', 'team_leader'].includes(profile.role)) redirect('/dashboard')
 
   const adminClient = createAdminClient()
   const { data: reports } = await adminClient
