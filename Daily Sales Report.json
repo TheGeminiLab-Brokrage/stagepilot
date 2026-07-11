@@ -1,0 +1,259 @@
+{
+  "name": "Daily Sales Report — The Gemini Lab V2",
+  "nodes": [
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1VkX4fDmV-jP8RDotUUX66QntZy760EdFixiOyXqXnk0",
+          "mode": "list",
+          "cachedResultName": "تقرير المبيعات اليومي — The Gemini Lab (Responses)",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1VkX4fDmV-jP8RDotUUX66QntZy760EdFixiOyXqXnk0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 858376122,
+          "mode": "list",
+          "cachedResultName": "Form Responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1VkX4fDmV-jP8RDotUUX66QntZy760EdFixiOyXqXnk0/edit#gid=858376122"
+        },
+        "options": {}
+      },
+      "id": "d342d13d-d9e1-43de-b5ac-579d5ba22f54",
+      "name": "Get All Form Responses1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [
+        -688,
+        1088
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "o30GRrMtaHL0Y59f",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Helpers ──────────────────────────────────────────────\nconst egyptOffset = 3 * 60;\nconst now = new Date();\nconst localTime = new Date(now.getTime() + egyptOffset * 60000);\nconst todayStr = localTime.toISOString().split('T')[0];\n\nconst allAgents = [\n  'Ahmed Mustafa','Mariam Ahmed','Mohamed Sayed','Nourhan Ayman',\n  'Kareem Mohammed','Fady Fawzy','Mohamed Shabaan','Taher','Yasmine','Hadeer','Shahd','Amira'\n];\n\nconst dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };\nconst formattedDate = localTime.toLocaleDateString('en-GB', dateOptions);\n\n// ── Column keys (exact Arabic as in Sheet) ───────────────\nconst COL_NAME      = 'اسم المسؤول عن المبيعات';\nconst COL_SHEETS    = 'عدد ورقات المكالمات الباردة';\nconst COL_POSTS     = 'عدد البوستات على السوشيال ميديا';\nconst COL_REQUESTS  = 'عدد الطلبات الجديدة';\nconst COL_FOLLOWUPS = ' Follow Ups عدد مكالمات المتابعة';\nconst COL_TOTLEADS  = 'إجمالي عدد الليدز الجديدة';\nconst COL_REACHED   = 'عدد الليدز اللي تم التواصل معاهم';\nconst COL_NOTREACH  = 'عدد الليدز اللي ما تمش التواصل معاهم';\nconst COL_UPLOADED  = 'Drive  عدد المكالمات المرفوعة على الـ ';\nconst COL_NOTUPL    = 'Drive  عدد المكالمات اللي ما اترفعتش على الـ ';\nconst COL_CRMCONF   = 'CRM  تأكيد تحديث الـ ';\nconst COL_BRANCH    = 'هل في مكالمات ما اترفعتش ومحتاج تضيف تفاصيلها؟';\nconst COL_SUMMARY   = 'ملخص اليوم';\n\nconst MISSED_KEYS = [\n  ['المكالمة الأولى — اسم العميل',  'المكالمة الأولى — رقم العميل',  'المكالمة الأولى — سبب عدم الرفع'],\n  ['المكالمة الثانية — اسم العميل', 'المكالمة الثانية — رقم العميل', 'المكالمة الثانية — سبب عدم الرفع'],\n  ['المكالمة الثالثة — اسم العميل', 'المكالمة الثالثة — رقم العميل', 'المكالمة الثالثة — سبب عدم الرفع'],\n];\n\n// ── Helper: extract YYYY-MM-DD from a Google Sheet timestamp ──\n// Google Sheets stores the timestamp as Egypt local time (no timezone),\n// so we must NOT shift it again. Just read the date portion directly.\nfunction extractDateStr(ts) {\n  if (!ts) return null;\n  const s = String(ts).trim();\n  // Handles \"2026-05-19 21:49:29\" or \"2026-05-19T21:49:29.000Z\" or \"5/19/2026 21:49:29\"\n  // ISO-like: starts with YYYY-MM-DD\n  const isoMatch = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);\n  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;\n  // US-like: M/D/YYYY\n  const usMatch = s.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/);\n  if (usMatch) {\n    const m = usMatch[1].padStart(2, '0');\n    const d = usMatch[2].padStart(2, '0');\n    return `${usMatch[3]}-${m}-${d}`;\n  }\n  return null;\n}\n\n// ── Filter today (no double timezone shift) ──────────────\nconst items = $input.all();\nconst todayRows = items.filter(item => {\n  const ts = item.json['Timestamp'];\n  const datePart = extractDateStr(ts);\n  return datePart === todayStr;\n});\n\n// ── Deduplicate: keep latest submission per agent ─────────\nconst latestMap = {};\nfor (const item of todayRows) {\n  const name = item.json[COL_NAME];\n  if (!name) continue;\n  const ts = new Date(item.json['Timestamp']).getTime();\n  if (!latestMap[name] || ts > latestMap[name].ts) {\n    latestMap[name] = { ts, data: item.json };\n  }\n}\nconst uniqueSubmissions = Object.values(latestMap).map(v => v.data);\n\n// ── Missing agents ────────────────────────────────────────\nconst submittedNames = new Set(uniqueSubmissions.map(d => d[COL_NAME]));\nconst missingAgents = allAgents.filter(a => !submittedNames.has(a));\n\n// ── Build agent cards ─────────────────────────────────────\nlet agentRows = '';\n\nfor (const d of uniqueSubmissions) {\n  const name       = d[COL_NAME]      || '—';\n  const sheets     = parseInt(d[COL_SHEETS]    || 0);\n  const posts      = parseInt(d[COL_POSTS]     || 0);\n  const requests   = parseInt(d[COL_REQUESTS]  || 0);\n  const followups  = parseInt(d[COL_FOLLOWUPS] || 0);\n  const totalLeads = parseInt(d[COL_TOTLEADS]  || 0);\n  const reached    = parseInt(d[COL_REACHED]   || 0);\n  const notReached = parseInt(d[COL_NOTREACH]  || 0);\n  const uploaded   = parseInt(d[COL_UPLOADED]  || 0);\n  const notUpl     = parseInt(d[COL_NOTUPL]    || 0);\n  const crmConfirm = d[COL_CRMCONF] || '';\n  const summary    = d[COL_SUMMARY]  || '—';\n\n  // Fuzzy lookup for CRM Activities column\n  const updLeadsKey = Object.keys(d).find(k => k.includes('إجمالي عدد الليدز اللي اتحدثت'));\n  const updLeads = parseInt((updLeadsKey ? d[updLeadsKey] : 0) || 0);\n\n  // Missed calls section\n  let missedCallsHTML = '';\n  if (notUpl > 0) {\n    let callsList = '';\n    for (const [nameKey, numKey, reasonKey] of MISSED_KEYS) {\n      const clientName = d[nameKey];\n      const clientNum  = d[numKey];\n      const reason     = d[reasonKey];\n      if (clientName && clientName.trim()) {\n        callsList += `<li><strong>${clientName}</strong> — ${clientNum || 'N/A'}<br><span style=\"color:#e74c3c\">Reason: ${reason || 'Not specified'}</span></li>`;\n      }\n    }\n    if (callsList) {\n      missedCallsHTML = `\n        <div class=\"missed-calls\">\n          <p class=\"missed-title\">⚠️ Missed Uploads (${notUpl})</p>\n          <ul>${callsList}</ul>\n        </div>`;\n    }\n  }\n\n  const postsStatus = posts >= 5 ? '<span class=\"ok\">✅</span>' : '<span class=\"warn\">⚠️</span>';\n  const reqStatus   = '';\n  const uplStatus   = notUpl > 0 ? '<span class=\"warn\">⚠️</span>' : '<span class=\"ok\">✅</span>';\n  const crmStatus   = crmConfirm.includes('تم') ? '<span class=\"ok\">✅</span>' : '<span class=\"warn\">⚠️</span>';\n\n  agentRows += `\n    <div class=\"agent-card\">\n      <div class=\"agent-header\">\n        <span class=\"agent-name\">${name}</span>\n      </div>\n      <div class=\"stats-grid\">\n        <div class=\"stat-box\"><div class=\"stat-label\">Cold Call Sheets</div><div class=\"stat-value\">${sheets}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Organic Posts ${postsStatus}</div><div class=\"stat-value\">${posts}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">New Requests ${reqStatus}</div><div class=\"stat-value\">${requests}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Follow-Ups</div><div class=\"stat-value\">${followups}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Total New Leads</div><div class=\"stat-value\">${totalLeads}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Reached</div><div class=\"stat-value\">${reached}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Not Reached</div><div class=\"stat-value\">${notReached}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">CRM Activities</div><div class=\"stat-value\">${updLeads}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Calls Uploaded ${uplStatus}</div><div class=\"stat-value\">${uploaded}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Not Uploaded</div><div class=\"stat-value\" style=\"color:${notUpl > 0 ? '#e74c3c' : 'inherit'}\">${notUpl}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">CRM Updated ${crmStatus}</div><div class=\"stat-value\">${crmConfirm.includes('تم') ? 'Yes' : 'No'}</div></div>\n      </div>\n      ${missedCallsHTML}\n      <div class=\"summary-box\">\n        <p class=\"summary-label\">📝 Daily Summary</p>\n        <p class=\"summary-text\">${summary}</p>\n      </div>\n    </div>`;\n}\n\n// ── Missing section ───────────────────────────────────────\nlet missingHTML = '';\nif (missingAgents.length > 0) {\n  missingHTML = `\n    <div class=\"missing-section\">\n      <p class=\"missing-title\">❌ Did Not Submit Today (${missingAgents.length})</p>\n      <ul>${missingAgents.map(a => `<li>${a}</li>`).join('')}</ul>\n    </div>`;\n}\n\n// ── Full HTML ─────────────────────────────────────────────\nconst html = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n  * { margin: 0; padding: 0; box-sizing: border-box; }\n  body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f0f2f5; color: #2c3e50; padding: 30px; }\n  .header { background: linear-gradient(135deg, #1a1a2e, #16213e); color: white; padding: 30px; border-radius: 12px; margin-bottom: 24px; text-align: center; }\n  .header h1 { font-size: 26px; font-weight: 700; letter-spacing: 1px; }\n  .header p { font-size: 14px; opacity: 0.75; margin-top: 6px; }\n  .summary-banner { display: flex; gap: 16px; margin-bottom: 24px; }\n  .banner-box { flex: 1; background: white; border-radius: 10px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }\n  .banner-box .num { font-size: 32px; font-weight: 800; color: #1a1a2e; }\n  .banner-box .lbl { font-size: 12px; color: #7f8c8d; margin-top: 4px; }\n  .agent-card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); }\n  .agent-header { display: flex; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #f0f2f5; }\n  .agent-name { font-size: 18px; font-weight: 700; color: #1a1a2e; }\n  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }\n  .stat-box { background: #f8f9fa; border-radius: 8px; padding: 12px; text-align: center; }\n  .stat-label { font-size: 11px; color: #7f8c8d; margin-bottom: 6px; }\n  .stat-value { font-size: 22px; font-weight: 800; color: #2c3e50; }\n  .ok { color: #27ae60; }\n  .warn { color: #e74c3c; }\n  .missed-calls { background: #fff5f5; border-left: 4px solid #e74c3c; border-radius: 6px; padding: 12px 16px; margin-bottom: 14px; }\n  .missed-title { font-weight: 700; color: #e74c3c; margin-bottom: 8px; }\n  .missed-calls ul { padding-left: 18px; }\n  .missed-calls li { margin-bottom: 6px; font-size: 13px; }\n  .summary-box { background: #f8f9fa; border-radius: 8px; padding: 14px; }\n  .summary-label { font-weight: 700; font-size: 13px; margin-bottom: 6px; color: #555; }\n  .summary-text { font-size: 13px; line-height: 1.6; color: #2c3e50; }\n  .missing-section { background: #fff5f5; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 2px dashed #e74c3c; }\n  .missing-title { font-weight: 700; font-size: 16px; color: #e74c3c; margin-bottom: 10px; }\n  .missing-section ul { padding-left: 20px; }\n  .missing-section li { margin-bottom: 4px; font-size: 14px; }\n  .footer { text-align: center; font-size: 11px; color: #bdc3c7; margin-top: 30px; }\n</style>\n</head>\n<body>\n  <div class=\"header\">\n    <h1>📋 Daily Sales Report — The Gemini Lab</h1>\n    <p>${formattedDate}</p>\n  </div>\n  <div class=\"summary-banner\">\n    <div class=\"banner-box\">\n      <div class=\"num\">${uniqueSubmissions.length}</div>\n      <div class=\"lbl\">Submitted</div>\n    </div>\n    <div class=\"banner-box\">\n      <div class=\"num\" style=\"color:${missingAgents.length > 0 ? '#e74c3c' : '#27ae60'}\">${missingAgents.length}</div>\n      <div class=\"lbl\">Missing</div>\n    </div>\n    <div class=\"banner-box\">\n      <div class=\"num\">${allAgents.length}</div>\n      <div class=\"lbl\">Total Agents</div>\n    </div>\n  </div>\n  ${missingHTML}\n  ${agentRows || '<p style=\"text-align:center;color:#7f8c8d;padding:40px\">No submissions received today.</p>'}\n  <div class=\"footer\">Generated automatically by n8n — The Gemini Lab Sales System</div>\n</body>\n</html>`;\n\nreturn [{ json: { html, date: formattedDate, submittedCount: uniqueSubmissions.length, missingAgents } }];"
+      },
+      "id": "51133ea6-f262-4b09-8a01-1f711a791437",
+      "name": "Build HTML Report1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $input.first().json.html;\nconst date = $input.first().json.date;\n\nconst pdfBase64 = Buffer.from(html).toString('base64');\n\nreturn [{\n  json: {\n    html: html,\n    date: date,\n    submittedCount: $input.first().json.submittedCount,\n    missingAgents: $input.first().json.missingAgents\n  },\n  binary: {\n    data: {\n      data: pdfBase64,\n      mimeType: 'text/html',\n      fileName: `Daily_Report_${date.replace(/ /g, '_')}.html`,\n      fileExtension: 'html'\n    }\n  }\n}];\n"
+      },
+      "id": "6cbc4844-919f-495e-8514-999b40a89c4c",
+      "name": "Prepare File1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "7690098577",
+        "text": "=📋 *Daily Sales Report — The Gemini Lab*\n🗓 {{ $json.date }}\n\n✅ Submitted: {{ $json.submittedCount }}/12\n❌ Missing: {{ $json.missingAgents.length > 0 ? $json.missingAgents.join(', ') : 'None — full team submitted! 🎉' }}\n\n_Full report attached below 👇_",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "877a3822-f626-4384-ac8f-e229a41641b8",
+      "name": "Send Telegram Summary1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        -16,
+        800
+      ],
+      "webhookId": "a79e49c2-9ca1-4343-be1d-cb95b636e2ab",
+      "credentials": {
+        "telegramApi": {
+          "id": "JFyA4Ezw1yNL7rsY",
+          "name": "Sales Daily Reports"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "7690098577",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=📋 Daily Sales Report — The Gemini Lab — {{ $json.date }}"
+        }
+      },
+      "id": "29a103cd-896c-4df6-8e72-4bcb99b429a4",
+      "name": "Send Report File1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        -16,
+        1184
+      ],
+      "webhookId": "eae77085-b003-4eae-90cb-6e31c9de452b",
+      "credentials": {
+        "telegramApi": {
+          "id": "JFyA4Ezw1yNL7rsY",
+          "name": "Sales Daily Reports"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 23 * * *"
+            }
+          ]
+        }
+      },
+      "id": "ec9438e8-5ed8-45ab-9727-237683cfcda8",
+      "name": "Every Day at 11 PM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -912,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "7091043762",
+        "text": "=📋 *Daily Sales Report — The Gemini Lab*\n🗓 {{ $json.date }}\n\n✅ Submitted: {{ $json.submittedCount }}/8\n❌ Missing: {{ $json.missingAgents.length > 0 ? $json.missingAgents.join(', ') : 'None — full team submitted! 🎉' }}\n\n_Full report attached below 👇_",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "3b44cf87-9722-45c9-9f3b-b6440d467a0c",
+      "name": "Send Telegram Summary3",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        -16,
+        992
+      ],
+      "webhookId": "a79e49c2-9ca1-4343-be1d-cb95b636e2ab",
+      "credentials": {
+        "telegramApi": {
+          "id": "JFyA4Ezw1yNL7rsY",
+          "name": "Sales Daily Reports"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "7091043762",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=📋 Daily Sales Report — The Gemini Lab — {{ $json.date }}"
+        }
+      },
+      "id": "b0fda1b7-7f5a-4a6a-a755-54644deefed2",
+      "name": "Send Report File3",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        -16,
+        1376
+      ],
+      "webhookId": "eae77085-b003-4eae-90cb-6e31c9de452b",
+      "credentials": {
+        "telegramApi": {
+          "id": "JFyA4Ezw1yNL7rsY",
+          "name": "Sales Daily Reports"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get All Form Responses1": {
+      "main": [
+        [
+          {
+            "node": "Build HTML Report1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build HTML Report1": {
+      "main": [
+        [
+          {
+            "node": "Prepare File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare File1": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Summary1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Report File1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Telegram Summary3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Report File3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Day at 11 PM": {
+      "main": [
+        [
+          {
+            "node": "Get All Form Responses1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "24bb43b6-c56d-4b5e-9fb8-4aab4dfcca66",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1bc3bde962b74e38a865c94fbe38e2ca7aa242e4f8aab347966e197724649f2e"
+  },
+  "nodeGroups": [],
+  "id": "w4ms10c4kxK31mb9",
+  "tags": []
+}

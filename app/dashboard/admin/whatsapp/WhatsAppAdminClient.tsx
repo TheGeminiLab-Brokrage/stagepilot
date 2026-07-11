@@ -335,7 +335,7 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
           {showAgents && (
             <div style={{ padding: '0 16px 16px', borderTop: `1px solid ${BORDER}` }}>
               <p style={{ color: MUTED, fontSize: 11, margin: '12px 0' }}>
-                Unchecked agents won&apos;t receive new clients on the next re-randomize. Existing assignments are unaffected.
+                Unchecked agents won&apos;t receive new clients on the next distribution. Existing assignments are unaffected.
               </p>
               {agents.length === 0 && <div style={{ color: MUTED, fontSize: 12, padding: '8px 0' }}>No agents found.</div>}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -493,7 +493,7 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                     </button>
                     <span style={{ fontSize: 11, color: MUTED }}>
                       {checkedAgentIds.size === 0
-                        ? 'No agents checked → all active agents receive contacts on randomize'
+                        ? 'No agents checked → all active agents receive contacts on distribution'
                         : `Only checked agents receive contacts from this sheet`}
                     </span>
                   </div>
@@ -541,12 +541,12 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                         padding: '9px 16px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
                         background: NEON_DIM, color: NEON, fontWeight: 600, fontSize: 12, cursor: 'pointer', ...fontDisplay,
                       }}>
-                        ↻ Re-randomize
+                        ↻ Distribute New Clients
                       </button>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: MUTED }}>Redistribute all contacts to a new agent for cycle {detail.sheet.current_cycle + 1}?</span>
+                      <span style={{ fontSize: 12, color: MUTED }}>Give untouched contacts to agents under 30 unsent, for cycle {detail.sheet.current_cycle + 1}? Contacts already assigned to someone are never reassigned.</span>
                       <button onClick={handleRandomize} disabled={randomizing} style={{
                         padding: '7px 14px', borderRadius: 6, border: 'none', background: NEON,
                         color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer', ...fontDisplay,

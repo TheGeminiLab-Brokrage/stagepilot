@@ -12,12 +12,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing ticketId' }, { status: 400 })
   }
 
-  const [{ data: ownedTicket }, { data: assigneeRow }] = await Promise.all([
+  const { data: callerProfile } = await supabase.from('profiles').select('role, company_id').eq('id', user.id).single()
+
+  const [{ data: ownedTicket }, { data: assigneeRow }, { data: companyTicket }] = await Promise.all([
     supabase.from('tickets').select('id').eq('id', ticketId).eq('created_by', user.id).maybeSingle(),
     supabase.from('ticket_assignees').select('id').eq('ticket_id', ticketId).eq('assignee_id', user.id).maybeSingle(),
+    callerProfile?.role === 'super_admin'
+      ? supabase.from('tickets').select('id').eq('id', ticketId).eq('company_id', callerProfile.company_id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ])
 
-  if (!ownedTicket && !assigneeRow) {
+  if (!ownedTicket && !assigneeRow && !companyTicket) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

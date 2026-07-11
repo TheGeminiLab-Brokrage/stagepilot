@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import sanitizeHtml from 'sanitize-html'
 import { createClient } from '@/lib/supabase/server'
 
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent']
+const DESCRIPTION_ALLOWED_TAGS = ['p', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i', 'br']
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -21,9 +23,21 @@ export async function POST(request: NextRequest) {
   const { title, description, priority, dueDate, assigneeIds } = await request.json()
 
   const trimmedTitle = typeof title === 'string' ? title.trim() : ''
-  const trimmedDescription = typeof description === 'string' ? description.trim() : ''
+  const sanitizedDescription = sanitizeHtml(typeof description === 'string' ? description.trim() : '', {
+    allowedTags: DESCRIPTION_ALLOWED_TAGS,
+    allowedAttributes: {},
+  })
   const validPriority = VALID_PRIORITIES.includes(priority) ? priority : 'medium'
-  const normalizedDueDate = typeof dueDate === 'string' && dueDate.trim() ? dueDate.trim() : null
+
+  let normalizedDueDate: string | null = null
+  if (typeof dueDate === 'string' && dueDate.trim()) {
+    const parsedDueDate = new Date(dueDate.trim())
+    if (Number.isNaN(parsedDueDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid due date' }, { status: 400 })
+    }
+    normalizedDueDate = parsedDueDate.toISOString()
+  }
+
   const uniqueAssigneeIds: string[] = Array.isArray(assigneeIds)
     ? Array.from(new Set(assigneeIds.filter((r: unknown) => typeof r === 'string')))
     : []
@@ -60,7 +74,7 @@ export async function POST(request: NextRequest) {
       company_id: callerProfile.company_id,
       created_by: user.id,
       title: trimmedTitle,
-      description: trimmedDescription,
+      description: sanitizedDescription,
       priority: validPriority,
       due_date: normalizedDueDate,
     })

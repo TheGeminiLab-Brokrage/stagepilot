@@ -331,10 +331,17 @@ export async function GET(req: Request) {
   const csvText = await csvRes.text()
   const allRows = parseCSV(csvText).slice(1)
 
-  // Determine Thursday (today) in Cairo time (UTC+2)
-  const now = new Date()
-  const cairoNow = new Date(now.getTime() + 2 * 60 * 60 * 1000)
-  const thursdayStr = `${cairoNow.getUTCFullYear()}-${pad(cairoNow.getUTCMonth() + 1)}-${pad(cairoNow.getUTCDate())}`
+  // ?thursday=YYYY-MM-DD overrides the default (today in Cairo UTC+2) — used to regenerate past weeks
+  const url = new URL(req.url)
+  const thursdayParam = url.searchParams.get('thursday')
+  let thursdayStr: string
+  if (thursdayParam && /^\d{4}-\d{2}-\d{2}$/.test(thursdayParam)) {
+    thursdayStr = thursdayParam
+  } else {
+    const now = new Date()
+    const cairoNow = new Date(now.getTime() + 2 * 60 * 60 * 1000)
+    thursdayStr = `${cairoNow.getUTCFullYear()}-${pad(cairoNow.getUTCMonth() + 1)}-${pad(cairoNow.getUTCDate())}`
+  }
 
   // Build Sun–Thu date set (Thursday − 4 days = Sunday)
   const [ty, tm, td] = thursdayStr.split('-').map(Number)

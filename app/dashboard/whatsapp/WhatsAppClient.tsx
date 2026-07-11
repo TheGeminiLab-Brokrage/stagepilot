@@ -60,8 +60,11 @@ export default function WhatsAppClient({
   const [isRefilling, setIsRefilling] = useState(false)
   const [refillDone, setRefillDone] = useState(false)
 
+  // A contact is permanently owned by whichever agent first gets it, so an
+  // unsent contact from an older cycle is still valid work — show it regardless
+  // of which cycle it was assigned in.
   const newAssignments = useMemo(
-    () => assignments.filter(a => a.cycle === a.sheet.current_cycle && !a.sent_at),
+    () => assignments.filter(a => !a.sent_at),
     [assignments]
   )
   const oldAssignments = useMemo(
@@ -524,7 +527,6 @@ export default function WhatsAppClient({
       setNumbersBatchIndex(0)
       const stillUnsent = updatedAssignments.filter(a =>
         a.sheet.id === activeSheetId &&
-        a.cycle === a.sheet.current_cycle &&
         !a.sent_at
       ).length
       if (stillUnsent === 0 && activeSheetId) refill(activeSheetId)

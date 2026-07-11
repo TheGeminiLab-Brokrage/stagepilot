@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/language-context'
-import type { ChatRole, TicketPriority, TicketSummary } from './chatTypes'
+import DescriptionEditor from './DescriptionEditor'
+import type { ChatRole, TicketPriority, TicketSummary } from '../chatTypes'
 
 const NEON = '#D7FF00'
 const CARD = 'rgba(255,255,255,0.03)'
@@ -177,7 +178,7 @@ export default function TicketCreateModal({
         title: title.trim(),
         description: description.trim(),
         priority,
-        dueDate: dueDate || null,
+        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
         assigneeIds: Array.from(selectedIds),
       }),
     })
@@ -300,13 +301,10 @@ export default function TicketCreateModal({
             <span className="text-xs font-semibold uppercase" style={{ color: MUTED, letterSpacing: '0.06em', fontFamily: "'Space Grotesk', sans-serif" }}>
               {t('ticketDescriptionLabel')}
             </span>
-            <textarea
+            <DescriptionEditor
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={setDescription}
               placeholder={t('ticketDescriptionPlaceholder')}
-              rows={3}
-              className="w-full text-sm px-3 py-1.5 rounded-md outline-none resize-none"
-              style={{ background: CARD, border: `1px solid ${BORDER}`, color: 'white', fontFamily: "'Montserrat', sans-serif" }}
             />
           </div>
 
@@ -334,7 +332,7 @@ export default function TicketCreateModal({
                 {t('ticketDueDateLabel')}
               </span>
               <input
-                type="date"
+                type="datetime-local"
                 value={dueDate}
                 onChange={e => setDueDate(e.target.value)}
                 onClick={e => (e.currentTarget as HTMLInputElement & { showPicker?: () => void }).showPicker?.()}

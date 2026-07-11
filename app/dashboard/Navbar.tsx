@@ -1,13 +1,18 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useLanguage, useT } from '@/lib/language-context'
+import { createClient } from '@/lib/supabase/client'
 
 interface NavbarProps {
   role: string
   fullName: string | null | undefined
+  currentUserId: string
   rightSlot?: React.ReactNode
 }
+
+const NEON = '#D7FF00'
 
 const ROLE_KEY_MAP: Record<string, 'roleAgent' | 'roleTeamLeader' | 'roleSuperAdmin' | 'roleTrainee' | 'roleExam' | 'rolePropertyViewer'> = {
   agent: 'roleAgent',
@@ -18,10 +23,46 @@ const ROLE_KEY_MAP: Record<string, 'roleAgent' | 'roleTeamLeader' | 'roleSuperAd
   property_viewer: 'rolePropertyViewer',
 }
 
-export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
+export default function Navbar({ role, fullName, currentUserId, rightSlot }: NavbarProps) {
   const { lang, setLang } = useLanguage()
   const t = useT()
   const pathname = usePathname()
+  const [pendingTicketCount, setPendingTicketCount] = useState(0)
+
+  useEffect(() => {
+    if (role !== 'agent' && role !== 'team_leader') return
+    const supabase = createClient()
+
+    async function loadPendingTickets() {
+      const { count } = await supabase
+        .from('ticket_assignees')
+        .select('id', { count: 'exact', head: true })
+        .eq('assignee_id', currentUserId)
+        .eq('status', 'open')
+
+      setPendingTicketCount(count ?? 0)
+    }
+
+    loadPendingTickets()
+
+    const channel = supabase
+      .channel(`ticket-inbox-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'ticket_assignees', filter: `assignee_id=eq.${currentUserId}` },
+        loadPendingTickets
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'ticket_assignees', filter: `assignee_id=eq.${currentUserId}` },
+        loadPendingTickets
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [currentUserId, role])
 
   const roleNavLinks =
     role === 'trainee'
@@ -37,6 +78,7 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
           { href: '/dashboard/admin/reports', label: t('navReports') },
           { href: '/dashboard', label: t('navTeamCalls') },
           { href: '/dashboard/assessment', label: t('navAssessment') },
+          { href: '/dashboard/tasks', label: t('navTasks') },
           { href: '/dashboard/admin', label: t('navAdmin') },
           { href: '/dashboard/admin/knowledge-base', label: t('navKnowledgeBase') },
           { href: '/dashboard/admin/whatsapp', label: 'WhatsApp' },
@@ -53,6 +95,7 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
           { href: '/dashboard/performance', label: 'Performance' },
           ...(role === 'team_leader' ? [{ href: '/dashboard/admin/reports', label: t('navReports') }] : []),
           { href: '/dashboard', label: role === 'agent' ? t('navMyCalls') : t('navTeamCalls') },
+          { href: '/dashboard/tasks', label: t('navTasks') },
           ...(role === 'agent' ? [
             { href: '/dashboard/upload', label: t('navUploadCall') },
           ] : []),
@@ -93,11 +136,12 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
           <nav className="flex gap-1">
             {navLinks.map(({ href, label }) => {
               const isActive = pathname === href
+              const badgeCount = href === '/dashboard/tasks' ? pendingTicketCount : 0
               return (
                 <a
                   key={href}
                   href={href}
-                  className="text-xs font-semibold uppercase px-3 py-1.5 rounded-md transition-all"
+                  className="relative text-xs font-semibold uppercase px-3 py-1.5 rounded-md transition-all"
                   style={{
                     color: isActive ? '#D7FF00' : 'rgba(255,255,255,0.45)',
                     background: isActive ? 'rgba(215,255,0,0.08)' : 'transparent',
@@ -120,6 +164,30 @@ export default function Navbar({ role, fullName, rightSlot }: NavbarProps) {
                   }}
                 >
                   {label}
+                  {badgeCount > 0 && (
+                    <span
+                      title={t('ticketPendingTooltip')}
+                      style={{
+                        position: 'absolute',
+                        top: -4,
+                        right: -4,
+                        minWidth: 16,
+                        height: 16,
+                        padding: '0 4px',
+                        borderRadius: 8,
+                        background: NEON,
+                        color: '#000',
+                        fontSize: 10,
+                        fontWeight: 700,
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {badgeCount > 9 ? t('chatUnreadBadgeOverflow') : badgeCount}
+                    </span>
+                  )}
                 </a>
               )
             })}

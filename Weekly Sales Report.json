@@ -1,0 +1,259 @@
+{
+  "name": "Weekly Sales Report — The Gemini Lab",
+  "nodes": [
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1VkX4fDmV-jP8RDotUUX66QntZy760EdFixiOyXqXnk0",
+          "mode": "list",
+          "cachedResultName": "تقرير المبيعات اليومي — The Gemini Lab (Responses)",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1VkX4fDmV-jP8RDotUUX66QntZy760EdFixiOyXqXnk0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 858376122,
+          "mode": "list",
+          "cachedResultName": "Form Responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1VkX4fDmV-jP8RDotUUX66QntZy760EdFixiOyXqXnk0/edit#gid=858376122"
+        },
+        "options": {}
+      },
+      "id": "3010b1b5-8d6e-40f2-8255-526d52c4a84f",
+      "name": "Get All Form Responses",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [
+        -1360,
+        720
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "o30GRrMtaHL0Y59f",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─────────────────────────────────────────────────────────────\n// Weekly Sales Report — The Gemini Lab\n// FIXED VERSION\n//\n// Bug fixes vs. previous version:\n//   1. Timezone double-shift removed. Previously the script added\n//      +3h to every timestamp on top of values that were already in\n//      Egypt local time, pushing any submission after 9 PM Egypt to\n//      the next day and breaking dedup + attendance.\n//   2. The reporting day is now driven by the \"التاريخ\" column\n//      (the date the agent reports FOR) rather than the submission\n//      timestamp, which is timezone-immune.\n//   3. Attendance section now correctly renders ✅ chips for agents\n//      with perfect attendance (Sun–Wed; Thursday is excluded from\n//      the \"missed\" check because the report fires at 11:30 PM Thu\n//      and most submissions are still in flight at that moment).\n//   4. Agent cards sorted by score (top performer first).\n//   5. CRM Activities total added to team totals grid.\n//   6. Defensive coding around the Date column (handles both Date\n//      objects and string values returned by the Google Sheets node).\n// ─────────────────────────────────────────────────────────────\n\n// ── Config ───────────────────────────────────────────────\nconst egyptOffset = 3 * 60; // minutes, kept ONLY for display \"now\"\n\nconst allAgents = [\n  'Ahmed Mustafa', 'Mariam Ahmed', 'Mohamed Sayed', 'Nourhan Ayman',\n  'Kareem Mohammed', 'Fady Fawzy', 'Mohamed Shabaan', 'Taher'\n];\n\n// Working days: Sunday(0) to Thursday(4)\nconst DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];\n\n// ── Column keys ──────────────────────────────────────────\nconst COL_NAME      = 'اسم المسؤول عن المبيعات';\nconst COL_DATE      = 'التاريخ';\nconst COL_SHEETS    = 'عدد ورقات المكالمات الباردة';\nconst COL_POSTS     = 'عدد البوستات على السوشيال ميديا';\nconst COL_REQUESTS  = 'عدد الطلبات الجديدة';\nconst COL_FOLLOWUPS = ' Follow Ups عدد مكالمات المتابعة';\nconst COL_TOTLEADS  = 'إجمالي عدد الليدز الجديدة';\nconst COL_REACHED   = 'عدد الليدز اللي تم التواصل معاهم';\nconst COL_NOTREACH  = 'عدد الليدز اللي ما تمش التواصل معاهم';\nconst COL_UPLOADED  = 'Drive  عدد المكالمات المرفوعة على الـ ';\nconst COL_NOTUPL    = 'Drive  عدد المكالمات اللي ما اترفعتش على الـ ';\n\n// ── \"Now\" in Egypt wall clock (for display only) ─────────\n// n8n servers are typically UTC. Compute Egypt wall-clock for header text.\nconst utcNow = new Date();\nconst localNow = new Date(utcNow.getTime() + egyptOffset * 60000);\n\n// ── Helper: parse a date-cell value into a YYYY-MM-DD string ─\n// Google Sheets node may return:\n//   - a JS Date object\n//   - an ISO string (\"2026-05-20T00:00:00.000Z\")\n//   - a locale-formatted string (\"5/20/2026\" or \"20/05/2026\")\n// We normalize to YYYY-MM-DD (the calendar date, no time).\nfunction toDateKey(val) {\n  if (!val) return null;\n\n  // Already a Date\n  if (val instanceof Date) {\n    return `${val.getUTCFullYear()}-${String(val.getUTCMonth() + 1).padStart(2, '0')}-${String(val.getUTCDate()).padStart(2, '0')}`;\n  }\n\n  const s = String(val).trim();\n  if (!s) return null;\n\n  // ISO with T (e.g. \"2026-05-20T00:00:00.000Z\" or \"2026-05-20\")\n  const isoMatch = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);\n  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;\n\n  // M/D/YYYY or MM/DD/YYYY (US-style, common Sheets output)\n  const usMatch = s.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/);\n  if (usMatch) {\n    const m = String(usMatch[1]).padStart(2, '0');\n    const d = String(usMatch[2]).padStart(2, '0');\n    return `${usMatch[3]}-${m}-${d}`;\n  }\n\n  // D/M/YYYY (Egypt locale fallback) — only if month > 12 in US parse impossible,\n  // we keep US-first; for unambiguous DD/MM use the explicit pattern below if needed.\n\n  // Last resort: let JS parse it\n  const parsed = new Date(s);\n  if (!isNaN(parsed.getTime())) {\n    return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, '0')}-${String(parsed.getUTCDate()).padStart(2, '0')}`;\n  }\n  return null;\n}\n\n// Helper: from a YYYY-MM-DD date key, return JS day index (0=Sun..6=Sat)\nfunction dayOfWeekFromKey(key) {\n  const [y, m, d] = key.split('-').map(Number);\n  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();\n}\n\n// ── This week's required date range (Sun–Thu, Egypt) ─────\n// Use Egypt wall-clock \"today\" to anchor the week.\nconst todayDay = localNow.getUTCDay(); // localNow is shifted UTC -> reading getUTCDay gives Egypt weekday\nconst daysFromSunday = todayDay === 6 ? -1 : todayDay; // if Saturday, treat as still \"this week\"\nconst weekStartDate = new Date(Date.UTC(\n  localNow.getUTCFullYear(),\n  localNow.getUTCMonth(),\n  localNow.getUTCDate() - daysFromSunday\n));\n\nconst requiredDates = [];\nfor (let i = 0; i <= 4; i++) {\n  const d = new Date(weekStartDate);\n  d.setUTCDate(weekStartDate.getUTCDate() + i);\n  requiredDates.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`);\n}\n\n// Saturday before this week (for \"weekend working\" detection)\nconst saturdayDate = new Date(weekStartDate);\nsaturdayDate.setUTCDate(weekStartDate.getUTCDate() - 1);\nconst saturdayKey = `${saturdayDate.getUTCFullYear()}-${String(saturdayDate.getUTCMonth() + 1).padStart(2, '0')}-${String(saturdayDate.getUTCDate()).padStart(2, '0')}`;\n\n// Today's date key (Egypt) — used to relax \"missed Thursday\" check while report is running\nconst todayKey = `${localNow.getUTCFullYear()}-${String(localNow.getUTCMonth() + 1).padStart(2, '0')}-${String(localNow.getUTCDate()).padStart(2, '0')}`;\n\n// Pretty week label for header\nfunction fmtDay(key) {\n  const [y, m, d] = key.split('-').map(Number);\n  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });\n}\nfunction fmtDayYear(key) {\n  const [y, m, d] = key.split('-').map(Number);\n  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });\n}\nconst weekLabel = `${fmtDay(requiredDates[0])} – ${fmtDayYear(requiredDates[4])}`;\n\n// ── Filter rows by reporting date (not submission timestamp) ──\nconst items = $input.all();\n\nconst weekEntries = [];   // entries whose التاريخ falls in Sun–Thu of this week\nconst satEntries = [];    // entries whose التاريخ is the Saturday before\n\nfor (const item of items) {\n  const d = item.json;\n  const name = d[COL_NAME];\n  if (!name) continue;\n  const dateKey = toDateKey(d[COL_DATE]);\n  if (!dateKey) continue;\n\n  if (requiredDates.includes(dateKey)) {\n    weekEntries.push({ name, dateKey, data: d, ts: new Date(d['Timestamp'] || 0).getTime() });\n  } else if (dateKey === saturdayKey) {\n    satEntries.push({ name, dateKey, data: d, ts: new Date(d['Timestamp'] || 0).getTime() });\n  }\n}\n\nconst hasSaturdaySubmissions = satEntries.length > 0;\n\n// ── Deduplicate: keep latest submission per agent per day ──\nfunction dedup(entries) {\n  const map = {};\n  for (const e of entries) {\n    const key = `${e.name}__${e.dateKey}`;\n    if (!map[key] || e.ts > map[key].ts) map[key] = e;\n  }\n  return Object.values(map);\n}\n\nconst weekDedup = dedup(weekEntries);\nconst satDedup = dedup(satEntries);\n\n// ── Build per-agent stats ───────────────────────────────\nconst agentStats = {};\nfor (const agent of allAgents) {\n  agentStats[agent] = {\n    name: agent,\n    totalSheets: 0, totalPosts: 0, totalRequests: 0,\n    totalFollowups: 0, totalLeads: 0, totalReached: 0,\n    totalNotReached: 0, totalUpdLeads: 0, totalUploaded: 0,\n    totalNotUpl: 0,\n    submittedDays: new Set(),\n    saturdaySubmitted: false,\n    score: 0\n  };\n}\n\nfunction toInt(v) {\n  if (v === null || v === undefined || v === '') return 0;\n  const n = parseInt(v, 10);\n  return isNaN(n) ? 0 : n;\n}\n\nfor (const e of weekDedup) {\n  const s = agentStats[e.name];\n  if (!s) continue;\n  s.totalSheets    += toInt(e.data[COL_SHEETS]);\n  s.totalPosts     += toInt(e.data[COL_POSTS]);\n  s.totalRequests  += toInt(e.data[COL_REQUESTS]);\n  s.totalFollowups += toInt(e.data[COL_FOLLOWUPS]);\n  s.totalLeads     += toInt(e.data[COL_TOTLEADS]);\n  s.totalReached   += toInt(e.data[COL_REACHED]);\n  s.totalNotReached+= toInt(e.data[COL_NOTREACH]);\n  s.totalUploaded  += toInt(e.data[COL_UPLOADED]);\n  s.totalNotUpl    += toInt(e.data[COL_NOTUPL]);\n\n  // Fuzzy lookup for CRM Activities column (has trailing/leading spaces)\n  const updLeadsKey = Object.keys(e.data).find(k => k && k.includes('إجمالي عدد الليدز اللي اتحدثت'));\n  s.totalUpdLeads  += toInt(updLeadsKey ? e.data[updLeadsKey] : 0);\n\n  s.submittedDays.add(e.dateKey);\n}\n\nfor (const e of satDedup) {\n  if (agentStats[e.name]) agentStats[e.name].saturdaySubmitted = true;\n}\n\n// Score (used for top performer + sorting)\nfor (const a of allAgents) {\n  const s = agentStats[a];\n  s.score = s.totalSheets + s.totalLeads + s.totalRequests + s.totalFollowups;\n}\n\n// ── Top performer ───────────────────────────────────────\nlet topAgent = null;\nlet topScore = -1;\nfor (const a of allAgents) {\n  if (agentStats[a].score > topScore) {\n    topScore = agentStats[a].score;\n    topAgent = a;\n  }\n}\n\n// ── Missing days ────────────────────────────────────────\n// Note: the report fires Thursday 11:30 PM Egypt. By that time most\n// agents have submitted, but some might still be in the pipeline.\n// We compute two views:\n//   - missingDaysStrict: missed any of Sun–Thu\n//   - missingDaysGrace: missed any of Sun–Wed (Thursday excused if today)\n// We display strict in the agent card but use grace for the attendance\n// section \"✅ All days\" chip so the team summary isn't all red.\nfunction missingDaysStrict(submitted) {\n  return requiredDates.filter(d => !submitted.has(d));\n}\nfunction missingDaysGrace(submitted) {\n  return requiredDates.filter(d => !submitted.has(d) && d !== todayKey);\n}\n\nfunction dayLabels(dateKeys) {\n  return dateKeys.map(k => DAY_NAMES[dayOfWeekFromKey(k)]);\n}\n\nconst formattedDate = localNow.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });\n\n// ── Build sorted agent list (by score desc) ─────────────\nconst sortedAgents = [...allAgents].sort((a, b) => agentStats[b].score - agentStats[a].score);\n\n// ── Build agent cards HTML ──────────────────────────────\nlet agentRows = '';\nfor (const agent of sortedAgents) {\n  const s = agentStats[agent];\n  const missing = missingDaysStrict(s.submittedDays);\n  const missingLabels = dayLabels(missing);\n  const daysSubmitted = s.submittedDays.size;\n  const isTop = agent === topAgent && topScore > 0;\n\n  const postStatus = s.totalPosts >= 25 ? '<span class=\"ok\">✅</span>' : '<span class=\"warn\">⚠️</span>';\n  const uplStatus  = s.totalNotUpl > 0  ? '<span class=\"warn\">⚠️</span>' : '<span class=\"ok\">✅</span>';\n\n  // If the only missing day is today (Thursday at report time), show a softer message\n  const onlyMissingToday = missing.length === 1 && missing[0] === todayKey;\n  let missingHTML;\n  if (missing.length === 0) {\n    missingHTML = `<div class=\"missing-days ok-days\">✅ Submitted all required days</div>`;\n  } else if (onlyMissingToday) {\n    missingHTML = `<div class=\"missing-days pending-days\">⏳ Pending today's submission (${DAY_NAMES[dayOfWeekFromKey(todayKey)]})</div>`;\n  } else {\n    missingHTML = `<div class=\"missing-days\">❌ Missing days: <strong>${missingLabels.join(', ')}</strong></div>`;\n  }\n\n  const satBadge = hasSaturdaySubmissions\n    ? (s.saturdaySubmitted\n        ? `<span class=\"sat-badge sat-ok\">Saturday ✅</span>`\n        : `<span class=\"sat-badge sat-miss\">Saturday ❌</span>`)\n    : '';\n\n  const topBadge = isTop ? `<span class=\"top-badge\">🏆 Top Performer</span>` : '';\n\n  agentRows += `\n    <div class=\"agent-card ${isTop ? 'top-card' : ''}\">\n      <div class=\"agent-header\">\n        <span class=\"agent-name\">${agent}</span>\n        <div class=\"badges\">${topBadge}${satBadge}</div>\n      </div>\n      <div class=\"days-submitted\">📅 Days submitted: <strong>${daysSubmitted}/5</strong></div>\n      ${missingHTML}\n      <div class=\"stats-grid\">\n        <div class=\"stat-box\"><div class=\"stat-label\">Cold Call Sheets</div><div class=\"stat-value\">${s.totalSheets}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Organic Posts ${postStatus}</div><div class=\"stat-value\">${s.totalPosts}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">New Requests</div><div class=\"stat-value\">${s.totalRequests}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Follow-Ups</div><div class=\"stat-value\">${s.totalFollowups}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Total New Leads</div><div class=\"stat-value\">${s.totalLeads}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Reached</div><div class=\"stat-value\">${s.totalReached}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Not Reached</div><div class=\"stat-value\">${s.totalNotReached}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">CRM Activities</div><div class=\"stat-value\">${s.totalUpdLeads}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Calls Uploaded ${uplStatus}</div><div class=\"stat-value\">${s.totalUploaded}</div></div>\n        <div class=\"stat-box\"><div class=\"stat-label\">Not Uploaded</div><div class=\"stat-value\" style=\"color:${s.totalNotUpl > 0 ? '#e74c3c' : 'inherit'}\">${s.totalNotUpl}</div></div>\n      </div>\n    </div>`;\n}\n\n// ── Team totals ─────────────────────────────────────────\nconst teamTotals = allAgents.reduce((acc, agent) => {\n  const s = agentStats[agent];\n  acc.sheets     += s.totalSheets;\n  acc.posts      += s.totalPosts;\n  acc.requests   += s.totalRequests;\n  acc.followups  += s.totalFollowups;\n  acc.leads      += s.totalLeads;\n  acc.reached    += s.totalReached;\n  acc.notUpl     += s.totalNotUpl;\n  acc.crm        += s.totalUpdLeads;\n  return acc;\n}, { sheets: 0, posts: 0, requests: 0, followups: 0, leads: 0, reached: 0, notUpl: 0, crm: 0 });\n\n// ── Attendance buckets (using grace-period definition) ──\nconst perfectAttendance = allAgents.filter(a => missingDaysGrace(agentStats[a].submittedDays).length === 0);\nconst missedAgents      = allAgents.filter(a => missingDaysGrace(agentStats[a].submittedDays).length > 0);\n\n// ── Full HTML ───────────────────────────────────────────\nconst html = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n  * { margin: 0; padding: 0; box-sizing: border-box; }\n  body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f0f2f5; color: #2c3e50; padding: 30px; }\n  .header { background: linear-gradient(135deg, #1a1a2e, #16213e); color: white; padding: 30px; border-radius: 12px; margin-bottom: 24px; text-align: center; }\n  .header h1 { font-size: 24px; font-weight: 700; letter-spacing: 1px; }\n  .header p { font-size: 13px; opacity: 0.75; margin-top: 6px; }\n  .team-summary { background: white; border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); }\n  .team-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; color: #1a1a2e; }\n  .team-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }\n  .team-stat { background: #f8f9fa; border-radius: 8px; padding: 12px; text-align: center; }\n  .team-stat .lbl { font-size: 11px; color: #7f8c8d; margin-bottom: 4px; }\n  .team-stat .val { font-size: 22px; font-weight: 800; color: #1a1a2e; }\n  .attendance-box { background: white; border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); }\n  .attendance-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: #1a1a2e; }\n  .att-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }\n  .att-chip { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }\n  .att-ok { background: #eafaf1; color: #27ae60; }\n  .att-miss { background: #fdf2f2; color: #e74c3c; }\n  .agent-card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); }\n  .top-card { border: 2px solid #f39c12; }\n  .agent-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 12px; border-bottom: 2px solid #f0f2f5; }\n  .agent-name { font-size: 17px; font-weight: 700; color: #1a1a2e; }\n  .badges { display: flex; gap: 6px; align-items: center; }\n  .top-badge { background: #fef9e7; color: #f39c12; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px; border: 1px solid #f39c12; }\n  .sat-badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px; }\n  .sat-ok { background: #eafaf1; color: #27ae60; }\n  .sat-miss { background: #fdf2f2; color: #e74c3c; }\n  .days-submitted { font-size: 13px; margin-bottom: 6px; color: #555; }\n  .missing-days { font-size: 12px; margin-bottom: 12px; color: #e74c3c; }\n  .ok-days { color: #27ae60; }\n  .pending-days { color: #f39c12; }\n  .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }\n  .stat-box { background: #f8f9fa; border-radius: 8px; padding: 10px; text-align: center; }\n  .stat-label { font-size: 10px; color: #7f8c8d; margin-bottom: 5px; }\n  .stat-value { font-size: 20px; font-weight: 800; color: #2c3e50; }\n  .ok { color: #27ae60; }\n  .warn { color: #e74c3c; }\n  .footer { text-align: center; font-size: 11px; color: #bdc3c7; margin-top: 30px; }\n</style>\n</head>\n<body>\n  <div class=\"header\">\n    <h1>📊 Weekly Sales Report — The Gemini Lab</h1>\n    <p>Week of ${weekLabel} &nbsp;|&nbsp; Generated ${formattedDate}</p>\n  </div>\n\n  <div class=\"team-summary\">\n    <div class=\"team-title\">🏢 Team Totals This Week</div>\n    <div class=\"team-grid\">\n      <div class=\"team-stat\"><div class=\"lbl\">Cold Call Sheets</div><div class=\"val\">${teamTotals.sheets}</div></div>\n      <div class=\"team-stat\"><div class=\"lbl\">Organic Posts</div><div class=\"val\">${teamTotals.posts}</div></div>\n      <div class=\"team-stat\"><div class=\"lbl\">New Requests</div><div class=\"val\">${teamTotals.requests}</div></div>\n      <div class=\"team-stat\"><div class=\"lbl\">Follow-Ups</div><div class=\"val\">${teamTotals.followups}</div></div>\n      <div class=\"team-stat\"><div class=\"lbl\">Total New Leads</div><div class=\"val\">${teamTotals.leads}</div></div>\n      <div class=\"team-stat\"><div class=\"lbl\">Reached</div><div class=\"val\">${teamTotals.reached}</div></div>\n      <div class=\"team-stat\"><div class=\"lbl\">CRM Activities</div><div class=\"val\">${teamTotals.crm}</div></div>\n      <div class=\"team-stat\"><div class=\"lbl\">Missed Uploads</div><div class=\"val\" style=\"color:${teamTotals.notUpl > 0 ? '#e74c3c' : 'inherit'}\">${teamTotals.notUpl}</div></div>\n    </div>\n  </div>\n\n  <div class=\"attendance-box\">\n    <div class=\"attendance-title\">📅 Weekly Attendance</div>\n    <div class=\"att-row\">\n      ${perfectAttendance.map(a => `<span class=\"att-chip att-ok\">${a} ✅</span>`).join('')}\n      ${missedAgents.map(a => `<span class=\"att-chip att-miss\">${a} ❌</span>`).join('')}\n    </div>\n    ${hasSaturdaySubmissions ? `<p style=\"font-size:12px;color:#7f8c8d;margin-top:8px\">⚠️ Saturday was a working day this week — see individual cards for Saturday attendance.</p>` : ''}\n  </div>\n\n  ${agentRows}\n\n  <div class=\"footer\">Generated automatically by n8n — The Gemini Lab Sales System</div>\n</body>\n</html>`;\n\nreturn [{ json: { html, weekLabel, topAgent, formattedDate } }];\n"
+      },
+      "id": "9e580695-3474-4226-b20f-c6c7c7c36c73",
+      "name": "Build Weekly Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1136,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $input.first().json.html;\nconst weekLabel = $input.first().json.weekLabel;\nconst topAgent = $input.first().json.topAgent;\nconst date = $input.first().json.formattedDate;\n\nconst pdfBase64 = Buffer.from(html).toString('base64');\n\nreturn [{\n  json: { html, weekLabel, topAgent, date },\n  binary: {\n    data: {\n      data: pdfBase64,\n      mimeType: 'text/html',\n      fileName: `Weekly_Report_${weekLabel.replace(/ /g,'_').replace('–','to')}.html`,\n      fileExtension: 'html'\n    }\n  }\n}];\n"
+      },
+      "id": "9e64648a-5224-4576-a0fc-d05a3ffd7f60",
+      "name": "Prepare File",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "7091043762",
+        "text": "=📊 *Weekly Sales Report — The Gemini Lab*\n🗓 Week of {{ $json.weekLabel }}\n\n🏆 Top Performer: *{{ $json.topAgent }}*\n\n_Full weekly report attached below 👇_",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "2cad1283-9358-4ab8-a536-09ed52264fc1",
+      "name": "Send Telegram Summary",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        -688,
+        432
+      ],
+      "webhookId": "694c44b3-03dd-4ee0-af2c-d2788ebfd145",
+      "credentials": {
+        "telegramApi": {
+          "id": "JFyA4Ezw1yNL7rsY",
+          "name": "Sales Daily Reports"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "7091043762",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=📊 Weekly Sales Report — The Gemini Lab 🗓 Week of {{ $json.weekLabel }}"
+        }
+      },
+      "id": "b3d88f99-7cce-4489-ade5-b81b6669e439",
+      "name": "Send Report File",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        -688,
+        624
+      ],
+      "webhookId": "e9e0d93d-352f-4375-bfe1-e0e71de0728a",
+      "credentials": {
+        "telegramApi": {
+          "id": "JFyA4Ezw1yNL7rsY",
+          "name": "Sales Daily Reports"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 30 23 * * 4"
+            }
+          ]
+        }
+      },
+      "id": "7a32fd0e-0971-4386-8677-0210a8b2a732",
+      "name": "Every Thursday at 11:30 PM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1584,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "7690098577",
+        "text": "=📊 *Weekly Sales Report — The Gemini Lab*\n🗓 Week of {{ $json.weekLabel }}\n\n🏆 Top Performer: *{{ $json.topAgent }}*\n\n_Full weekly report attached below 👇_",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "77767fad-3a45-4d17-8711-7174cb325ee5",
+      "name": "Send Telegram Summary1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        -688,
+        816
+      ],
+      "webhookId": "694c44b3-03dd-4ee0-af2c-d2788ebfd145",
+      "credentials": {
+        "telegramApi": {
+          "id": "JFyA4Ezw1yNL7rsY",
+          "name": "Sales Daily Reports"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "7690098577",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=📊 Weekly Sales Report — The Gemini Lab 🗓 Week of {{ $json.weekLabel }}"
+        }
+      },
+      "id": "ed4e0cc4-2fda-4922-805b-ddd1e682298d",
+      "name": "Send Report File1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        -688,
+        1008
+      ],
+      "webhookId": "e9e0d93d-352f-4375-bfe1-e0e71de0728a",
+      "credentials": {
+        "telegramApi": {
+          "id": "JFyA4Ezw1yNL7rsY",
+          "name": "Sales Daily Reports"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get All Form Responses": {
+      "main": [
+        [
+          {
+            "node": "Build Weekly Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Weekly Report": {
+      "main": [
+        [
+          {
+            "node": "Prepare File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare File": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Summary",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Report File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Telegram Summary1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Report File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Thursday at 11:30 PM": {
+      "main": [
+        [
+          {
+            "node": "Get All Form Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "afb73438-2273-4cd4-a24e-0b844a5e9fcf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1bc3bde962b74e38a865c94fbe38e2ca7aa242e4f8aab347966e197724649f2e"
+  },
+  "nodeGroups": [],
+  "id": "U14wt8eQX8hlSWb5",
+  "tags": []
+}

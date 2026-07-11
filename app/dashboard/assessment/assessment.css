@@ -1,0 +1,182 @@
+/* Scoped styling for the Assessment section (ported from the standalone
+   "visual-assessment" app). Variables/keyframes/classes below are scoped
+   under .tgl-assessment-scope rather than :root so they can never leak
+   into (or collide with) the rest of the StagePilot dashboard, which
+   already defines its own equivalents under different names
+   (--tgl-canvas/--tgl-energy/--tgl-clarity in app/globals.css). */
+
+.tgl-assessment-scope {
+  --tgl-black: #000000;
+  --tgl-lime: #D7FF00;
+  --tgl-white: #FFFFFF;
+  --tgl-surface: #0d0d0d;
+  --tgl-border: rgba(215, 255, 0, 0.15);
+  --glow-lime: 0 0 12px rgba(215, 255, 0, 0.4), 0 0 40px rgba(215, 255, 0, 0.15);
+  --glow-lime-sm: 0 0 8px rgba(215, 255, 0, 0.35);
+  /* StagePilot loads these fonts globally via @import in app/globals.css
+     (not next/font), so these are plain font stacks rather than
+     next/font-generated hashes. */
+  --font-space: 'Space Grotesk', sans-serif;
+  --font-montserrat: 'Montserrat', sans-serif;
+}
+
+/* ── Leaflet z-index fix, scoped ──
+   The source app forced .leaflet-pane to z-index 400 (to sit above the
+   in-map drag overlay's own layers but stay one flat stacking context).
+   StagePilot's sticky dashboard Navbar is z-index 50 and lives in the
+   same stacking context as this section's content (app/dashboard/layout.tsx
+   has no isolation/transform boundary between Navbar and <main>) — so a
+   400 pane would render on top of the Navbar wherever they visually
+   overlap during scroll. Scoping these values down (relative order
+   between the two selectors preserved) keeps the Navbar on top while
+   leaving the map's own internal pane stacking untouched. */
+.tgl-assessment-scope .leaflet-pane { z-index: 10 !important; }
+.tgl-assessment-scope .leaflet-top,
+.tgl-assessment-scope .leaflet-bottom { z-index: 15 !important; }
+
+@keyframes pin-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.65; }
+  50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.9; }
+}
+
+@keyframes pin-pulse-ring {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.12); }
+}
+
+@keyframes section-breathe {
+  0%, 100% { opacity: 0.9; }
+  50%       { opacity: 0.15; }
+}
+
+.tgl-assessment-scope .section-breathing-border {
+  animation: section-breathe 2.2s ease-in-out infinite;
+}
+
+@keyframes masterplan-entrance {
+  0%   { transform: scale(1.25); opacity: 0; filter: brightness(2); }
+  40%  { opacity: 1; filter: brightness(1.1); }
+  100% { transform: scale(1);    opacity: 1; filter: brightness(1); }
+}
+
+@keyframes star-blink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 10px rgba(215,255,0,0.8), 0 0 20px rgba(215,255,0,0.3); }
+  50%       { opacity: 0.2; box-shadow: 0 0 3px rgba(215,255,0,0.2); }
+}
+
+@keyframes modal-enter {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes overlay-enter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes token-appear {
+  from { opacity: 0; transform: translateY(5px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes score-entrance {
+  from { opacity: 0; transform: scale(0.85); filter: blur(4px); }
+  to   { opacity: 1; transform: scale(1);    filter: blur(0); }
+}
+
+/* ── Landmark panel scrollbar ── */
+.tgl-assessment-scope .landmark-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(215,255,0,0.35) transparent;
+}
+
+.tgl-assessment-scope .landmark-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.tgl-assessment-scope .landmark-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 99px;
+  margin-block: 6px;
+}
+
+.tgl-assessment-scope .landmark-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(215,255,0,0.08) 0%,
+    rgba(215,255,0,0.55) 40%,
+    rgba(215,255,0,0.55) 60%,
+    rgba(215,255,0,0.08) 100%
+  );
+  border-radius: 99px;
+  box-shadow:
+    0 0 6px rgba(215,255,0,0.5),
+    0 0 18px rgba(215,255,0,0.18),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+  transition: box-shadow 200ms ease, background 200ms ease;
+}
+
+.tgl-assessment-scope .landmark-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(215,255,0,0.15) 0%,
+    #D7FF00 35%,
+    #D7FF00 65%,
+    rgba(215,255,0,0.15) 100%
+  );
+  box-shadow:
+    0 0 10px rgba(215,255,0,0.8),
+    0 0 28px rgba(215,255,0,0.35),
+    0 0 50px rgba(215,255,0,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.3);
+}
+
+.tgl-assessment-scope .landmark-scroll::-webkit-scrollbar-thumb:active {
+  background: #D7FF00;
+  box-shadow:
+    0 0 14px rgba(215,255,0,1),
+    0 0 36px rgba(215,255,0,0.5),
+    0 0 70px rgba(215,255,0,0.2);
+}
+
+@keyframes km-uber-ring {
+  0%   { transform: translate(-50%, -50%) scale(0.05); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1);    opacity: 0; }
+}
+
+.tgl-assessment-scope .km-pulse-ring {
+  position: absolute;
+  top: 0; left: 0;
+  width: 280px; height: 280px;
+  border-radius: 50%;
+  border: 3.5px solid #D7FF00;
+  background: rgba(215, 255, 0, 0.10);
+  animation: km-uber-ring 2.2s cubic-bezier(0.08, 0.82, 0.17, 1) infinite;
+  animation-fill-mode: backwards;
+  pointer-events: none;
+}
+
+.tgl-assessment-scope .km-pulse-ring-2 { animation-delay: 0.73s; }
+.tgl-assessment-scope .km-pulse-ring-3 { animation-delay: 1.46s; }
+
+/* Draggable token hover — overrides inline styles */
+.tgl-assessment-scope .draggable-token {
+  transition: box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.tgl-assessment-scope .draggable-token:not(.token-selected):not(.token-overlay):hover {
+  box-shadow: 0 0 0 1px rgba(215,255,0,0.3), 0 4px 16px rgba(215,255,0,0.1), inset 3px 0 0 rgba(215,255,0,0.7), inset 0 1px 0 rgba(215,255,0,0.08) !important;
+  border-color: rgba(215,255,0,0.5) !important;
+}
+
+/* ── Full-bleed override ──
+   app/dashboard/layout.tsx wraps all dashboard children in
+   <main class="max-w-6xl mx-auto w-full px-6 py-6">. The assessment's
+   map/quiz screens are immersive full-bleed min-h-screen UIs, so this
+   section cancels that parent's padding/max-width for its own subtree
+   while keeping the sticky Navbar visible above it. */
+.tgl-assessment-scope {
+  margin: -1.5rem calc(50% - 50vw);
+  max-width: 100vw;
+  width: 100vw;
+}

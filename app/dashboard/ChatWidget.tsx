@@ -8,6 +8,37 @@ import type { ChatRole } from './chatTypes'
 
 const NEON = '#D7FF00'
 
+let sharedAudioContext: AudioContext | null = null
+
+function getAudioContext() {
+  if (typeof window === 'undefined') return null
+  if (!sharedAudioContext) {
+    const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    sharedAudioContext = new Ctor()
+  }
+  return sharedAudioContext
+}
+
+function playChime() {
+  const ctx = getAudioContext()
+  if (!ctx) return
+  const now = ctx.currentTime
+  ;[880, 1320].forEach((freq, i) => {
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = freq
+    const start = now + i * 0.09
+    gain.gain.setValueAtTime(0, start)
+    gain.gain.linearRampToValueAtTime(0.2, start + 0.015)
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start(start)
+    osc.stop(start + 0.2)
+  })
+}
+
 export default function ChatWidget({
   currentUserId,
   companyId,
@@ -22,8 +53,44 @@ export default function ChatWidget({
   const [unreadTotal, setUnreadTotal] = useState(0)
   const [unreadBySender, setUnreadBySender] = useState<Record<string, number>>({})
   const [unreadByGroup, setUnreadByGroup] = useState<Record<string, number>>({})
-  const [pendingTicketCount, setPendingTicketCount] = useState(0)
   const myGroupIdsRef = useRef<Set<string>>(new Set())
+  const nameCacheRef = useRef<Record<string, string>>({})
+  const groupNameCacheRef = useRef<Record<string, string>>({})
+
+  async function resolveSenderName(senderId: string) {
+    const cached = nameCacheRef.current[senderId]
+    if (cached) return cached
+    const supabase = createClient()
+    const { data } = await supabase.from('profiles').select('full_name').eq('id', senderId).single()
+    const name = data?.full_name ?? 'Someone'
+    nameCacheRef.current[senderId] = name
+    return name
+  }
+
+  async function resolveGroupName(groupId: string) {
+    const cached = groupNameCacheRef.current[groupId]
+    if (cached) return cached
+    const supabase = createClient()
+    const { data } = await supabase.from('chat_groups').select('name').eq('id', groupId).single()
+    const name = data?.name ?? 'Group'
+    groupNameCacheRef.current[groupId] = name
+    return name
+  }
+
+  function attachmentPreview(body: string, attachmentKind: string | null) {
+    if (attachmentKind === 'voice') return t('chatNotificationVoiceNoteLabel')
+    if (attachmentKind === 'image') return t('chatNotificationImageLabel')
+    if (attachmentKind === 'sticker') return t('chatNotificationStickerLabel')
+    return body.length > 80 ? `${body.slice(0, 80)}…` : body
+  }
+
+  function notify(title: string, body: string) {
+    playChime()
+    if (typeof Notification === 'undefined') return
+    if (Notification.permission !== 'granted') return
+    if (document.hasFocus()) return
+    new Notification(title, { body, icon: '/favicon.ico' })
+  }
 
   useEffect(() => {
     const supabase = createClient()
@@ -51,9 +118,10 @@ export default function ChatWidget({
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `recipient_id=eq.${currentUserId}` },
         payload => {
-          const senderId = (payload.new as { sender_id: string }).sender_id
+          const row = payload.new as { sender_id: string; body: string; attachment_kind: string | null }
           setUnreadTotal(t => t + 1)
-          setUnreadBySender(prev => ({ ...prev, [senderId]: (prev[senderId] ?? 0) + 1 }))
+          setUnreadBySender(prev => ({ ...prev, [row.sender_id]: (prev[row.sender_id] ?? 0) + 1 }))
+          resolveSenderName(row.sender_id).then(name => notify(name, attachmentPreview(row.body, row.attachment_kind)))
         }
       )
       .subscribe()
@@ -61,6 +129,7 @@ export default function ChatWidget({
     return () => {
       supabase.removeChannel(channel)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId])
 
   useEffect(() => {
@@ -115,10 +184,13 @@ export default function ChatWidget({
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_group_messages' },
         payload => {
-          const row = payload.new as { group_id: string; sender_id: string }
+          const row = payload.new as { group_id: string; sender_id: string; body: string; attachment_kind: string | null }
           if (row.sender_id === currentUserId) return
           if (!myGroupIdsRef.current.has(row.group_id)) return
           setUnreadByGroup(prev => ({ ...prev, [row.group_id]: (prev[row.group_id] ?? 0) + 1 }))
+          Promise.all([resolveSenderName(row.sender_id), resolveGroupName(row.group_id)]).then(([senderName, groupName]) => {
+            notify(`${senderName} · ${groupName}`, attachmentPreview(row.body, row.attachment_kind))
+          })
         }
       )
       .subscribe()
@@ -139,42 +211,8 @@ export default function ChatWidget({
       supabase.removeChannel(messagesChannel)
       supabase.removeChannel(membersChannel)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId])
-
-  useEffect(() => {
-    if (role === 'super_admin') return
-    const supabase = createClient()
-
-    async function loadPendingTickets() {
-      const { count } = await supabase
-        .from('ticket_assignees')
-        .select('id', { count: 'exact', head: true })
-        .eq('assignee_id', currentUserId)
-        .eq('status', 'open')
-
-      setPendingTicketCount(count ?? 0)
-    }
-
-    loadPendingTickets()
-
-    const channel = supabase
-      .channel(`ticket-inbox-${currentUserId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'ticket_assignees', filter: `assignee_id=eq.${currentUserId}` },
-        loadPendingTickets
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'ticket_assignees', filter: `assignee_id=eq.${currentUserId}` },
-        loadPendingTickets
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [currentUserId, role])
 
   function handleThreadRead(contactId: string, count: number) {
     setUnreadTotal(t => Math.max(0, t - count))
@@ -196,19 +234,20 @@ export default function ChatWidget({
     })
   }
 
-  function handleTicketStatusChanged(delta: number) {
-    setPendingTicketCount(n => Math.max(0, n + delta))
-  }
-
   const groupUnreadTotal = Object.values(unreadByGroup).reduce((a, b) => a + b, 0)
   const combinedUnreadTotal = unreadTotal + groupUnreadTotal
   const badgeText = combinedUnreadTotal > 9 ? t('chatUnreadBadgeOverflow') : String(combinedUnreadTotal)
-  const ticketBadgeText = pendingTicketCount > 9 ? t('chatUnreadBadgeOverflow') : String(pendingTicketCount)
 
   return (
     <>
       <button
-        onClick={() => setIsOpen(v => !v)}
+        onClick={() => {
+          setIsOpen(v => !v)
+          getAudioContext()?.resume()
+          if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            Notification.requestPermission()
+          }
+        }}
         title={t('chatIconTooltip')}
         aria-label={t('chatIconTooltip')}
         style={{
@@ -261,31 +300,6 @@ export default function ChatWidget({
             {badgeText}
           </span>
         )}
-
-        {pendingTicketCount > 0 && (
-          <span
-            title={t('ticketPendingTooltip')}
-            style={{
-              position: 'absolute',
-              top: -4,
-              left: -4,
-              minWidth: 20,
-              height: 20,
-              padding: '0 5px',
-              borderRadius: 10,
-              background: NEON,
-              color: '#000',
-              fontSize: 11,
-              fontWeight: 700,
-              fontFamily: "'Space Grotesk', sans-serif",
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {ticketBadgeText}
-          </span>
-        )}
       </button>
 
       {isOpen && (
@@ -297,7 +311,6 @@ export default function ChatWidget({
           unreadByGroup={unreadByGroup}
           onThreadRead={handleThreadRead}
           onGroupRead={handleGroupRead}
-          onTicketStatusChanged={handleTicketStatusChanged}
           onClose={() => setIsOpen(false)}
         />
       )}

@@ -50,7 +50,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const [{ data: contacts, error: contactsErr }, { data: existing, error: existingErr }] = await Promise.all([
     adminClient.from('whatsapp_contacts').select('id').eq('sheet_id', id),
-    adminClient.from('whatsapp_assignments').select('contact_id, agent_id').eq('sheet_id', id),
+    adminClient.from('whatsapp_assignments').select('contact_id, agent_id, sent_at').eq('sheet_id', id),
   ])
 
   let agents: { id: string }[] | null = null
@@ -87,18 +87,29 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const DRIP_SIZE = 30
 
-  const assignedPairs = new Set((existing ?? []).map(a => `${a.contact_id}:${a.agent_id}`))
+  // Golden rule: a contact, once assigned to any agent, is permanently theirs —
+  // it never re-enters distribution for a different agent, answered or not.
+  const assignedContactIds = new Set((existing ?? []).map(a => a.contact_id))
   const newCycle = sheet.current_cycle + 1
+
+  // Seed each eligible agent's load from their current unsent (in-flight) count,
+  // so this round tops them up to DRIP_SIZE instead of stacking another 30 on
+  // top of whatever they haven't sent yet.
   const load = new Map<string, number>(agents.map(a => [a.id, 0]))
+  for (const a of existing ?? []) {
+    if (!a.sent_at && load.has(a.agent_id)) {
+      load.set(a.agent_id, load.get(a.agent_id)! + 1)
+    }
+  }
 
   const newRows: { sheet_id: string; contact_id: string; agent_id: string; company_id: string; cycle: number }[] = []
   let exhausted = 0
+  let alreadyAssigned = 0
 
   for (const contact of shuffle(contacts ?? [])) {
-    const eligible = agents.filter(a =>
-      !assignedPairs.has(`${contact.id}:${a.id}`) &&
-      load.get(a.id)! < DRIP_SIZE
-    )
+    if (assignedContactIds.has(contact.id)) { alreadyAssigned++; continue }
+
+    const eligible = agents.filter(a => load.get(a.id)! < DRIP_SIZE)
     if (eligible.length === 0) { exhausted++; continue }
 
     eligible.sort((a, b) => (load.get(a.id)! - load.get(b.id)!))
@@ -122,5 +133,5 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
-  return NextResponse.json({ success: true, cycle: newCycle, assigned: newRows.length, exhausted })
+  return NextResponse.json({ success: true, cycle: newCycle, assigned: newRows.length, exhausted, alreadyAssigned })
 }

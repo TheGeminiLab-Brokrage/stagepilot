@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase/client'
 import { useT } from '@/lib/language-context'
-import type { TicketAssigneeRow, TicketAttachment, TicketSummary } from './chatTypes'
+import { formatDateTime } from './ticketUtils'
+import type { TicketAssigneeRow, TicketAttachment, TicketSummary } from '../chatTypes'
 
 const NEON = '#D7FF00'
 const CARD = 'rgba(255,255,255,0.03)'
@@ -112,16 +113,23 @@ export default function TicketDetailView({
           </span>
           {ticket.dueDate && (
             <span className="text-xs" style={{ color: MUTED, fontFamily: "'Space Grotesk', sans-serif" }}>
-              {ticket.dueDate}
+              {formatDateTime(ticket.dueDate)}
             </span>
           )}
         </div>
 
         {ticket.description && (
-          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.85)', fontFamily: "'Montserrat', sans-serif" }}>
-            {ticket.description}
-          </p>
+          <div
+            className="text-sm ticket-description-html"
+            style={{ color: 'rgba(255,255,255,0.85)', fontFamily: "'Montserrat', sans-serif" }}
+            dangerouslySetInnerHTML={{ __html: ticket.description }}
+          />
         )}
+
+        <span className="text-xs" style={{ color: MUTED, fontFamily: "'Space Grotesk', sans-serif" }}>
+          {ticket.creatorName ? `${t('ticketCreatedByLabel')}: ${ticket.creatorName} · ` : ''}
+          {t('ticketCreatedAtLabel')}: {formatDateTime(ticket.createdAt)}
+        </span>
 
         {photoAttachments.length > 0 && (
           <div className="flex flex-col gap-1.5">

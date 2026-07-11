@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import type { PieSectorDataItem } from 'recharts'
 import CrmStatusChanges from '../admin/reports/CrmStatusChanges'
+import SalesTargets from './SalesTargets'
 
 type Call = {
   id: string
@@ -131,7 +132,32 @@ function StageBadge({ stage }: { stage: string | null | undefined }) {
 const cardStyle = { background: 'rgba(215,255,0,0.03)', border: '1px solid rgba(215,255,0,0.12)', borderRadius: 12 }
 const chipStyle = (active: boolean) => ({ padding: '5px 14px', borderRadius: 6, border: active ? '1px solid rgba(215,255,0,0.6)' : '1px solid rgba(255,255,255,0.12)', background: active ? 'rgba(215,255,0,0.1)' : 'transparent', color: active ? '#D7FF00' : 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", transition: 'all 0.15s' })
 
-type PerfTab = 'leads' | 'crm'
+// Dark/lime-themed single-select dropdown (native <select> popups can't be restyled to match the app theme)
+function StageSelect({ value, onChange, options, placeholder }: { value: string | null; onChange: (v: string | null) => void; options: string[]; placeholder: string }) {
+  const [open, setOpen] = useState(false)
+  const label = value ? (STAGE_LABELS[value] ?? value) : placeholder
+  const rowStyle = (active: boolean) => ({ padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: active ? '#D7FF00' : 'rgba(255,255,255,0.6)', background: active ? 'rgba(215,255,0,0.08)' : 'transparent' })
+  return (
+    <div style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(o => !o)} style={{ padding: '5px 10px', borderRadius: 8, border: value ? '1px solid rgba(215,255,0,0.4)' : '1px solid rgba(255,255,255,0.12)', background: value ? 'rgba(215,255,0,0.1)' : 'rgba(255,255,255,0.04)', color: value ? '#D7FF00' : 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer', fontFamily: "'Montserrat', sans-serif", display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+        {label} <span style={{ fontSize: 9, opacity: 0.6 }}>▾</span>
+      </button>
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
+          <div style={{ position: 'absolute', left: 0, top: '100%', marginTop: 6, background: '#0e0e0e', border: '1px solid rgba(215,255,0,0.2)', borderRadius: 10, padding: '6px 4px', zIndex: 50, minWidth: 170, maxHeight: 240, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+            <div onClick={() => { onChange(null); setOpen(false) }} style={rowStyle(!value)}>{placeholder}</div>
+            {options.map(s => (
+              <div key={s} onClick={() => { onChange(s); setOpen(false) }} style={rowStyle(value === s)}>{STAGE_LABELS[s] ?? s}</div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+type PerfTab = 'leads' | 'crm' | 'targets'
 
 export default function PerformanceDashboard({
   calls,
@@ -155,6 +181,8 @@ export default function PerformanceDashboard({
   const [stageDropdownOpen, setStageDropdownOpen] = useState(false)
   const [crmData, setCrmData]                 = useState<CrmDataState>(crmExport ?? null)
   const [drawer, setDrawer]                   = useState<{ title: string; leads: Call[]; showTransition?: boolean } | null>(null)
+  const [drawerFromFilter, setDrawerFromFilter] = useState<string | null>(null)
+  const [drawerToFilter, setDrawerToFilter]     = useState<string | null>(null)
   const [tooltipAnchor, setTooltipAnchor]     = useState<{ x: number; y: number }>({ x: 300, y: 140 })
 
   // Called by CrmStatusChanges whenever data is parsed (drop, upload, or loaded from DB)
@@ -358,7 +386,29 @@ export default function PerformanceDashboard({
 
   function openDrawer(title: string, stages: string[], opts?: { showTransition?: boolean }) {
     setDrawer({ title, leads: filtered.filter(c => stages.includes(effectiveStage(c))), showTransition: opts?.showTransition })
+    setDrawerFromFilter(null)
+    setDrawerToFilter(null)
   }
+
+  const drawerFromOptions = useMemo(() => {
+    if (!drawer?.showTransition) return []
+    const present = new Set(drawer.leads.map(c => c.from_stage).filter(Boolean) as string[])
+    return ALL_STAGES.filter(s => present.has(s))
+  }, [drawer])
+
+  const drawerToOptions = useMemo(() => {
+    if (!drawer?.showTransition) return []
+    const present = new Set(drawer.leads.map(c => effectiveStage(c)).filter(Boolean))
+    return ALL_STAGES.filter(s => present.has(s))
+  }, [drawer])
+
+  const filteredDrawerLeads = useMemo(() => {
+    if (!drawer) return []
+    return drawer.leads.filter(c =>
+      (!drawerFromFilter || c.from_stage === drawerFromFilter) &&
+      (!drawerToFilter || effectiveStage(c) === drawerToFilter)
+    )
+  }, [drawer, drawerFromFilter, drawerToFilter])
 
   const kpiCards = [
     { label: 'GAP(A)%',          value: `${metrics.gapA}%`,              note: 'Interested → beyond',      onClick: () => openDrawer('GAP(A) — Stuck at Interested', ['interested / follow up']) },
@@ -367,17 +417,22 @@ export default function PerformanceDashboard({
     { label: 'GAP(D)%',          value: `${metrics.gapD}%`,              note: 'Done → Closed Deal',        onClick: () => openDrawer('GAP(D) — Meeting Done, No Deal', ['meeting done']) },
     {
       label: 'Direct to Meeting', value: String(metrics.directToMeeting), note: 'no prior follow-up',
-      onClick: isUsingCrm ? undefined : () => setDrawer({ title: 'Direct to Meeting', leads: filtered.filter(c => {
-        const agSt = (c.agent_stage ?? '').toLowerCase()
-        const effSt = effectiveStage(c)
-        return ['meeting scheduled', 'meeting done'].includes(agSt) && ['meeting scheduled', 'meeting done'].includes(effSt)
-      }) }),
+      onClick: isUsingCrm ? undefined : () => {
+        setDrawer({ title: 'Direct to Meeting', leads: filtered.filter(c => {
+          const agSt = (c.agent_stage ?? '').toLowerCase()
+          const effSt = effectiveStage(c)
+          return ['meeting scheduled', 'meeting done'].includes(agSt) && ['meeting scheduled', 'meeting done'].includes(effSt)
+        }) })
+        setDrawerFromFilter(null)
+        setDrawerToFilter(null)
+      },
     },
   ]
 
   const tabs: { key: PerfTab; label: string }[] = [
     { key: 'leads', label: 'Leads Over Stages' },
     ...(role === 'super_admin' ? [{ key: 'crm' as PerfTab, label: 'Status Changes' }] : []),
+    { key: 'targets', label: 'Sales Targets' },
   ]
 
   return (
@@ -393,6 +448,10 @@ export default function PerformanceDashboard({
 
       {activeTab === 'crm' && (
         <CrmStatusChanges onDataChange={handleCrmDataChange} />
+      )}
+
+      {activeTab === 'targets' && (
+        <SalesTargets role={role} />
       )}
 
       {activeTab === 'leads' && <>
@@ -580,14 +639,22 @@ export default function PerformanceDashboard({
             <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <p style={{ fontSize: 15, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif", marginBottom: 4 }}>{drawer.title}</p>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{drawer.leads.length} lead{drawer.leads.length !== 1 ? 's' : ''}</p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{filteredDrawerLeads.length} lead{filteredDrawerLeads.length !== 1 ? 's' : ''}</p>
               </div>
               <button onClick={() => setDrawer(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4, flexShrink: 0 }}>✕</button>
             </div>
 
+            {/* Stage filters */}
+            {drawer.showTransition && (
+              <div style={{ display: 'flex', gap: 8, padding: '14px 24px 0' }}>
+                <StageSelect value={drawerFromFilter} onChange={setDrawerFromFilter} options={drawerFromOptions} placeholder="All From Stages" />
+                <StageSelect value={drawerToFilter} onChange={setDrawerToFilter} options={drawerToOptions} placeholder="All To Stages" />
+              </div>
+            )}
+
             {/* Lead list */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
-              {drawer.leads.length === 0 ? (
+              {filteredDrawerLeads.length === 0 ? (
                 <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 13, marginTop: 40 }}>No leads in this category</p>
               ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -607,7 +674,7 @@ export default function PerformanceDashboard({
                     </tr>
                   </thead>
                   <tbody>
-                    {drawer.leads.map((c, i) => (
+                    {filteredDrawerLeads.map((c, i) => (
                       <tr key={c.id + i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                         <td style={{ padding: '10px 16px', color: '#fff', fontWeight: 600, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {isUsingCrm ? c.id : (c.client_name ?? c.id)}

@@ -1,7 +1,8 @@
 'use client'
 
 import { useT } from '@/lib/language-context'
-import type { TicketSummary } from './chatTypes'
+import { formatDateTime, isOverdue, stripHtml } from './ticketUtils'
+import type { TicketSummary } from '../chatTypes'
 
 const NEON = '#D7FF00'
 const CARD = 'rgba(255,255,255,0.03)'
@@ -24,14 +25,6 @@ const PRIORITY_LABEL_KEY = {
   urgent: 'ticketPriorityUrgent',
 } as const
 
-function isOverdue(dueDate: string | null, status: 'open' | 'done' | undefined) {
-  if (!dueDate || status === 'done') return false
-  const due = new Date(dueDate)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return due < today
-}
-
 export default function TicketCard({
   ticket,
   onOpen,
@@ -43,7 +36,7 @@ export default function TicketCard({
 }) {
   const t = useT()
   const priorityColor = PRIORITY_COLOR[ticket.priority]
-  const overdue = isOverdue(ticket.dueDate, ticket.mode === 'assignee' ? ticket.myStatus : undefined)
+  const overdue = isOverdue(ticket)
 
   return (
     <div
@@ -82,17 +75,21 @@ export default function TicketCard({
               overflow: 'hidden',
             }}
           >
-            {ticket.description}
+            {stripHtml(ticket.description)}
           </span>
         )}
       </button>
+
+      <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)', fontFamily: "'Space Grotesk', sans-serif" }}>
+        {t('ticketCreatedAtLabel')}: {formatDateTime(ticket.createdAt)}
+      </span>
 
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {ticket.dueDate && (
             <span className="text-xs" style={{ color: overdue ? RED : MUTED, fontFamily: "'Space Grotesk', sans-serif" }}>
               {overdue ? `${t('ticketDueDateOverdueLabel')} · ` : ''}
-              {ticket.dueDate}
+              {formatDateTime(ticket.dueDate)}
             </span>
           )}
           {(ticket.attachmentCount ?? 0) > 0 && (

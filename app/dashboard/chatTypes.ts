@@ -7,7 +7,45 @@ export type ChatContact = {
   team_name: string | null
 }
 
-export type ChatAttachmentKind = 'voice'
+export type ChatAttachmentKind = 'voice' | 'image' | 'sticker'
+
+export const QUICK_REACT_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const
+export type ReactionEmoji = typeof QUICK_REACT_EMOJIS[number]
+
+// message_id -> emoji -> user ids who reacted with that emoji. Kept as
+// client-side component state built from a bulk fetch + realtime events,
+// not embedded on ChatMessageRow/ChatGroupMessageRow (those stay pure
+// mirrors of their DB rows).
+export type ReactionMap = Record<string, Partial<Record<ReactionEmoji, string[]>>>
+
+export type ChatReactionRow = {
+  id: string
+  message_id: string
+  user_id: string
+  emoji: ReactionEmoji
+  created_at: string
+}
+
+// Real-estate + funny sticker pack, rendered from public/stickers/{slug}.png.
+export const STICKER_CATALOG = [
+  'sold-sign',
+  'keys-handoff',
+  'house-heart',
+  'deal-closed-handshake',
+  'moving-boxes',
+  'for-sale-sign',
+  'open-house-balloon',
+  'mind-blown',
+  'fire-hot-listing',
+  'popcorn-watching',
+  'thumbs-up-confetti',
+  'party-popper-closing',
+  'coffee-monday',
+  'sleeping-tired-agent',
+  'money-rain',
+  'trophy-top-agent',
+] as const
+export type StickerSlug = typeof STICKER_CATALOG[number]
 
 export type ChatMessageRow = {
   id: string
@@ -39,6 +77,12 @@ export type TicketAttachment = {
   kind: TicketAttachmentKind
 }
 
+export type TicketSummaryAssignee = {
+  id: string
+  fullName: string
+  teamName: string | null
+}
+
 export type TicketSummary = {
   id: string
   title: string
@@ -53,6 +97,8 @@ export type TicketSummary = {
   assigneeCount?: number
   doneCount?: number
   attachmentCount?: number
+  assignees?: TicketSummaryAssignee[]
+  creatorName?: string
 }
 
 export type ChatGroupSummary = {

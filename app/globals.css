@@ -86,6 +86,48 @@ body {
   opacity: 1;
 }
 
+/* ── Ticket description rich text editor ── */
+.tgl-description-editor {
+  outline: none;
+}
+.tgl-description-editor p {
+  margin: 0;
+}
+.tgl-description-editor ul,
+.tgl-description-editor ol {
+  margin: 0.25em 0;
+  padding-left: 1.25em;
+}
+.tgl-description-editor ul {
+  list-style: disc;
+}
+.tgl-description-editor ol {
+  list-style: decimal;
+}
+.tgl-description-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: rgba(255, 255, 255, 0.3);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.ticket-description-html ul {
+  list-style: disc;
+  padding-left: 1.25em;
+  margin: 0.25em 0;
+}
+.ticket-description-html ol {
+  list-style: decimal;
+  padding-left: 1.25em;
+  margin: 0.25em 0;
+}
+.ticket-description-html p {
+  margin: 0 0 0.4em 0;
+}
+.ticket-description-html p:last-child {
+  margin-bottom: 0;
+}
+
 /* ── Brand scrollbar ── */
 ::-webkit-scrollbar {
   width: 5px;
