@@ -41,12 +41,15 @@ export default function TaskFilterBar({ tickets, onFiltered }: Props) {
   const [status, setStatus] = useState<'' | 'open' | 'done'>('')
   const [agentSearch, setAgentSearch] = useState('')
   const [teamFilter, setTeamFilter] = useState('')
+  const [managerFilter, setManagerFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
   const teams = Array.from(
     new Set(tickets.flatMap(tk => (tk.assignees ?? []).map(a => a.teamName).filter(Boolean)))
   ) as string[]
+
+  const managers = Array.from(new Set(tickets.map(tk => tk.creatorName).filter(Boolean))) as string[]
 
   useEffect(() => {
     let result = tickets
@@ -68,6 +71,10 @@ export default function TaskFilterBar({ tickets, onFiltered }: Props) {
       result = result.filter(tk => (tk.assignees ?? []).some(a => a.teamName === teamFilter))
     }
 
+    if (managerFilter) {
+      result = result.filter(tk => tk.creatorName === managerFilter)
+    }
+
     if (dateFrom) {
       const from = new Date(dateFrom).getTime()
       result = result.filter(tk => tk.dueDate && new Date(tk.dueDate).getTime() >= from)
@@ -80,15 +87,16 @@ export default function TaskFilterBar({ tickets, onFiltered }: Props) {
 
     onFiltered(result)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickets, priority, status, agentSearch, teamFilter, dateFrom, dateTo])
+  }, [tickets, priority, status, agentSearch, teamFilter, managerFilter, dateFrom, dateTo])
 
-  const hasFilters = priority || status || agentSearch || teamFilter || dateFrom || dateTo
+  const hasFilters = priority || status || agentSearch || teamFilter || managerFilter || dateFrom || dateTo
 
   function clearAll() {
     setPriority('')
     setStatus('')
     setAgentSearch('')
     setTeamFilter('')
+    setManagerFilter('')
     setDateFrom('')
     setDateTo('')
   }
@@ -132,6 +140,17 @@ export default function TaskFilterBar({ tickets, onFiltered }: Props) {
         >
           <option value="" style={{ color: '#000' }}>{t('filterAllTeams')}</option>
           {teams.map(team => <option key={team} value={team} style={{ color: '#000' }}>{team}</option>)}
+        </select>
+      )}
+
+      {managers.length > 0 && (
+        <select
+          value={managerFilter}
+          onChange={e => setManagerFilter(e.target.value)}
+          style={{ ...inputBase, cursor: 'pointer', ...(managerFilter ? activeStyle : {}) }}
+        >
+          <option value="" style={{ color: '#000' }}>{t('filterAllManagers')}</option>
+          {managers.map(manager => <option key={manager} value={manager} style={{ color: '#000' }}>{manager}</option>)}
         </select>
       )}
 

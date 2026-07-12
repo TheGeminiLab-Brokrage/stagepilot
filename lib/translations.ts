@@ -40,6 +40,7 @@ const en = {
   filterStage: 'Stage',
   filterSearchClient: 'Search client…',
   filterAllTeams: 'All teams',
+  filterAllManagers: 'All managers',
   filterSearchAgent: 'Search agent…',
   filterClearAll: 'Clear all',
 
@@ -445,6 +446,7 @@ const ar: typeof en = {
   filterStage: 'المرحلة',
   filterSearchClient: 'البحث عن عميل…',
   filterAllTeams: 'كل الفرق',
+  filterAllManagers: 'كل المديرين',
   filterSearchAgent: 'البحث عن وكيل…',
   filterClearAll: 'مسح الكل',
 
