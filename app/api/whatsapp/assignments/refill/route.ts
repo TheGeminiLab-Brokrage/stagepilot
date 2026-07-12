@@ -28,6 +28,7 @@ async function fetchAllIds(
   let from = 0
   for (;;) {
     const { data, error } = await filters(client.from(table).select(column))
+      .order(column, { ascending: true })
       .range(from, from + PAGE_SIZE - 1)
     if (error) throw error
     if (!data || data.length === 0) break
