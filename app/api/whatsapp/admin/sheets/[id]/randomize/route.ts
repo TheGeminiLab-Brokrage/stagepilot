@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 
 async function requireSuperAdmin() {
   const supabase = await createClient()
@@ -48,10 +49,20 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     .select('agent_id')
     .eq('sheet_id', id)
 
-  const [{ data: contacts, error: contactsErr }, { data: existing, error: existingErr }] = await Promise.all([
-    adminClient.from('whatsapp_contacts').select('id').eq('sheet_id', id),
-    adminClient.from('whatsapp_assignments').select('contact_id, agent_id, sent_at').eq('sheet_id', id),
-  ])
+  let contacts: { id: string }[]
+  let existing: { contact_id: string; agent_id: string; sent_at: string | null }[]
+
+  try {
+    ;[contacts, existing] = await Promise.all([
+      fetchAllRows<{ id: string }>((from, to) =>
+        adminClient.from('whatsapp_contacts').select('id').eq('sheet_id', id).order('id', { ascending: true }).range(from, to)),
+      fetchAllRows<{ contact_id: string; agent_id: string; sent_at: string | null }>((from, to) =>
+        adminClient.from('whatsapp_assignments').select('contact_id, agent_id, sent_at').eq('sheet_id', id).order('id', { ascending: true }).range(from, to)),
+    ])
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load contacts/assignments'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 
   let agents: { id: string }[] | null = null
   let agentsErr: { message: string } | null = null
@@ -78,8 +89,6 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   }
 
   if (agentsErr) return NextResponse.json({ error: agentsErr.message }, { status: 500 })
-  if (contactsErr) return NextResponse.json({ error: contactsErr.message }, { status: 500 })
-  if (existingErr) return NextResponse.json({ error: existingErr.message }, { status: 500 })
 
   if (!agents || agents.length === 0) {
     return NextResponse.json({ error: 'No agents available to assign' }, { status: 400 })

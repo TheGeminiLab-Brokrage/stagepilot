@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 
 async function requireSuperAdmin() {
   const supabase = await createClient()
@@ -33,21 +34,32 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   if (sheetErr || !sheet) return NextResponse.json({ error: 'Sheet not found' }, { status: 404 })
 
-  const { data: contacts, error: contactsErr } = await adminClient
-    .from('whatsapp_contacts')
-    .select('id, phone, client_name, first_response_at, first_response_agent:profiles!first_response_agent_id(full_name)')
-    .eq('sheet_id', id)
-    .order('phone', { ascending: true })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let contacts: any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let assignments: any[]
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    contacts = await fetchAllRows<any>((from, to) =>
+      adminClient
+        .from('whatsapp_contacts')
+        .select('id, phone, client_name, first_response_at, first_response_agent:profiles!first_response_agent_id(full_name)')
+        .eq('sheet_id', id)
+        .order('phone', { ascending: true })
+        .range(from, to))
 
-  if (contactsErr) return NextResponse.json({ error: contactsErr.message }, { status: 500 })
-
-  const { data: assignments, error: assignmentsErr } = await adminClient
-    .from('whatsapp_assignments')
-    .select('id, contact_id, cycle, message_text, sent_at, response_status, responded_at, agent:profiles!agent_id(id, full_name)')
-    .eq('sheet_id', id)
-    .order('cycle', { ascending: true })
-
-  if (assignmentsErr) return NextResponse.json({ error: assignmentsErr.message }, { status: 500 })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    assignments = await fetchAllRows<any>((from, to) =>
+      adminClient
+        .from('whatsapp_assignments')
+        .select('id, contact_id, cycle, message_text, sent_at, response_status, responded_at, agent:profiles!agent_id(id, full_name)')
+        .eq('sheet_id', id)
+        .order('cycle', { ascending: true })
+        .range(from, to))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load contacts/assignments'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 
   const { data: assignedAgents } = await adminClient
     .from('whatsapp_sheet_agents')
