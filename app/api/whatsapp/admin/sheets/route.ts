@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { normalizePhoneKey } from '@/lib/phone'
 
 async function requireAdminOrTeamLeader() {
   const supabase = await createClient()
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     .filter(c => c.phone.length > 0)
 
   for (const c of cleanContacts) {
-    const key = c.phone.replace(/\D/g, '')
+    const key = normalizePhoneKey(c.phone)
     if (!key || seen.has(key)) continue
     seen.add(key)
     rows.push({ sheet_id: '', company_id: companyId!, phone: c.phone, client_name: c.client_name })

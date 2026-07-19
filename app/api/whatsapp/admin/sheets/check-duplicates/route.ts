@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
+import { normalizePhoneKey } from '@/lib/phone'
 
 async function requireAdminOrTeamLeader() {
   const supabase = await createClient()
@@ -20,10 +21,6 @@ async function requireAdminOrTeamLeader() {
   return { error: null, status: 200, companyId: profile.company_id as string }
 }
 
-function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, '')
-}
-
 export async function POST(request: NextRequest) {
   const { error, status, companyId } = await requireAdminOrTeamLeader()
   if (error) return NextResponse.json({ error }, { status })
@@ -33,7 +30,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'phones must be a non-empty array' }, { status: 400 })
   }
 
-  const requestedKeys = new Set(phones.map((p: string) => normalizePhone(String(p ?? ''))).filter(Boolean))
+  const requestedKeys = new Set(phones.map((p: string) => normalizePhoneKey(String(p ?? ''))).filter(Boolean))
 
   const adminClient = createAdminClient()
 
@@ -51,7 +48,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 
-  const matches = existingContacts.filter(c => requestedKeys.has(normalizePhone(c.phone)))
+  const matches = existingContacts.filter(c => requestedKeys.has(normalizePhoneKey(c.phone)))
   if (matches.length === 0) {
     return NextResponse.json({ duplicates: [] })
   }

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useMemo } from 'react'
 import { parseExcelFile, type ParsedSheet, type RawRow } from '@/lib/excel-parser'
+import { normalizePhoneKey } from '@/lib/phone'
 
 const NEON = '#D7FF00'
 const NEON_DIM = 'rgba(215,255,0,0.12)'
@@ -100,7 +101,7 @@ export default function UploadSheetPanel({
     for (const row of activeSheet.rows) {
       const phone = cellToString(row[phoneCol])
       if (!phone) continue
-      const key = phone.replace(/\D/g, '')
+      const key = normalizePhoneKey(phone)
       if (!key || seen.has(key)) continue
       seen.add(key)
       out.push({ phone, client_name: nameCol ? (cellToString(row[nameCol]) || null) : null })
@@ -177,9 +178,9 @@ export default function UploadSheetPanel({
 
   function handleUploadExcludingAnswered() {
     const answeredKeys = new Set(
-      (duplicateReport ?? []).filter(d => d.status === 'answered').map(d => d.phone.replace(/\D/g, ''))
+      (duplicateReport ?? []).filter(d => d.status === 'answered').map(d => normalizePhoneKey(d.phone))
     )
-    const filtered = previewContacts.filter(c => !answeredKeys.has(c.phone.replace(/\D/g, '')))
+    const filtered = previewContacts.filter(c => !answeredKeys.has(normalizePhoneKey(c.phone)))
     setDuplicateReport(null)
     doUpload(filtered)
   }

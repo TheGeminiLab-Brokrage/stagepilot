@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import UploadSheetPanel from '@/app/dashboard/whatsapp/UploadSheetPanel'
+import { normalizePhoneKey } from '@/lib/phone'
 
 const NEON = '#D7FF00'
 const NEON_DIM = 'rgba(215,255,0,0.12)'
@@ -116,6 +117,22 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
   const [combinedReport, setCombinedReport] = useState<CombinedReport | null>(null)
   const [loadingCombined, setLoadingCombined] = useState(false)
   const [combineError, setCombineError] = useState<string | null>(null)
+  const [combineStatusFilter, setCombineStatusFilter] = useState<Set<CombinedStatus>>(
+    new Set<CombinedStatus>(['pending', 'not_answered', 'never_distributed'])
+  )
+
+  function toggleCombineStatus(s: CombinedStatus) {
+    setCombineStatusFilter(prev => {
+      const next = new Set(prev)
+      if (next.has(s)) next.delete(s); else next.add(s)
+      return next
+    })
+  }
+
+  const filteredCombinedContacts = useMemo(() => {
+    if (!combinedReport) return []
+    return combinedReport.contacts.filter(c => combineStatusFilter.has(c.status))
+  }, [combinedReport, combineStatusFilter])
 
   function toggleCombineMode() {
     setCombineMode(m => !m)
@@ -153,21 +170,20 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
     }
   }
 
-  function exportNonAnswered() {
-    if (!combinedReport) return
+  function exportFilteredCombined() {
+    if (filteredCombinedContacts.length === 0) return
     const seen = new Set<string>()
     const rows: { 'Client Name': string; 'Phone': string; 'Source Sheet': string; 'Status': string }[] = []
-    for (const c of combinedReport.contacts) {
-      if (c.status === 'answered') continue
-      const key = c.phone.replace(/\D/g, '')
+    for (const c of filteredCombinedContacts) {
+      const key = normalizePhoneKey(c.phone)
       if (!key || seen.has(key)) continue
       seen.add(key)
       rows.push({ 'Client Name': c.client_name ?? '', 'Phone': c.phone, 'Source Sheet': c.sheet_name, 'Status': COMBINED_STATUS_LABEL[c.status] })
     }
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Not Answered')
-    XLSX.writeFile(wb, `not-answered-combined-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    XLSX.utils.book_append_sheet(wb, ws, 'Export')
+    XLSX.writeFile(wb, `whatsapp-combined-export-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   const loadDetail = useCallback(async (sheetId: string) => {
@@ -570,15 +586,32 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                   <StatCard label="Pending" value={combinedReport.stats.pending} />
                   <StatCard label="Not Yet Sent" value={combinedReport.stats.never_distributed} />
                 </div>
+                <div style={{ fontSize: 12, color: MUTED, marginBottom: 16 }}>
+                  Across {combinedReport.sheets.length} sheet{combinedReport.sheets.length === 1 ? '' : 's'}: {combinedReport.sheets.map(s => s.name).join(', ')}
+                  <span style={{ marginLeft: 8, color: NEON }}>(each client counted once, even if uploaded in more than one sheet)</span>
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-                  <span style={{ fontSize: 12, color: MUTED }}>
-                    Across {combinedReport.sheets.length} sheet{combinedReport.sheets.length === 1 ? '' : 's'}: {combinedReport.sheets.map(s => s.name).join(', ')}
-                  </span>
-                  <button onClick={exportNonAnswered} style={{
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                    <span style={{ fontSize: 12, color: MUTED, ...fontDisplay }}>Include:</span>
+                    {(['pending', 'not_answered', 'never_distributed', 'answered'] as CombinedStatus[]).map(s => (
+                      <label key={s} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: combineStatusFilter.has(s) ? '#fff' : MUTED, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={combineStatusFilter.has(s)}
+                          onChange={() => toggleCombineStatus(s)}
+                          style={{ accentColor: NEON }}
+                        />
+                        {COMBINED_STATUS_LABEL[s]} ({combinedReport.stats[s]})
+                      </label>
+                    ))}
+                  </div>
+                  <button onClick={exportFilteredCombined} disabled={filteredCombinedContacts.length === 0} style={{
                     padding: '9px 16px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
-                    background: NEON_DIM, color: NEON, fontWeight: 600, fontSize: 12, cursor: 'pointer', ...fontDisplay,
+                    background: filteredCombinedContacts.length > 0 ? NEON_DIM : 'transparent',
+                    color: filteredCombinedContacts.length > 0 ? NEON : MUTED, fontWeight: 600, fontSize: 12,
+                    cursor: filteredCombinedContacts.length > 0 ? 'pointer' : 'not-allowed', ...fontDisplay,
                   }}>
-                    ↓ Export Not Answered ({combinedReport.stats.total - combinedReport.stats.answered})
+                    ↓ Export Selected ({filteredCombinedContacts.length})
                   </button>
                 </div>
                 <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
@@ -595,7 +628,7 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                         </tr>
                       </thead>
                       <tbody>
-                        {combinedReport.contacts.slice(0, 500).map((c, i) => (
+                        {filteredCombinedContacts.slice(0, 500).map((c, i) => (
                           <tr key={i} style={{ borderBottom: `1px solid ${BORDER}` }}>
                             <td style={{ padding: '12px 14px', color: '#fff', whiteSpace: 'nowrap' }}>{c.phone}</td>
                             <td style={{ padding: '12px 14px', color: MUTED }}>{c.client_name ?? '—'}</td>
@@ -605,15 +638,15 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                             </td>
                           </tr>
                         ))}
-                        {combinedReport.contacts.length === 0 && (
-                          <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: MUTED }}>No contacts.</td></tr>
+                        {filteredCombinedContacts.length === 0 && (
+                          <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: MUTED }}>No contacts match the selected filters.</td></tr>
                         )}
                       </tbody>
                     </table>
                   </div>
-                  {combinedReport.contacts.length > 500 && (
+                  {filteredCombinedContacts.length > 500 && (
                     <div style={{ padding: '10px 14px', fontSize: 11, color: MUTED, textAlign: 'center', borderTop: `1px solid ${BORDER}` }}>
-                      Showing first 500 of {combinedReport.contacts.length} — the export includes all of them.
+                      Showing first 500 of {filteredCombinedContacts.length} — the export includes all of them.
                     </div>
                   )}
                 </div>

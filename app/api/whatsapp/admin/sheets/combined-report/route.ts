@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
+import { normalizePhoneKey } from '@/lib/phone'
 
 async function requireAdminOrTeamLeader() {
   const supabase = await createClient()
@@ -72,8 +73,11 @@ export async function POST(request: NextRequest) {
   const assignmentByContactId = new Map(assignments.map(a => [a.contact_id, a]))
   const sheetNameById = new Map(sheets.map(s => [s.id as string, s.name as string]))
 
-  const rows: { phone: string; client_name: string | null; sheet_name: string; status: Status }[] = []
-  const stats: Record<Status, number> = { answered: 0, not_answered: 0, pending: 0, never_distributed: 0 }
+  // The same real client can appear as separate contact rows across multiple
+  // sheets (e.g. re-uploaded by mistake, or in a different phone format).
+  // Merge by canonical phone key so they're counted and exported as one person.
+  const STATUS_PRIORITY: Record<Status, number> = { answered: 3, not_answered: 2, pending: 1, never_distributed: 0 }
+  const merged = new Map<string, { phone: string; client_name: string | null; sheetNames: Set<string>; status: Status }>()
 
   for (const c of contacts) {
     const assignment = assignmentByContactId.get(c.id)
@@ -83,13 +87,27 @@ export async function POST(request: NextRequest) {
     if (teamAgentIds && assignment && !teamAgentIds.has(assignment.agent_id)) continue
 
     const contactStatus: Status = assignment ? (assignment.response_status as Status) : 'never_distributed'
-    stats[contactStatus]++
-    rows.push({
-      phone: c.phone,
-      client_name: c.client_name,
-      sheet_name: sheetNameById.get(c.sheet_id) ?? 'Unknown sheet',
-      status: contactStatus,
-    })
+    const key = normalizePhoneKey(c.phone)
+    if (!key) continue
+    const sheetName = sheetNameById.get(c.sheet_id) ?? 'Unknown sheet'
+
+    const existing = merged.get(key)
+    if (!existing) {
+      merged.set(key, { phone: c.phone, client_name: c.client_name, sheetNames: new Set([sheetName]), status: contactStatus })
+    } else {
+      existing.sheetNames.add(sheetName)
+      if (!existing.client_name && c.client_name) existing.client_name = c.client_name
+      // If this person answered anywhere, that always wins — never let a stale
+      // "pending" copy from another sheet make them look re-contactable.
+      if (STATUS_PRIORITY[contactStatus] > STATUS_PRIORITY[existing.status]) existing.status = contactStatus
+    }
+  }
+
+  const stats: Record<Status, number> = { answered: 0, not_answered: 0, pending: 0, never_distributed: 0 }
+  const rows: { phone: string; client_name: string | null; sheet_name: string; status: Status }[] = []
+  for (const m of merged.values()) {
+    stats[m.status]++
+    rows.push({ phone: m.phone, client_name: m.client_name, sheet_name: Array.from(m.sheetNames).join(', '), status: m.status })
   }
 
   return NextResponse.json({
