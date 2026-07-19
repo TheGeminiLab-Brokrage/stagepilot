@@ -2,23 +2,25 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-async function requireSuperAdmin() {
+async function requireAdminOrTeamLeader() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized', status: 401, companyId: null }
+  if (!user) return { error: 'Unauthorized', status: 401, companyId: null, role: null, fullName: null }
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, company_id')
+    .select('role, company_id, full_name')
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'super_admin') return { error: 'Forbidden', status: 403, companyId: null }
-  return { error: null, status: 200, companyId: profile.company_id as string }
+  if (profile?.role !== 'super_admin' && profile?.role !== 'team_leader') {
+    return { error: 'Forbidden', status: 403, companyId: null, role: null, fullName: null }
+  }
+  return { error: null, status: 200, companyId: profile.company_id as string, role: profile.role as string, fullName: profile.full_name as string }
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { error, status, companyId } = await requireSuperAdmin()
+  const { error, status, companyId, role, fullName } = await requireAdminOrTeamLeader()
   if (error) return NextResponse.json({ error }, { status })
 
   const { id } = await params
@@ -34,13 +36,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   if (sheetErr || !sheet) return NextResponse.json({ error: 'Sheet not found' }, { status: 404 })
 
+  let agentsQuery = adminClient
+    .from('profiles')
+    .select('id, full_name, team_name, whatsapp_active')
+    .eq('company_id', companyId!)
+    .eq('role', 'agent')
+    .order('full_name', { ascending: true })
+  // Team leaders may only assign their own team's agents to a sheet
+  if (role === 'team_leader') agentsQuery = agentsQuery.eq('team_name', fullName!)
+
   const [{ data: agents, error: agentsErr }, { data: assigned, error: assignedErr }] = await Promise.all([
-    adminClient
-      .from('profiles')
-      .select('id, full_name, team_name, whatsapp_active')
-      .eq('company_id', companyId!)
-      .eq('role', 'agent')
-      .order('full_name', { ascending: true }),
+    agentsQuery,
     adminClient
       .from('whatsapp_sheet_agents')
       .select('agent_id')
@@ -64,7 +70,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { error, status, companyId } = await requireSuperAdmin()
+  const { error, status, companyId, role, fullName } = await requireAdminOrTeamLeader()
   if (error) return NextResponse.json({ error }, { status })
 
   const { id } = await params
@@ -91,11 +97,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .eq('sheet_id', id)
 
   const currentIds = (current ?? []).map(r => r.agent_id as string)
-  const newSet = new Set(agent_ids)
+
+  let submittedIds = agent_ids
+  let removableIds = currentIds
+
+  if (role === 'team_leader') {
+    // A team leader may only touch their own team's assignments on this sheet —
+    // other teams' assigned agents must be left untouched.
+    const { data: teamAgents } = await adminClient
+      .from('profiles')
+      .select('id')
+      .eq('company_id', companyId!)
+      .eq('role', 'agent')
+      .eq('team_name', fullName!)
+    const teamIds = new Set((teamAgents ?? []).map(a => a.id as string))
+    submittedIds = agent_ids.filter(aid => teamIds.has(aid))
+    removableIds = currentIds.filter(aid => teamIds.has(aid))
+  }
+
+  const newSet = new Set(submittedIds)
   const currentSet = new Set(currentIds)
 
-  const toAdd = agent_ids.filter(aid => !currentSet.has(aid))
-  const toRemove = currentIds.filter(aid => !newSet.has(aid))
+  const toAdd = submittedIds.filter(aid => !currentSet.has(aid))
+  const toRemove = removableIds.filter(aid => !newSet.has(aid))
 
   await Promise.all([
     toAdd.length > 0
@@ -113,5 +137,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       : Promise.resolve(),
   ])
 
-  return NextResponse.json({ success: true, assigned: agent_ids.length })
+  return NextResponse.json({ success: true, assigned: submittedIds.length })
 }

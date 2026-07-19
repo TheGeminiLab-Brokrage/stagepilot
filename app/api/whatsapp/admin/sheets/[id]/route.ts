@@ -18,8 +18,25 @@ async function requireSuperAdmin() {
   return { error: null, status: 200, companyId: profile.company_id as string }
 }
 
+async function requireAdminOrTeamLeader() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized', status: 401, companyId: null }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, company_id')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'super_admin' && profile?.role !== 'team_leader') {
+    return { error: 'Forbidden', status: 403, companyId: null }
+  }
+  return { error: null, status: 200, companyId: profile.company_id as string }
+}
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { error, status, companyId } = await requireSuperAdmin()
+  const { error, status, companyId } = await requireAdminOrTeamLeader()
   if (error) return NextResponse.json({ error }, { status })
 
   const { id } = await params

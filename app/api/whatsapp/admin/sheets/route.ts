@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-async function requireSuperAdmin() {
+async function requireAdminOrTeamLeader() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized', status: 401, companyId: null, userId: null }
@@ -13,7 +13,9 @@ async function requireSuperAdmin() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'super_admin') return { error: 'Forbidden', status: 403, companyId: null, userId: null }
+  if (profile?.role !== 'super_admin' && profile?.role !== 'team_leader') {
+    return { error: 'Forbidden', status: 403, companyId: null, userId: null }
+  }
   return { error: null, status: 200, companyId: profile.company_id as string, userId: user.id }
 }
 
@@ -23,7 +25,7 @@ interface IncomingContact {
 }
 
 export async function POST(request: NextRequest) {
-  const { error, status, companyId, userId } = await requireSuperAdmin()
+  const { error, status, companyId, userId } = await requireAdminOrTeamLeader()
   if (error) return NextResponse.json({ error }, { status })
 
   const { name, contacts } = await request.json().catch(() => ({}))

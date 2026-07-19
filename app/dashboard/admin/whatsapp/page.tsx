@@ -10,11 +10,11 @@ export default async function WhatsAppAdminPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, company_id')
+    .select('role, company_id, full_name')
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'super_admin') redirect('/dashboard')
+  if (profile?.role !== 'super_admin' && profile?.role !== 'team_leader') redirect('/dashboard')
 
   const adminClient = createAdminClient()
 
@@ -36,12 +36,16 @@ export default async function WhatsAppAdminPage() {
 
   const sheetsWithCounts = (sheets ?? []).map(s => ({ ...s, contactCount: counts[s.id] ?? 0 }))
 
-  const { data: agents } = await adminClient
+  let agentsQuery = adminClient
     .from('profiles')
     .select('id, full_name, team_name, whatsapp_active')
     .eq('company_id', profile.company_id)
     .eq('role', 'agent')
     .order('full_name')
+  // Team leaders only manage their own team's agents
+  if (profile.role === 'team_leader') agentsQuery = agentsQuery.eq('team_name', profile.full_name)
+
+  const { data: agents } = await agentsQuery
 
   return <WhatsAppAdminClient initialSheets={sheetsWithCounts} initialAgents={agents ?? []} />
 }

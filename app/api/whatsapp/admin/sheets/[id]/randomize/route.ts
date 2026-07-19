@@ -3,19 +3,21 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 
-async function requireSuperAdmin() {
+async function requireAdminOrTeamLeader() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized', status: 401, companyId: null }
+  if (!user) return { error: 'Unauthorized', status: 401, companyId: null, role: null, fullName: null }
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, company_id')
+    .select('role, company_id, full_name')
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'super_admin') return { error: 'Forbidden', status: 403, companyId: null }
-  return { error: null, status: 200, companyId: profile.company_id as string }
+  if (profile?.role !== 'super_admin' && profile?.role !== 'team_leader') {
+    return { error: 'Forbidden', status: 403, companyId: null, role: null, fullName: null }
+  }
+  return { error: null, status: 200, companyId: profile.company_id as string, role: profile.role as string, fullName: profile.full_name as string }
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -28,7 +30,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { error, status, companyId } = await requireSuperAdmin()
+  const { error, status, companyId, role, fullName } = await requireAdminOrTeamLeader()
   if (error) return NextResponse.json({ error }, { status })
 
   const { id } = await params
@@ -69,21 +71,26 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   if (sheetAgents && sheetAgents.length > 0) {
     // Sheet has specific agent assignments — use only those agents
-    const { data, error } = await adminClient
+    let query = adminClient
       .from('profiles')
       .select('id')
       .in('id', sheetAgents.map(r => r.agent_id))
       .eq('role', 'agent')
+    // Team leaders may only distribute to their own team, even within a sheet-specific assignment
+    if (role === 'team_leader') query = query.eq('team_name', fullName!)
+    const { data, error } = await query
     agents = data
     agentsErr = error
   } else {
-    // Legacy sheet — fall back to all whatsapp_active agents
-    const { data, error } = await adminClient
+    // Legacy sheet — fall back to all whatsapp_active agents (scoped to own team for a team leader)
+    let query = adminClient
       .from('profiles')
       .select('id')
       .eq('company_id', sheet.company_id)
       .eq('role', 'agent')
       .eq('whatsapp_active', true)
+    if (role === 'team_leader') query = query.eq('team_name', fullName!)
+    const { data, error } = await query
     agents = data
     agentsErr = error
   }
