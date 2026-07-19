@@ -460,8 +460,18 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           {/* Sheet list */}
           <div style={{ width: 240, flexShrink: 0, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ padding: '12px 16px', borderBottom: `1px solid ${BORDER}`, fontSize: 12, fontWeight: 600, color: MUTED, ...fontDisplay, letterSpacing: '0.05em' }}>
-              SHEETS ({sheets.length})
+            <div style={{ padding: '12px 16px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: MUTED, ...fontDisplay, letterSpacing: '0.05em' }}>
+                SHEETS ({sheets.length})
+              </span>
+              {combineMode && sheets.length > 0 && (
+                <button
+                  onClick={() => setCombineSelectedIds(combineSelectedIds.size === sheets.length ? new Set() : new Set(sheets.map(s => s.id)))}
+                  style={{ background: 'none', border: 'none', color: NEON, fontSize: 11, fontWeight: 600, cursor: 'pointer', ...fontDisplay }}
+                >
+                  {combineSelectedIds.size === sheets.length ? 'Clear' : 'Select All'}
+                </button>
+              )}
             </div>
             {sheets.length === 0 && (
               <div style={{ padding: 20, color: MUTED, fontSize: 12, textAlign: 'center' }}>No sheets yet</div>
