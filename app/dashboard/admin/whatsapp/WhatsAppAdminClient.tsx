@@ -100,6 +100,7 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
   const [randomizing, setRandomizing] = useState(false)
   const [confirmRandomize, setConfirmRandomize] = useState(false)
   const [startNewCycle, setStartNewCycle] = useState(false)
+  const [capPerAgent, setCapPerAgent] = useState(30)
   const [showUpload, setShowUpload] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
@@ -279,7 +280,7 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
       const res = await fetch(`/api/whatsapp/admin/sheets/${selectedId}/randomize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startNewCycle }),
+        body: JSON.stringify({ startNewCycle, capPerAgent }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Randomize failed')
@@ -781,7 +782,18 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                       <span style={{ fontSize: 12, color: MUTED, textAlign: 'right' }}>
-                        Give untouched contacts to agents under 30 unsent, for{' '}
+                        Give untouched contacts to agents under{' '}
+                        <input
+                          type="number"
+                          min={1}
+                          value={capPerAgent}
+                          onChange={e => setCapPerAgent(Math.max(1, Number(e.target.value) || 1))}
+                          style={{
+                            width: 52, background: '#111', border: `1px solid ${NEON_BORDER}`, borderRadius: 4,
+                            padding: '2px 6px', color: NEON, fontSize: 12, fontWeight: 700, textAlign: 'center', ...font,
+                          }}
+                        />{' '}
+                        unsent, for{' '}
                         {detail.sheet.current_cycle === 0
                           ? <>cycle 1</>
                           : startNewCycle

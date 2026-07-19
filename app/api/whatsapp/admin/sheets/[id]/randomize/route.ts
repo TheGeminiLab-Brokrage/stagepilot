@@ -34,7 +34,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (error) return NextResponse.json({ error }, { status })
 
   const body = await req.json().catch(() => ({}))
-  const { startNewCycle } = body as { startNewCycle?: boolean }
+  const { startNewCycle, capPerAgent } = body as { startNewCycle?: boolean; capPerAgent?: number }
+  const DRIP_SIZE = Number.isFinite(capPerAgent) && capPerAgent! > 0 ? Math.floor(capPerAgent!) : 30
 
   const { id } = await params
   const adminClient = createAdminClient()
@@ -104,8 +105,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'No agents available to assign' }, { status: 400 })
   }
 
-  const DRIP_SIZE = 30
-
   // Golden rule: a contact, once assigned to any agent, is permanently theirs —
   // it never re-enters distribution for a different agent, answered or not.
   const assignedContactIds = new Set((existing ?? []).map(a => a.contact_id))
@@ -158,5 +157,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true, cycle: newCycle, assigned: newRows.length, exhausted, alreadyAssigned })
+  return NextResponse.json({ success: true, cycle: newCycle, assigned: newRows.length, exhausted, alreadyAssigned, capPerAgent: DRIP_SIZE })
 }
