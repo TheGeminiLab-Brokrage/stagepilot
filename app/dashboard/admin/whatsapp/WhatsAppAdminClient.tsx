@@ -52,6 +52,23 @@ interface SheetDetail {
   assigned_agents: { id: string; full_name: string }[]
 }
 
+type CombinedStatus = 'answered' | 'not_answered' | 'pending' | 'never_distributed'
+
+interface CombinedRow { phone: string; client_name: string | null; sheet_name: string; status: CombinedStatus }
+
+interface CombinedReport {
+  sheets: { id: string; name: string }[]
+  stats: Record<CombinedStatus, number> & { total: number }
+  contacts: CombinedRow[]
+}
+
+const COMBINED_STATUS_LABEL: Record<CombinedStatus, string> = {
+  answered: 'Answered',
+  not_answered: 'No Answer',
+  pending: 'Pending',
+  never_distributed: 'Not Yet Sent',
+}
+
 function oneOf<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v
 }
@@ -81,6 +98,7 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
   const [sentFilter, setSentFilter] = useState(false)
   const [randomizing, setRandomizing] = useState(false)
   const [confirmRandomize, setConfirmRandomize] = useState(false)
+  const [startNewCycle, setStartNewCycle] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
@@ -92,6 +110,65 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
   const [checkedAgentIds, setCheckedAgentIds] = useState<Set<string>>(new Set())
   const [savingAgents, setSavingAgents] = useState(false)
   const [agentAssignmentError, setAgentAssignmentError] = useState<string | null>(null)
+
+  const [combineMode, setCombineMode] = useState(false)
+  const [combineSelectedIds, setCombineSelectedIds] = useState<Set<string>>(new Set())
+  const [combinedReport, setCombinedReport] = useState<CombinedReport | null>(null)
+  const [loadingCombined, setLoadingCombined] = useState(false)
+  const [combineError, setCombineError] = useState<string | null>(null)
+
+  function toggleCombineMode() {
+    setCombineMode(m => !m)
+    setCombineSelectedIds(new Set())
+    setCombinedReport(null)
+    setCombineError(null)
+  }
+
+  function toggleSheetForCombine(sheetId: string) {
+    setCombineSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(sheetId)) next.delete(sheetId); else next.add(sheetId)
+      return next
+    })
+  }
+
+  async function runCombinedReport() {
+    if (combineSelectedIds.size === 0) return
+    setLoadingCombined(true)
+    setCombineError(null)
+    setCombinedReport(null)
+    try {
+      const res = await fetch('/api/whatsapp/admin/sheets/combined-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sheet_ids: Array.from(combineSelectedIds) }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to load combined report')
+      setCombinedReport(data)
+    } catch (err) {
+      setCombineError(err instanceof Error ? err.message : 'Failed to load combined report')
+    } finally {
+      setLoadingCombined(false)
+    }
+  }
+
+  function exportNonAnswered() {
+    if (!combinedReport) return
+    const seen = new Set<string>()
+    const rows: { 'Client Name': string; 'Phone': string; 'Source Sheet': string; 'Status': string }[] = []
+    for (const c of combinedReport.contacts) {
+      if (c.status === 'answered') continue
+      const key = c.phone.replace(/\D/g, '')
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      rows.push({ 'Client Name': c.client_name ?? '', 'Phone': c.phone, 'Source Sheet': c.sheet_name, 'Status': COMBINED_STATUS_LABEL[c.status] })
+    }
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Not Answered')
+    XLSX.writeFile(wb, `not-answered-combined-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
 
   const loadDetail = useCallback(async (sheetId: string) => {
     setLoadingDetail(true)
@@ -183,7 +260,11 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
     setRandomizing(true)
     setError(null)
     try {
-      const res = await fetch(`/api/whatsapp/admin/sheets/${selectedId}/randomize`, { method: 'POST' })
+      const res = await fetch(`/api/whatsapp/admin/sheets/${selectedId}/randomize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startNewCycle }),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Randomize failed')
       setSheets(prev => prev.map(s => s.id === selectedId ? { ...s, current_cycle: data.cycle } : s))
@@ -193,6 +274,7 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
     } finally {
       setRandomizing(false)
       setConfirmRandomize(false)
+      setStartNewCycle(false)
     }
   }
 
@@ -301,12 +383,21 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
               Upload client sheets, rotate them across agents, and track responses.
             </p>
           </div>
-          <button onClick={() => setShowUpload(true)} style={{
-            padding: '11px 20px', borderRadius: 8, border: 'none', background: NEON,
-            color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer', ...fontDisplay,
-          }}>
-            + Upload Sheet
-          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={toggleCombineMode} style={{
+              padding: '11px 20px', borderRadius: 8, border: `1px solid ${combineMode ? NEON_BORDER : BORDER}`,
+              background: combineMode ? NEON_DIM : 'transparent', color: combineMode ? NEON : MUTED,
+              fontWeight: 700, fontSize: 13, cursor: 'pointer', ...fontDisplay,
+            }}>
+              {combineMode ? '✕ Exit Combine Mode' : 'Combine Sheets'}
+            </button>
+            <button onClick={() => setShowUpload(true)} style={{
+              padding: '11px 20px', borderRadius: 8, border: 'none', background: NEON,
+              color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer', ...fontDisplay,
+            }}>
+              + Upload Sheet
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -316,7 +407,12 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
         )}
 
         {showUpload && (
-          <UploadSheetPanel endpoint="/api/whatsapp/admin/sheets" onClose={() => setShowUpload(false)} onUploaded={handleUploaded} />
+          <UploadSheetPanel
+            endpoint="/api/whatsapp/admin/sheets"
+            checkDuplicatesEndpoint="/api/whatsapp/admin/sheets/check-duplicates"
+            onClose={() => setShowUpload(false)}
+            onUploaded={handleUploaded}
+          />
         )}
 
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, marginBottom: 20, overflow: 'hidden' }}>
@@ -373,9 +469,22 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
             {sheets.map(s => (
               <div key={s.id} style={{
                 padding: '12px 16px', borderBottom: `1px solid ${BORDER}`,
-                background: s.id === selectedId ? NEON_DIM : 'transparent',
+                background: (combineMode ? combineSelectedIds.has(s.id) : s.id === selectedId) ? NEON_DIM : 'transparent',
               }}>
-                {confirmDeleteId === s.id ? (
+                {combineMode ? (
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={combineSelectedIds.has(s.id)}
+                      onChange={() => toggleSheetForCombine(s.id)}
+                      style={{ accentColor: NEON, marginTop: 3 }}
+                    />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: combineSelectedIds.has(s.id) ? NEON : '#fff', fontSize: 13, fontWeight: 600, ...fontDisplay, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                      <div style={{ color: MUTED, fontSize: 11, marginTop: 4 }}>{s.contactCount} contacts &middot; cycle {s.current_cycle}</div>
+                    </div>
+                  </label>
+                ) : confirmDeleteId === s.id ? (
                   <div>
                     <div style={{ color: '#fff', fontSize: 12, marginBottom: 8 }}>Delete &quot;{s.name}&quot;? This removes all contacts and assignments.</div>
                     <div style={{ display: 'flex', gap: 6 }}>
@@ -415,23 +524,105 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                 )}
               </div>
             ))}
+            {combineMode && (
+              <div style={{ padding: 12 }}>
+                <button onClick={runCombinedReport} disabled={combineSelectedIds.size === 0 || loadingCombined} style={{
+                  width: '100%', padding: '10px', borderRadius: 8, border: 'none',
+                  background: combineSelectedIds.size > 0 && !loadingCombined ? NEON : 'rgba(215,255,0,0.25)',
+                  color: '#000', fontWeight: 700, fontSize: 12, cursor: combineSelectedIds.size > 0 ? 'pointer' : 'not-allowed', ...fontDisplay,
+                }}>
+                  {loadingCombined ? 'Loading…' : `View Combined Report (${combineSelectedIds.size})`}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Sheet detail */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {!selectedId && (
+            {combineMode && combineError && (
+              <div style={{ background: 'rgba(255,60,60,0.1)', border: '1px solid rgba(255,60,60,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, color: '#ff8080', fontSize: 13 }}>
+                {combineError}
+              </div>
+            )}
+
+            {combineMode && !combinedReport && (
+              <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 40, textAlign: 'center', color: MUTED, fontSize: 13 }}>
+                Check sheets on the left, then run the combined report to see status across all of them and export a clean re-upload list.
+              </div>
+            )}
+
+            {combineMode && combinedReport && (
+              <>
+                <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                  <StatCard label="Total Contacts" value={combinedReport.stats.total} />
+                  <StatCard label="Answered" value={combinedReport.stats.answered} />
+                  <StatCard label="No Answer" value={combinedReport.stats.not_answered} />
+                  <StatCard label="Pending" value={combinedReport.stats.pending} />
+                  <StatCard label="Not Yet Sent" value={combinedReport.stats.never_distributed} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: MUTED }}>
+                    Across {combinedReport.sheets.length} sheet{combinedReport.sheets.length === 1 ? '' : 's'}: {combinedReport.sheets.map(s => s.name).join(', ')}
+                  </span>
+                  <button onClick={exportNonAnswered} style={{
+                    padding: '9px 16px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`,
+                    background: NEON_DIM, color: NEON, fontWeight: 600, fontSize: 12, cursor: 'pointer', ...fontDisplay,
+                  }}>
+                    ↓ Export Not Answered ({combinedReport.stats.total - combinedReport.stats.answered})
+                  </button>
+                </div>
+                <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ overflowX: 'auto', maxHeight: 600, overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
+                          {['Phone', 'Client', 'Sheet', 'Status'].map(h => (
+                            <th key={h} style={{
+                              textAlign: 'left', padding: '12px 14px', color: MUTED, fontWeight: 600, ...fontDisplay,
+                              whiteSpace: 'nowrap', position: 'sticky', top: 0, background: '#0a0a0a', zIndex: 1,
+                            }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {combinedReport.contacts.slice(0, 500).map((c, i) => (
+                          <tr key={i} style={{ borderBottom: `1px solid ${BORDER}` }}>
+                            <td style={{ padding: '12px 14px', color: '#fff', whiteSpace: 'nowrap' }}>{c.phone}</td>
+                            <td style={{ padding: '12px 14px', color: MUTED }}>{c.client_name ?? '—'}</td>
+                            <td style={{ padding: '12px 14px', color: MUTED, whiteSpace: 'nowrap' }}>{c.sheet_name}</td>
+                            <td style={{ padding: '12px 14px', color: c.status === 'answered' ? NEON : c.status === 'not_answered' ? 'rgba(255,120,120,0.8)' : MUTED, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {COMBINED_STATUS_LABEL[c.status]}
+                            </td>
+                          </tr>
+                        ))}
+                        {combinedReport.contacts.length === 0 && (
+                          <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: MUTED }}>No contacts.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {combinedReport.contacts.length > 500 && (
+                    <div style={{ padding: '10px 14px', fontSize: 11, color: MUTED, textAlign: 'center', borderTop: `1px solid ${BORDER}` }}>
+                      Showing first 500 of {combinedReport.contacts.length} — the export includes all of them.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {!combineMode && !selectedId && (
               <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 40, textAlign: 'center', color: MUTED, fontSize: 13 }}>
                 Select or upload a sheet to get started.
               </div>
             )}
 
-            {selectedId && loadingDetail && (
+            {!combineMode && selectedId && loadingDetail && (
               <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 40, textAlign: 'center', color: MUTED, fontSize: 13 }}>
                 Loading…
               </div>
             )}
 
-            {selectedId && !loadingDetail && detail && (
+            {!combineMode && selectedId && !loadingDetail && detail && (
               <>
                 <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
                   <StatCard label="Contacts" value={detail.contacts.length} />
@@ -545,20 +736,41 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                       </button>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: MUTED }}>Give untouched contacts to agents under 30 unsent, for cycle {detail.sheet.current_cycle + 1}? Contacts already assigned to someone are never reassigned.</span>
-                      <button onClick={handleRandomize} disabled={randomizing} style={{
-                        padding: '7px 14px', borderRadius: 6, border: 'none', background: NEON,
-                        color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer', ...fontDisplay,
-                      }}>
-                        {randomizing ? 'Working…' : 'Confirm'}
-                      </button>
-                      <button onClick={() => setConfirmRandomize(false)} style={{
-                        padding: '7px 14px', borderRadius: 6, border: `1px solid ${BORDER}`, background: 'transparent',
-                        color: MUTED, fontSize: 12, cursor: 'pointer', ...fontDisplay,
-                      }}>
-                        Cancel
-                      </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                      <span style={{ fontSize: 12, color: MUTED, textAlign: 'right' }}>
+                        Give untouched contacts to agents under 30 unsent, for{' '}
+                        {detail.sheet.current_cycle === 0
+                          ? <>cycle 1</>
+                          : startNewCycle
+                            ? <>new cycle {detail.sheet.current_cycle + 1}</>
+                            : <>current cycle {detail.sheet.current_cycle}</>}
+                        ? Contacts already assigned to someone are never reassigned.
+                      </span>
+                      {detail.sheet.current_cycle > 0 && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: startNewCycle ? NEON : MUTED, cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={startNewCycle}
+                            onChange={e => setStartNewCycle(e.target.checked)}
+                            style={{ accentColor: NEON }}
+                          />
+                          Start a new cycle ({detail.sheet.current_cycle + 1}) instead of adding to cycle {detail.sheet.current_cycle}
+                        </label>
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button onClick={handleRandomize} disabled={randomizing} style={{
+                          padding: '7px 14px', borderRadius: 6, border: 'none', background: NEON,
+                          color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer', ...fontDisplay,
+                        }}>
+                          {randomizing ? 'Working…' : 'Confirm'}
+                        </button>
+                        <button onClick={() => { setConfirmRandomize(false); setStartNewCycle(false) }} style={{
+                          padding: '7px 14px', borderRadius: 6, border: `1px solid ${BORDER}`, background: 'transparent',
+                          color: MUTED, fontSize: 12, cursor: 'pointer', ...fontDisplay,
+                        }}>
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

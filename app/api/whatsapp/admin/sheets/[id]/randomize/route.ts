@@ -29,9 +29,12 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { error, status, companyId, role, fullName } = await requireAdminOrTeamLeader()
   if (error) return NextResponse.json({ error }, { status })
+
+  const body = await req.json().catch(() => ({}))
+  const { startNewCycle } = body as { startNewCycle?: boolean }
 
   const { id } = await params
   const adminClient = createAdminClient()
@@ -106,7 +109,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   // Golden rule: a contact, once assigned to any agent, is permanently theirs —
   // it never re-enters distribution for a different agent, answered or not.
   const assignedContactIds = new Set((existing ?? []).map(a => a.contact_id))
-  const newCycle = sheet.current_cycle + 1
+  // Cycle 0 means this sheet has never been distributed — it must start cycle 1.
+  // Otherwise, default to topping up the current cycle; only bump to a new cycle
+  // when explicitly requested, so multiple partial distributions (3 agents now,
+  // 4 more later) can share one cycle instead of fragmenting into several.
+  const newCycle = sheet.current_cycle === 0 || startNewCycle ? sheet.current_cycle + 1 : sheet.current_cycle
 
   // Seed each eligible agent's load from their current unsent (in-flight) count,
   // so this round tops them up to DRIP_SIZE instead of stacking another 30 on
@@ -142,12 +149,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 })
   }
 
-  const { error: updateErr } = await adminClient
-    .from('whatsapp_sheets')
-    .update({ current_cycle: newCycle })
-    .eq('id', id)
+  if (newCycle > sheet.current_cycle) {
+    const { error: updateErr } = await adminClient
+      .from('whatsapp_sheets')
+      .update({ current_cycle: newCycle })
+      .eq('id', id)
 
-  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
+  }
 
   return NextResponse.json({ success: true, cycle: newCycle, assigned: newRows.length, exhausted, alreadyAssigned })
 }

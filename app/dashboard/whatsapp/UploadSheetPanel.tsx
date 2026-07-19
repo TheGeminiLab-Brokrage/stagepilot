@@ -53,12 +53,28 @@ function detectNameColumn(sheet: ParsedSheet, phoneCol: string): string {
   return sheet.headers.find(h => h !== phoneCol && NAME_HEADER_KEYWORDS.some(k => h.toLowerCase().includes(k))) ?? ''
 }
 
+interface DuplicateEntry {
+  phone: string
+  client_name: string | null
+  sheet_name: string
+  status: 'answered' | 'not_answered' | 'pending' | 'never_distributed'
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  answered: 'Answered',
+  not_answered: 'No Answer',
+  pending: 'Pending',
+  never_distributed: 'Not yet sent',
+}
+
 export default function UploadSheetPanel({
   endpoint,
+  checkDuplicatesEndpoint,
   onClose,
   onUploaded,
 }: {
   endpoint: string
+  checkDuplicatesEndpoint?: string
   onClose: () => void
   onUploaded: (sheet: UploadedSheet) => void
 }) {
@@ -70,6 +86,8 @@ export default function UploadSheetPanel({
   const [sheetName, setSheetName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false)
+  const [duplicateReport, setDuplicateReport] = useState<DuplicateEntry[] | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const activeSheet = parsedSheets[sheetIdx]
@@ -111,14 +129,13 @@ export default function UploadSheetPanel({
     const f = e.dataTransfer.files[0]; if (f) handleFile(f)
   }
 
-  async function handleConfirm() {
-    if (!sheetName.trim() || previewContacts.length === 0) return
+  async function doUpload(contacts: { phone: string; client_name: string | null }[]) {
     setSubmitting(true); setError(null)
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: sheetName.trim(), contacts: previewContacts }),
+        body: JSON.stringify({ name: sheetName.trim(), contacts }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Upload failed')
@@ -128,6 +145,48 @@ export default function UploadSheetPanel({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function handleConfirm() {
+    if (!sheetName.trim() || previewContacts.length === 0) return
+
+    if (checkDuplicatesEndpoint) {
+      setCheckingDuplicates(true); setError(null)
+      try {
+        const res = await fetch(checkDuplicatesEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phones: previewContacts.map(c => c.phone) }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error ?? 'Duplicate check failed')
+        setCheckingDuplicates(false)
+        if (Array.isArray(data.duplicates) && data.duplicates.length > 0) {
+          setDuplicateReport(data.duplicates)
+          return
+        }
+      } catch (err) {
+        setCheckingDuplicates(false)
+        setError(err instanceof Error ? err.message : 'Duplicate check failed')
+        return
+      }
+    }
+
+    await doUpload(previewContacts)
+  }
+
+  function handleUploadExcludingAnswered() {
+    const answeredKeys = new Set(
+      (duplicateReport ?? []).filter(d => d.status === 'answered').map(d => d.phone.replace(/\D/g, ''))
+    )
+    const filtered = previewContacts.filter(c => !answeredKeys.has(c.phone.replace(/\D/g, '')))
+    setDuplicateReport(null)
+    doUpload(filtered)
+  }
+
+  function handleUploadAllAnyway() {
+    setDuplicateReport(null)
+    doUpload(previewContacts)
   }
 
   return (
@@ -162,7 +221,58 @@ export default function UploadSheetPanel({
         </div>
       )}
 
-      {parsedSheets.length > 0 && activeSheet && (
+      {duplicateReport && (() => {
+        const answered = duplicateReport.filter(d => d.status === 'answered')
+        const safe = duplicateReport.filter(d => d.status !== 'answered')
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 13, color: '#fff' }}>
+              Found <strong>{duplicateReport.length}</strong> number{duplicateReport.length === 1 ? '' : 's'} already in another sheet.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1, background: 'rgba(255,60,60,0.08)', border: '1px solid rgba(255,60,60,0.25)', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#ff8080', ...fontDisplay }}>{answered.length}</div>
+                <div style={{ fontSize: 11, color: MUTED }}>already answered</div>
+              </div>
+              <div style={{ flex: 1, background: NEON_DIM, border: `1px solid ${NEON_BORDER}`, borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: NEON, ...fontDisplay }}>{safe.length}</div>
+                <div style={{ fontSize: 11, color: MUTED }}>pending / no answer / not yet sent</div>
+              </div>
+            </div>
+            <div style={{ maxHeight: 200, overflowY: 'auto', border: `1px solid ${BORDER}`, borderRadius: 8 }}>
+              {duplicateReport.map((d, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '6px 12px', borderBottom: `1px solid ${BORDER}`, fontSize: 12 }}>
+                  <span style={{ color: '#fff', flexShrink: 0 }}>{d.phone}</span>
+                  <span style={{ color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.client_name ?? ''}</span>
+                  <span style={{ color: MUTED, flexShrink: 0 }}>{d.sheet_name}</span>
+                  <span style={{ color: d.status === 'answered' ? '#ff8080' : NEON, fontWeight: 600, flexShrink: 0 }}>{STATUS_LABEL[d.status]}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setDuplicateReport(null)} style={{
+                flex: 1, padding: '11px', borderRadius: 8, border: `1px solid ${BORDER}`, background: 'transparent', color: MUTED, fontSize: 12, cursor: 'pointer', ...fontDisplay,
+              }}>← Back</button>
+              {answered.length > 0 && (
+                <button onClick={handleUploadExcludingAnswered} disabled={submitting} style={{
+                  flex: 2, padding: '11px', borderRadius: 8, border: 'none', background: NEON,
+                  color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer', ...fontDisplay,
+                }}>
+                  {submitting ? 'Uploading…' : `Skip Answered, Upload Rest (${previewContacts.length - answered.length})`}
+                </button>
+              )}
+              <button onClick={handleUploadAllAnyway} disabled={submitting} style={{
+                flex: 2, padding: '11px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`, background: 'transparent',
+                color: NEON, fontWeight: 700, fontSize: 12, cursor: 'pointer', ...fontDisplay,
+              }}>
+                {submitting ? 'Uploading…' : `Upload All Anyway (${previewContacts.length})`}
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+
+      {!duplicateReport && parsedSheets.length > 0 && activeSheet && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {parsedSheets.length > 1 && (
             <div>
@@ -232,12 +342,12 @@ export default function UploadSheetPanel({
             <button onClick={() => setParsedSheets([])} style={{
               flex: 1, padding: '11px', borderRadius: 8, border: `1px solid ${BORDER}`, background: 'transparent', color: MUTED, fontSize: 13, cursor: 'pointer', ...fontDisplay,
             }}>← Choose different file</button>
-            <button onClick={handleConfirm} disabled={!phoneCol || !sheetName.trim() || previewContacts.length === 0 || submitting} style={{
+            <button onClick={handleConfirm} disabled={!phoneCol || !sheetName.trim() || previewContacts.length === 0 || submitting || checkingDuplicates} style={{
               flex: 2, padding: '11px', borderRadius: 8, border: 'none',
-              background: phoneCol && sheetName.trim() && previewContacts.length > 0 && !submitting ? NEON : 'rgba(215,255,0,0.25)',
+              background: phoneCol && sheetName.trim() && previewContacts.length > 0 && !submitting && !checkingDuplicates ? NEON : 'rgba(215,255,0,0.25)',
               color: '#000', fontWeight: 700, fontSize: 14, cursor: phoneCol && sheetName.trim() ? 'pointer' : 'not-allowed', ...fontDisplay,
             }}>
-              {submitting ? 'Uploading…' : `Create Sheet (${previewContacts.length} contacts)`}
+              {checkingDuplicates ? 'Checking for duplicates…' : submitting ? 'Uploading…' : `Create Sheet (${previewContacts.length} contacts)`}
             </button>
           </div>
         </div>
