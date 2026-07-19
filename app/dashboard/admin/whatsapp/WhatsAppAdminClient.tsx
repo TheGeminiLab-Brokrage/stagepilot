@@ -85,7 +85,7 @@ const STATUS_COLOR: Record<string, string> = {
   not_answered: 'rgba(255,120,120,0.8)',
 }
 
-export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { initialSheets: SheetSummary[]; initialAgents: AgentSetting[] }) {
+export default function WhatsAppAdminClient({ initialSheets, initialAgents, role }: { initialSheets: SheetSummary[]; initialAgents: AgentSetting[]; role: 'super_admin' | 'team_leader' }) {
   const [sheets, setSheets] = useState<SheetSummary[]>(initialSheets)
   const [agents, setAgents] = useState<AgentSetting[]>(initialAgents)
   const [showAgents, setShowAgents] = useState(false)
@@ -783,16 +783,20 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents }: { 
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                       <span style={{ fontSize: 12, color: MUTED, textAlign: 'right' }}>
                         Give untouched contacts to agents under{' '}
-                        <input
-                          type="number"
-                          min={1}
-                          value={capPerAgent}
-                          onChange={e => setCapPerAgent(Math.max(1, Number(e.target.value) || 1))}
-                          style={{
-                            width: 52, background: '#111', border: `1px solid ${NEON_BORDER}`, borderRadius: 4,
-                            padding: '2px 6px', color: NEON, fontSize: 12, fontWeight: 700, textAlign: 'center', ...font,
-                          }}
-                        />{' '}
+                        {role === 'super_admin' ? (
+                          <input
+                            type="number"
+                            min={1}
+                            value={capPerAgent}
+                            onChange={e => setCapPerAgent(Math.max(1, Number(e.target.value) || 1))}
+                            style={{
+                              width: 52, background: '#111', border: `1px solid ${NEON_BORDER}`, borderRadius: 4,
+                              padding: '2px 6px', color: NEON, fontSize: 12, fontWeight: 700, textAlign: 'center', ...font,
+                            }}
+                          />
+                        ) : (
+                          <strong style={{ color: NEON }}>30</strong>
+                        )}{' '}
                         unsent, for{' '}
                         {detail.sheet.current_cycle === 0
                           ? <>cycle 1</>

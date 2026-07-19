@@ -35,7 +35,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const body = await req.json().catch(() => ({}))
   const { startNewCycle, capPerAgent } = body as { startNewCycle?: boolean; capPerAgent?: number }
-  const DRIP_SIZE = Number.isFinite(capPerAgent) && capPerAgent! > 0 ? Math.floor(capPerAgent!) : 30
+  // Only a super admin may raise the per-agent cap above the safe default —
+  // team leaders always distribute at the standard steady pace.
+  const DRIP_SIZE = role === 'super_admin' && Number.isFinite(capPerAgent) && capPerAgent! > 0 ? Math.floor(capPerAgent!) : 30
 
   const { id } = await params
   const adminClient = createAdminClient()

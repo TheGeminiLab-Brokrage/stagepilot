@@ -47,5 +47,5 @@ export default async function WhatsAppAdminPage() {
 
   const { data: agents } = await agentsQuery
 
-  return <WhatsAppAdminClient initialSheets={sheetsWithCounts} initialAgents={agents ?? []} />
+  return <WhatsAppAdminClient initialSheets={sheetsWithCounts} initialAgents={agents ?? []} role={profile.role as 'super_admin' | 'team_leader'} />
 }
