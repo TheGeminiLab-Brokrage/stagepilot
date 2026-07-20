@@ -436,6 +436,39 @@ export default function PropertyDashboardClient({ userId }: { userId: string }) 
     setPriceKpiState(0)
   }, [])
 
+  // ── Saved searches (localStorage, max 20) ──
+  type SavedSearch = { name: string; filters: Filters; zone: 'R' | 'R7' | 'R8'; sort: string }
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([])
+  const [savedOpen, setSavedOpen] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('sp_saved_searches')
+      if (raw) setSavedSearches(JSON.parse(raw))
+    } catch { /* corrupt storage — start fresh */ }
+  }, [])
+
+  const persistSaved = useCallback((next: SavedSearch[]) => {
+    setSavedSearches(next)
+    try { localStorage.setItem('sp_saved_searches', JSON.stringify(next)) } catch { /* storage full */ }
+  }, [])
+
+  const saveCurrentSearch = useCallback(() => {
+    const name = window.prompt('Name this search (e.g. "3-bed under 8M, R7"):')?.trim()
+    if (!name) return
+    const entry: SavedSearch = { name, filters, zone, sort }
+    persistSaved([entry, ...savedSearches.filter(s => s.name !== name)].slice(0, 20))
+  }, [filters, zone, sort, savedSearches, persistSaved])
+
+  const applySavedSearch = useCallback((s: SavedSearch) => {
+    setFilters(s.filters)
+    setApplied(s.filters)
+    setZone(s.zone)
+    setSort(s.sort)
+    setPage(1)
+    setSavedOpen(false)
+  }, [])
+
   useEffect(() => {
     if (!applied.city.includes('new capital')) setZone('R')
   }, [applied.city])
@@ -875,6 +908,40 @@ export default function PropertyDashboardClient({ userId }: { userId: string }) 
 
         <button className="ph-btn-primary" onClick={applyFilters}>Apply Filters</button>
         <button className="ph-btn-reset" onClick={resetFilters}>↺ Reset All</button>
+
+        {/* Saved searches */}
+        <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 10 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="ph-btn-reset" style={{ flex: 1 }} onClick={saveCurrentSearch}>★ Save Search</button>
+            <button className="ph-btn-reset" style={{ flex: 1 }} onClick={() => setSavedOpen(o => !o)}>
+              Saved ({savedSearches.length}) {savedOpen ? '▾' : '▸'}
+            </button>
+          </div>
+          {savedOpen && (
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {savedSearches.length === 0 && (
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>No saved searches yet — set your filters, then ★ Save.</span>
+              )}
+              {savedSearches.map(s => (
+                <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button
+                    onClick={() => applySavedSearch(s)}
+                    style={{ flex: 1, textAlign: 'left', padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(215,255,0,0.25)', background: 'rgba(215,255,0,0.08)', color: '#D7FF00', fontSize: 12, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {s.name}
+                  </button>
+                  <button
+                    onClick={() => persistSaved(savedSearches.filter(x => x.name !== s.name))}
+                    title="Delete saved search"
+                    style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </aside>
 
       {/* ── MAIN ── */}
