@@ -166,6 +166,13 @@ export default function ManagerPage({ isAdmin }: ManagerClientProps) {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push('/dashboard/assessment/manager/overview')}
+            className="px-4 py-2 rounded-xl text-sm font-bold transition-all duration-150"
+            style={{ background: 'rgba(215,255,0,0.1)', color: 'var(--tgl-lime)', border: '1px solid rgba(215,255,0,0.25)', fontFamily: 'var(--font-space)', cursor: 'pointer' }}
+          >
+            Agent Development
+          </button>
           {isAdmin && (
             <button
               onClick={() => router.push('/dashboard/assessment/admin/zone-answers')}
