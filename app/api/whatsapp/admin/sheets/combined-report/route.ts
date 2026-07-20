@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   try {
     ;[contacts, assignments] = await Promise.all([
       fetchAllRows<{ id: string; phone: string; client_name: string | null; sheet_id: string }>((from, to) =>
-        adminClient.from('whatsapp_contacts').select('id, phone, client_name, sheet_id').in('sheet_id', validSheetIds).order('id', { ascending: true }).range(from, to)),
+        adminClient.from('whatsapp_contacts').select('id, phone, client_name, sheet_id').in('sheet_id', validSheetIds).eq('opted_out', false).order('id', { ascending: true }).range(from, to)),
       fetchAllRows<{ contact_id: string; agent_id: string; response_status: string }>((from, to) =>
         adminClient.from('whatsapp_assignments').select('contact_id, agent_id, response_status').in('sheet_id', validSheetIds).order('id', { ascending: true }).range(from, to)),
     ])

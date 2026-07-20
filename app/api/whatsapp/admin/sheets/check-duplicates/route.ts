@@ -34,12 +34,12 @@ export async function POST(request: NextRequest) {
 
   const adminClient = createAdminClient()
 
-  let existingContacts: { id: string; phone: string; client_name: string | null; sheet_id: string }[]
+  let existingContacts: { id: string; phone: string; client_name: string | null; sheet_id: string; opted_out: boolean }[]
   try {
-    existingContacts = await fetchAllRows<{ id: string; phone: string; client_name: string | null; sheet_id: string }>((from, to) =>
+    existingContacts = await fetchAllRows<{ id: string; phone: string; client_name: string | null; sheet_id: string; opted_out: boolean }>((from, to) =>
       adminClient
         .from('whatsapp_contacts')
-        .select('id, phone, client_name, sheet_id')
+        .select('id, phone, client_name, sheet_id, opted_out')
         .eq('company_id', companyId!)
         .order('id', { ascending: true })
         .range(from, to))
@@ -71,7 +71,9 @@ export async function POST(request: NextRequest) {
     phone: c.phone,
     client_name: c.client_name,
     sheet_name: sheetNameById.get(c.sheet_id) ?? 'Unknown sheet',
-    status: statusByContactId.get(c.id) ?? 'never_distributed',
+    // Opted-out overrides everything — these clients asked to stop and must
+    // never be re-uploaded, regardless of their response status.
+    status: c.opted_out ? 'opted_out' : (statusByContactId.get(c.id) ?? 'never_distributed'),
   }))
 
   return NextResponse.json({ duplicates })

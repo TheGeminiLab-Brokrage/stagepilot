@@ -144,6 +144,12 @@ app.post('/send/:agentId', async (req, res) => {
   const jid = `${withCountry}@s.whatsapp.net`
 
   try {
+    // Look human: show "typing…" for a length-proportional, jittered delay before sending
+    const typingMs = Math.round((2000 + Math.min(String(message).length * 25, 4000)) * (0.7 + Math.random() * 0.6))
+    await session.socket.presenceSubscribe(jid).catch(() => {})
+    await session.socket.sendPresenceUpdate('composing', jid).catch(() => {})
+    await new Promise(r => setTimeout(r, typingMs))
+    await session.socket.sendPresenceUpdate('paused', jid).catch(() => {})
     await session.socket.sendMessage(jid, { text: message })
     return res.json({ success: true })
   } catch (err) {

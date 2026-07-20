@@ -63,7 +63,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     ;[contacts, existing] = await Promise.all([
       fetchAllRows<{ id: string }>((from, to) =>
-        adminClient.from('whatsapp_contacts').select('id').eq('sheet_id', id).order('id', { ascending: true }).range(from, to)),
+        adminClient.from('whatsapp_contacts').select('id').eq('sheet_id', id).eq('opted_out', false).order('id', { ascending: true }).range(from, to)),
       fetchAllRows<{ contact_id: string; agent_id: string; sent_at: string | null }>((from, to) =>
         adminClient.from('whatsapp_assignments').select('contact_id, agent_id, sent_at').eq('sheet_id', id).order('id', { ascending: true }).range(from, to)),
     ])

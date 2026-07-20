@@ -58,7 +58,7 @@ interface DuplicateEntry {
   phone: string
   client_name: string | null
   sheet_name: string
-  status: 'answered' | 'not_answered' | 'pending' | 'never_distributed'
+  status: 'answered' | 'not_answered' | 'pending' | 'never_distributed' | 'opted_out'
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -66,6 +66,7 @@ const STATUS_LABEL: Record<string, string> = {
   not_answered: 'No Answer',
   pending: 'Pending',
   never_distributed: 'Not yet sent',
+  opted_out: 'Asked to stop',
 }
 
 export default function UploadSheetPanel({
@@ -176,18 +177,28 @@ export default function UploadSheetPanel({
     await doUpload(previewContacts)
   }
 
-  function handleUploadExcludingAnswered() {
-    const answeredKeys = new Set(
-      (duplicateReport ?? []).filter(d => d.status === 'answered').map(d => normalizePhoneKey(d.phone))
+  // Opted-out clients asked to stop — they are stripped from EVERY upload path,
+  // including "Upload All Anyway". There is no override.
+  function optedOutKeys(): Set<string> {
+    return new Set(
+      (duplicateReport ?? []).filter(d => d.status === 'opted_out').map(d => normalizePhoneKey(d.phone))
     )
-    const filtered = previewContacts.filter(c => !answeredKeys.has(normalizePhoneKey(c.phone)))
+  }
+
+  function handleUploadExcludingAnswered() {
+    const excludeKeys = new Set(
+      (duplicateReport ?? []).filter(d => d.status === 'answered' || d.status === 'opted_out').map(d => normalizePhoneKey(d.phone))
+    )
+    const filtered = previewContacts.filter(c => !excludeKeys.has(normalizePhoneKey(c.phone)))
     setDuplicateReport(null)
     doUpload(filtered)
   }
 
   function handleUploadAllAnyway() {
+    const excluded = optedOutKeys()
+    const filtered = previewContacts.filter(c => !excluded.has(normalizePhoneKey(c.phone)))
     setDuplicateReport(null)
-    doUpload(previewContacts)
+    doUpload(filtered)
   }
 
   return (
@@ -224,7 +235,8 @@ export default function UploadSheetPanel({
 
       {duplicateReport && (() => {
         const answered = duplicateReport.filter(d => d.status === 'answered')
-        const safe = duplicateReport.filter(d => d.status !== 'answered')
+        const optedOut = duplicateReport.filter(d => d.status === 'opted_out')
+        const safe = duplicateReport.filter(d => d.status !== 'answered' && d.status !== 'opted_out')
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ fontSize: 13, color: '#fff' }}>
@@ -235,6 +247,12 @@ export default function UploadSheetPanel({
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#ff8080', ...fontDisplay }}>{answered.length}</div>
                 <div style={{ fontSize: 11, color: MUTED }}>already answered</div>
               </div>
+              {optedOut.length > 0 && (
+                <div style={{ flex: 1, background: 'rgba(255,60,60,0.08)', border: '1px solid rgba(255,60,60,0.25)', borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#ff8080', ...fontDisplay }}>{optedOut.length}</div>
+                  <div style={{ fontSize: 11, color: MUTED }}>asked to stop — always excluded</div>
+                </div>
+              )}
               <div style={{ flex: 1, background: NEON_DIM, border: `1px solid ${NEON_BORDER}`, borderRadius: 8, padding: '10px 12px' }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: NEON, ...fontDisplay }}>{safe.length}</div>
                 <div style={{ fontSize: 11, color: MUTED }}>pending / no answer / not yet sent</div>
@@ -259,14 +277,14 @@ export default function UploadSheetPanel({
                   flex: 2, padding: '11px', borderRadius: 8, border: 'none', background: NEON,
                   color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer', ...fontDisplay,
                 }}>
-                  {submitting ? 'Uploading…' : `Skip Answered, Upload Rest (${previewContacts.length - answered.length})`}
+                  {submitting ? 'Uploading…' : `Skip Answered, Upload Rest (${previewContacts.length - answered.length - optedOut.length})`}
                 </button>
               )}
               <button onClick={handleUploadAllAnyway} disabled={submitting} style={{
                 flex: 2, padding: '11px', borderRadius: 8, border: `1px solid ${NEON_BORDER}`, background: 'transparent',
                 color: NEON, fontWeight: 700, fontSize: 12, cursor: 'pointer', ...fontDisplay,
               }}>
-                {submitting ? 'Uploading…' : `Upload All Anyway (${previewContacts.length})`}
+                {submitting ? 'Uploading…' : `Upload All Anyway (${previewContacts.length - optedOut.length})`}
               </button>
             </div>
           </div>

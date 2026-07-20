@@ -11,7 +11,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const body = await req.json().catch(() => ({}))
   const { action, message_text } = body as { action?: string; message_text?: string }
 
-  if (!action || !['sent', 'answered', 'not_answered'].includes(action)) {
+  if (!action || !['sent', 'answered', 'not_answered', 'opt_out'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   }
 
@@ -30,6 +30,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const now = new Date().toISOString()
+
+  if (action === 'opt_out') {
+    // The client asked to stop — permanently exclude them from every future
+    // distribution, refill, export, and re-upload path.
+    const { error: optErr } = await adminClient
+      .from('whatsapp_contacts')
+      .update({ opted_out: true })
+      .eq('id', assignment.contact_id)
+
+    if (optErr) return NextResponse.json({ error: optErr.message }, { status: 500 })
+    return NextResponse.json({ success: true })
+  }
 
   if (action === 'sent') {
     const { error: updateErr } = await adminClient

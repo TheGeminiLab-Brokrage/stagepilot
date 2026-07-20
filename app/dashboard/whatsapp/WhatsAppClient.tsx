@@ -211,9 +211,12 @@ export default function WhatsAppClient({
       setCooldownUntil(Date.now() + 30000)
       setCooldownRemaining(30)
       if (autoSendIntervalRef.current !== null) {
+        // Jitter the interval (0.6×–1.6×) — perfectly regular sends are a bot
+        // signature WhatsApp's anti-spam systems key on.
+        const jittered = Math.round(autoSendIntervalRef.current * (0.6 + Math.random()))
         autoSendTimerRef.current = setTimeout(() => {
           sendViaWhatsAppRef.current()
-        }, autoSendIntervalRef.current)
+        }, jittered)
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to send'
@@ -568,6 +571,21 @@ export default function WhatsAppClient({
     }
   }
 
+  async function optOut(assignment: Assignment) {
+    setBusyId(assignment.id); setError(null)
+    try {
+      // Opting out also records "answered" so this contact leaves the pending
+      // queue — but the opt-out flag guarantees they are never contacted again.
+      await patchAssignment(assignment.id, { action: 'opt_out' })
+      await patchAssignment(assignment.id, { action: 'answered' })
+      setAssignments(prev => prev.map(a => a.id === assignment.id ? { ...a, response_status: 'answered' as const } : a))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save opt-out')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#000', ...font }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '32px 24px' }}>
@@ -754,6 +772,9 @@ export default function WhatsAppClient({
                   <textarea value={messageText} onChange={e => setMessageText(e.target.value)}
                     placeholder="Type the message you want to send to clients…"
                     style={{ width: '100%', height: 120, background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 13, ...font, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }} />
+                  <p style={{ fontSize: 11, color: MUTED, margin: '6px 0 0' }}>
+                    Tip: write options like <span style={{ color: NEON }}>{'{Hi|Hello|Good day}'}</span> and each client gets a random one — varied messages protect your number from spam detection.
+                  </p>
                   <button onClick={copyMessage} style={{
                     marginTop: 10, padding: '8px 14px', borderRadius: 6, border: `1px solid ${NEON_BORDER}`,
                     background: NEON_DIM, color: copied ? NEON : '#fff', fontSize: 12, cursor: 'pointer', ...fontDisplay,
@@ -1060,6 +1081,12 @@ export default function WhatsAppClient({
                           padding: '7px 12px', borderRadius: 6, border: `1px solid ${BORDER}`, background: 'transparent',
                           color: MUTED, fontSize: 12, cursor: 'pointer', ...fontDisplay,
                         }}>✗ No Answer</button>
+                        <button onClick={() => optOut(a)} disabled={busyId === a.id}
+                          title="Client asked to stop receiving messages — never contact again"
+                          style={{
+                            padding: '7px 12px', borderRadius: 6, border: '1px solid rgba(255,80,80,0.35)', background: 'transparent',
+                            color: 'rgba(255,120,120,0.85)', fontSize: 12, cursor: 'pointer', ...fontDisplay,
+                          }}>🚫 Stop</button>
                       </div>
                     </div>
                   ))}

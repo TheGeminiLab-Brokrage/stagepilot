@@ -113,6 +113,25 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents, role
   const [savingAgents, setSavingAgents] = useState(false)
   const [agentAssignmentError, setAgentAssignmentError] = useState<string | null>(null)
 
+  const [showHealth, setShowHealth] = useState(false)
+  const [healthStats, setHealthStats] = useState<{ id: string; full_name: string; team_name: string | null; sent_today: number; sent_week: number; answered_week: number; answer_rate_week: number | null }[] | null>(null)
+  const [loadingHealth, setLoadingHealth] = useState(false)
+
+  async function toggleHealth() {
+    const opening = !showHealth
+    setShowHealth(opening)
+    if (opening && healthStats === null && !loadingHealth) {
+      setLoadingHealth(true)
+      try {
+        const res = await fetch('/api/whatsapp/admin/stats')
+        const data = await res.json()
+        if (res.ok) setHealthStats(data.stats ?? [])
+      } finally {
+        setLoadingHealth(false)
+      }
+    }
+  }
+
   const [combineMode, setCombineMode] = useState(false)
   const [combineSelectedIds, setCombineSelectedIds] = useState<Set<string>>(new Set())
   const [combinedReport, setCombinedReport] = useState<CombinedReport | null>(null)
@@ -431,6 +450,61 @@ export default function WhatsAppAdminClient({ initialSheets, initialAgents, role
             onUploaded={handleUploaded}
           />
         )}
+
+        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, marginBottom: 20, overflow: 'hidden' }}>
+          <button
+            onClick={toggleHealth}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+            }}
+          >
+            <span style={{ fontSize: 12, fontWeight: 600, color: MUTED, ...fontDisplay, letterSpacing: '0.05em' }}>
+              CAMPAIGN HEALTH (sends &amp; answer rates per agent)
+            </span>
+            <span style={{ color: MUTED, fontSize: 12 }}>{showHealth ? '▾' : '▸'}</span>
+          </button>
+          {showHealth && (
+            <div style={{ padding: '0 16px 16px', borderTop: `1px solid ${BORDER}` }}>
+              {loadingHealth && <div style={{ color: MUTED, fontSize: 12, padding: '12px 0' }}>Loading…</div>}
+              {!loadingHealth && healthStats && healthStats.length === 0 && (
+                <div style={{ color: MUTED, fontSize: 12, padding: '12px 0' }}>No agents found.</div>
+              )}
+              {!loadingHealth && healthStats && healthStats.length > 0 && (
+                <div style={{ overflowX: 'auto', marginTop: 12 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
+                        {['Agent', 'Team', 'Sent Today', 'Sent (7d)', 'Answered (7d)', 'Answer Rate (7d)'].map(h => (
+                          <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: MUTED, fontWeight: 600, ...fontDisplay, whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {healthStats.map(s => {
+                        // A low answer rate on real volume is the pattern that attracts
+                        // bans (and signals a weak sheet or message) — flag it.
+                        const atRisk = s.answer_rate_week !== null && s.answer_rate_week < 5 && s.sent_week >= 50
+                        return (
+                          <tr key={s.id} style={{ borderBottom: `1px solid ${BORDER}`, background: atRisk ? 'rgba(255,60,60,0.07)' : 'transparent' }}>
+                            <td style={{ padding: '8px 12px', color: '#fff', whiteSpace: 'nowrap' }}>{s.full_name}</td>
+                            <td style={{ padding: '8px 12px', color: MUTED, whiteSpace: 'nowrap' }}>{s.team_name ?? '—'}</td>
+                            <td style={{ padding: '8px 12px', color: '#fff' }}>{s.sent_today}</td>
+                            <td style={{ padding: '8px 12px', color: '#fff' }}>{s.sent_week}</td>
+                            <td style={{ padding: '8px 12px', color: NEON }}>{s.answered_week}</td>
+                            <td style={{ padding: '8px 12px', fontWeight: 700, color: atRisk ? '#ff8080' : s.answer_rate_week === null ? MUTED : NEON }}>
+                              {s.answer_rate_week === null ? '—' : `${s.answer_rate_week}%`}{atRisk ? ' ⚠ ban risk' : ''}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, marginBottom: 20, overflow: 'hidden' }}>
           <button

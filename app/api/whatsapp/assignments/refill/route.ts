@@ -84,7 +84,7 @@ export async function POST(req: Request) {
   let claimedIds: string[]
   try {
     ;[allContactIds, claimedIds] = await Promise.all([
-      fetchAllIds(adminClient, 'whatsapp_contacts', 'id', q => q.eq('sheet_id', sheetId)),
+      fetchAllIds(adminClient, 'whatsapp_contacts', 'id', q => q.eq('sheet_id', sheetId).eq('opted_out', false)),
       fetchAllIds(adminClient, 'whatsapp_assignments', 'contact_id', q => q.eq('sheet_id', sheetId)),
     ])
   } catch (err) {
