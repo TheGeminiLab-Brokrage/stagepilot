@@ -384,6 +384,7 @@ export default function PropertyDashboardClient({ userId }: { userId: string }) 
   const [rawData, setRawData] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [dataUpdated, setDataUpdated] = useState<Date | null>(null)
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [applied, setApplied] = useState<Filters>(DEFAULT_FILTERS)
   const [zone, setZone] = useState<'R' | 'R7' | 'R8'>('R')
@@ -410,14 +411,20 @@ export default function PropertyDashboardClient({ userId }: { userId: string }) 
     setLoadError(false)
 
     const clean = (data: Property[]) => data.filter(r => parseFloat(String(r.price)) > 0)
+    // /api/property-data serves the admin-uploaded dataset when one exists,
+    // falling back to the repo-bundled file
+    const DATA_URL = '/api/property-data'
+    const CACHE_KEY = '/property-data-cache'
 
     const fromNetwork = async (): Promise<Property[]> => {
-      const r = await fetch('/property-data.json')
+      const r = await fetch(DATA_URL)
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const lastMod = r.headers.get('last-modified')
+      if (lastMod) setDataUpdated(new Date(lastMod))
       if ('caches' in window) {
         try {
           const cache = await caches.open('sp-property-v1')
-          await cache.put('/property-data.json', r.clone())
+          await cache.put(CACHE_KEY, r.clone())
         } catch { /* private mode or quota — network copy still works */ }
       }
       return r.json()
@@ -427,8 +434,10 @@ export default function PropertyDashboardClient({ userId }: { userId: string }) 
       try {
         if ('caches' in window) {
           const cache = await caches.open('sp-property-v1')
-          const hit = await cache.match('/property-data.json')
+          const hit = await cache.match(CACHE_KEY)
           if (hit) {
+            const lastMod = hit.headers.get('last-modified')
+            if (lastMod) setDataUpdated(new Date(lastMod))
             setRawData(clean(await hit.json()))
             setLoading(false)
             // Refresh silently in the background so tomorrow's visit is current
@@ -950,6 +959,11 @@ export default function PropertyDashboardClient({ userId }: { userId: string }) 
               Saved ({savedSearches.length}) {savedOpen ? '▾' : '▸'}
             </button>
           </div>
+          {dataUpdated && (
+            <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
+              Data updated: {dataUpdated.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </div>
+          )}
           {savedOpen && (
             <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {savedSearches.length === 0 && (

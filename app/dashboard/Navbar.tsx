@@ -82,6 +82,7 @@ export default function Navbar({ role, fullName, currentUserId, rightSlot }: Nav
           { href: '/dashboard/admin', label: t('navAdmin') },
           { href: '/dashboard/admin/knowledge-base', label: t('navKnowledgeBase') },
           { href: '/dashboard/admin/whatsapp', label: 'WhatsApp' },
+          { href: '/dashboard/admin/properties', label: 'Property Data' },
         ]
       : [
           { href: '/dashboard/find-property', label: 'Find a Property' },
