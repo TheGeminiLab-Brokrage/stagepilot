@@ -32,6 +32,7 @@ export default function TasksClient({
   const [loading, setLoading] = useState(true)
   const [selectedTicket, setSelectedTicket] = useState<TicketSummary | null>(null)
   const [showCreateTicketModal, setShowCreateTicketModal] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list')
   const myOwnedTicketIdsRef = useRef<Set<string>>(new Set())
 
   const canManageTickets = role === 'super_admin' || role === 'team_leader'
@@ -97,7 +98,7 @@ export default function TasksClient({
 
       const [{ data: assigneeRows }, { data: attachmentRows }] = ticketIds.length > 0
         ? await Promise.all([
-            supabase.from('ticket_assignees').select('ticket_id, status, assignee_id, profiles(full_name, team_name)').in('ticket_id', ticketIds),
+            supabase.from('ticket_assignees').select('ticket_id, status, assignee_id, completed_at, profiles(full_name, team_name)').in('ticket_id', ticketIds),
             supabase.from('ticket_attachments').select('ticket_id').in('ticket_id', ticketIds),
           ])
         : [{ data: [] }, { data: [] }]
@@ -122,7 +123,7 @@ export default function TasksClient({
           attachmentCount: attachmentCounts[ticketRow.id] ?? 0,
           assignees: ticketAssignees.map(a => {
             const profile = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles
-            return { id: a.assignee_id, fullName: profile?.full_name ?? '', teamName: profile?.team_name ?? null }
+            return { id: a.assignee_id, fullName: profile?.full_name ?? '', teamName: profile?.team_name ?? null, status: a.status, completedAt: a.completed_at ?? null }
           }),
           creatorName: role === 'super_admin' ? (creator?.full_name ?? '') : undefined,
         })
@@ -217,7 +218,25 @@ export default function TasksClient({
       )}
 
       {!selectedTicket && !loading && canManageTickets && totalCount > 0 && (
-        <TaskFilterBar tickets={tickets} onFiltered={setFilteredTickets} />
+        <>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            {(['list', 'board'] as const).map(m => (
+              <button key={m} onClick={() => setViewMode(m)} style={{
+                padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${viewMode === m ? 'rgba(215,255,0,0.3)' : BORDER}`,
+                background: viewMode === m ? 'rgba(215,255,0,0.1)' : 'transparent',
+                color: viewMode === m ? NEON : MUTED, fontFamily: "'Space Grotesk', sans-serif",
+              }}>
+                {m === 'list' ? 'List' : 'Board by Agent'}
+              </button>
+            ))}
+          </div>
+          {viewMode === 'list' && <TaskFilterBar tickets={tickets} onFiltered={setFilteredTickets} />}
+        </>
+      )}
+
+      {!selectedTicket && !loading && canManageTickets && viewMode === 'board' && (
+        <AgentBoard tickets={tickets} onOpen={setSelectedTicket} />
       )}
 
       {selectedTicket ? (
@@ -247,7 +266,7 @@ export default function TasksClient({
         <div className="text-sm" style={{ color: MUTED }}>
           {role === 'agent' ? t('ticketEmptyState') : t('ticketOwnerEmptyState')}
         </div>
-      ) : openTickets.length === 0 && doneTickets.length === 0 ? (
+      ) : viewMode === 'board' && canManageTickets ? null : openTickets.length === 0 && doneTickets.length === 0 ? (
         <div className="text-sm" style={{ color: MUTED }}>{t('ticketFilterEmptyState')}</div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -296,6 +315,82 @@ export default function TasksClient({
           onCreated={handleTicketCreated}
         />
       )}
+    </div>
+  )
+}
+
+// One column per team member: their open tickets sorted by due date, with
+// counts for open / due today / overdue / completed late — the manager's
+// at-a-glance answer to "who is overloaded and who is behind."
+function AgentBoard({ tickets, onOpen }: { tickets: TicketSummary[]; onOpen: (t: TicketSummary) => void }) {
+  const now = new Date()
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+
+  type Cell = { ticket: TicketSummary; due: Date | null; overdue: boolean; dueToday: boolean }
+  const byAgent = new Map<string, { name: string; team: string | null; open: Cell[]; doneLate: number; done: number }>()
+
+  for (const tk of tickets) {
+    if (tk.mode !== 'owner' || !tk.assignees) continue
+    for (const a of tk.assignees) {
+      if (!byAgent.has(a.id)) byAgent.set(a.id, { name: a.fullName || '—', team: a.teamName, open: [], doneLate: 0, done: 0 })
+      const agent = byAgent.get(a.id)!
+      const due = tk.dueDate ? new Date(tk.dueDate) : null
+      if (a.status === 'done') {
+        agent.done++
+        if (due && a.completedAt && new Date(a.completedAt) > due) agent.doneLate++
+      } else {
+        agent.open.push({
+          ticket: tk,
+          due,
+          overdue: !!due && due < now,
+          dueToday: !!due && due >= now && due < todayEnd,
+        })
+      }
+    }
+  }
+
+  const agents = [...byAgent.values()].sort((x, y) => y.open.length - x.open.length)
+  if (agents.length === 0) {
+    return <div className="text-sm" style={{ color: MUTED }}>No assigned tasks yet.</div>
+  }
+
+  for (const ag of agents) ag.open.sort((x, y) => (x.due?.getTime() ?? Infinity) - (y.due?.getTime() ?? Infinity))
+
+  return (
+    <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, alignItems: 'flex-start' }}>
+      {agents.map(ag => {
+        const overdueN = ag.open.filter(c => c.overdue).length
+        const todayN = ag.open.filter(c => c.dueToday).length
+        return (
+          <div key={ag.name} style={{ minWidth: 230, maxWidth: 260, flexShrink: 0, background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 12 }}>
+            <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{ag.name}</div>
+            {ag.team && <div style={{ color: MUTED, fontSize: 10, marginTop: 2 }}>{ag.team}</div>}
+            <div style={{ display: 'flex', gap: 8, margin: '8px 0 10px', fontSize: 11 }}>
+              <span style={{ color: NEON }}>{ag.open.length} open</span>
+              {todayN > 0 && <span style={{ color: '#ffb020' }}>{todayN} due today</span>}
+              {overdueN > 0 && <span style={{ color: RED }}>{overdueN} overdue</span>}
+              {ag.doneLate > 0 && <span style={{ color: MUTED }}>{ag.doneLate}/{ag.done} done late</span>}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {ag.open.length === 0 && <span style={{ color: MUTED, fontSize: 11 }}>All clear ✓</span>}
+              {ag.open.map(c => (
+                <button key={c.ticket.id + ag.name} onClick={() => onOpen(c.ticket)} style={{
+                  textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                  border: `1px solid ${c.overdue ? 'rgba(255,59,48,0.4)' : BORDER}`,
+                  background: c.overdue ? 'rgba(255,59,48,0.08)' : 'rgba(255,255,255,0.02)',
+                }}>
+                  <div style={{ color: '#fff', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.ticket.title}</div>
+                  <div style={{ fontSize: 10, marginTop: 3, color: c.overdue ? RED : c.dueToday ? '#ffb020' : MUTED }}>
+                    {c.due
+                      ? (c.overdue ? 'Overdue · ' : c.dueToday ? 'Due today · ' : '') + c.due.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                      : 'No due date'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

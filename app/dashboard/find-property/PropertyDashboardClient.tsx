@@ -403,13 +403,46 @@ export default function PropertyDashboardClient({ userId }: { userId: string }) 
   const [previewCopied, setPreviewCopied] = useState(false)
   const { record, undo } = useUndoStack()
 
+  // The dataset is ~13.5 MB, so repeat visits serve instantly from the browser
+  // Cache API while a silent background fetch keeps the copy fresh.
   const loadData = useCallback(() => {
     setLoading(true)
     setLoadError(false)
-    fetch('/property-data.json')
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then((data: Property[]) => { setRawData(data.filter(r => parseFloat(String(r.price)) > 0)); setLoading(false) })
-      .catch(() => { setLoadError(true); setLoading(false) })
+
+    const clean = (data: Property[]) => data.filter(r => parseFloat(String(r.price)) > 0)
+
+    const fromNetwork = async (): Promise<Property[]> => {
+      const r = await fetch('/property-data.json')
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      if ('caches' in window) {
+        try {
+          const cache = await caches.open('sp-property-v1')
+          await cache.put('/property-data.json', r.clone())
+        } catch { /* private mode or quota — network copy still works */ }
+      }
+      return r.json()
+    }
+
+    ;(async () => {
+      try {
+        if ('caches' in window) {
+          const cache = await caches.open('sp-property-v1')
+          const hit = await cache.match('/property-data.json')
+          if (hit) {
+            setRawData(clean(await hit.json()))
+            setLoading(false)
+            // Refresh silently in the background so tomorrow's visit is current
+            fromNetwork().then(fresh => setRawData(clean(fresh))).catch(() => {})
+            return
+          }
+        }
+        setRawData(clean(await fromNetwork()))
+        setLoading(false)
+      } catch {
+        setLoadError(true)
+        setLoading(false)
+      }
+    })()
   }, [])
 
   useEffect(() => { loadData() }, [loadData])

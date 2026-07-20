@@ -81,6 +81,8 @@ export type TicketSummaryAssignee = {
   id: string
   fullName: string
   teamName: string | null
+  status?: TicketStatus
+  completedAt?: string | null
 }
 
 export type TicketSummary = {
