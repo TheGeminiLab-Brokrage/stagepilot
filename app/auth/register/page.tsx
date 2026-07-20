@@ -10,6 +10,7 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -27,7 +28,7 @@ export default function RegisterPage() {
     const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyName, fullName, email, password }),
+      body: JSON.stringify({ companyName, fullName, email, password, inviteCode }),
     })
 
     const data = await res.json().catch(() => ({}))
@@ -101,6 +102,18 @@ export default function RegisterPage() {
               onChange={e => setPassword(e.target.value)}
               className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Min. 8 characters"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Invite code</label>
+            <input
+              type="password"
+              required
+              value={inviteCode}
+              onChange={e => setInviteCode(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Provided by your administrator"
             />
           </div>
 

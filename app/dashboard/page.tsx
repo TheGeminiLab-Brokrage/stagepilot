@@ -22,14 +22,14 @@ export default async function DashboardPage() {
   if (role === 'trainee') redirect('/dashboard/practice')
 
   // Fetch calls — RLS enforces scope automatically
-  const { data: rawCalls } = await supabase
+  const { data: rawCalls, count: totalCalls } = await supabase
     .from('call_records')
     .select(`
       id, file_name, client_name, client_phone, campaign,
       stage, stage_corrected, agent_stage, reasoning, transcript_summary,
       pain_points, triple_c, agent_feedback, audio_url,
       status, error_message, uploaded_at, agent_id, team_name
-    `)
+    `, { count: 'exact' })
     .order('uploaded_at', { ascending: false })
     .limit(200)
 
@@ -49,10 +49,17 @@ export default async function DashboardPage() {
     agent_full_name: profileMap[c.agent_id] ?? null,
   }))
 
+  const total = totalCalls ?? calls.length
+
   return (
     <div>
       <DashboardPageHeader isLeader={isLeader} role={role} teamName={profile?.team_name} />
       <StatsCards calls={calls} />
+      {total > calls.length && (
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: '4px 0 8px' }}>
+          Showing the {calls.length} most recent calls of {total} total — stats above reflect only these.
+        </p>
+      )}
       <DashboardClient calls={calls} isLeader={isLeader} currentUserId={user.id} />
     </div>
   )

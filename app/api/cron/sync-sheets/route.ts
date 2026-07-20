@@ -6,7 +6,7 @@ import { syncSheetConnection } from '@/lib/sheet-sync'
 // Called by Vercel Cron every 15 minutes. Protected by CRON_SECRET.
 export async function GET(req: Request) {
   const secret = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (secret !== process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

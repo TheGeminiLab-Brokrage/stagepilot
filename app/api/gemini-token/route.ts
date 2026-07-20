@@ -33,8 +33,8 @@ export async function POST(req: Request) {
     .eq('id', user.id)
     .single()
 
-  // Enforce free-plan daily limit for trainee and agent accounts (exempt trainee@test.com)
-  if ((profile?.role === 'trainee' || profile?.role === 'agent') && user.email !== 'trainee@test.com') {
+  // Enforce free-plan daily limit for trainee and agent accounts
+  if (profile?.role === 'trainee' || profile?.role === 'agent') {
     const admin = createAdminClient()
     const now = new Date()
     const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))

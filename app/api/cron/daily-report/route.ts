@@ -248,6 +248,11 @@ ${agentRows || '<p style="text-align:center;color:rgba(255,255,255,0.3);padding:
 // Reads today's Google Form submissions directly from the sheet CSV,
 // builds the HTML report, and upserts it into the reports table.
 export async function GET(req: Request) {
+  const secret = req.headers.get('authorization')?.replace('Bearer ', '')
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`
   const csvRes = await fetch(csvUrl)
   if (!csvRes.ok) {

@@ -2,7 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
-  const { companyName, fullName, email, password } = await request.json()
+  const { companyName, fullName, email, password, inviteCode } = await request.json()
+
+  // Self-serve signup creates a company + super_admin account, so it must be
+  // invite-gated: registration is disabled entirely until REGISTRATION_INVITE_CODE
+  // is configured, and requires the matching code once it is.
+  const expectedCode = process.env.REGISTRATION_INVITE_CODE
+  if (!expectedCode) {
+    return NextResponse.json({ error: 'Registration is disabled. Contact your administrator.' }, { status: 403 })
+  }
+  if (inviteCode !== expectedCode) {
+    return NextResponse.json({ error: 'Invalid invite code' }, { status: 403 })
+  }
 
   if (!companyName || !fullName || !email || !password) {
     return NextResponse.json({ error: 'All fields are required' }, { status: 400 })

@@ -23,10 +23,6 @@ export async function GET() {
   const tomorrowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
 
   if (role === 'trainee') {
-    if (user.email === 'trainee@test.com') {
-      return NextResponse.json({ role: 'trainee', unlimited: true })
-    }
-
     const { data: rows } = await admin
       .from('practice_sessions')
       .select('scenario_id')

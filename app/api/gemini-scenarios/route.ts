@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { SCENARIOS } from '@/lib/gemini-scenarios'
 
 // Returns scenario metadata — prompts never leave the server via this route
 export async function GET() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const list = SCENARIOS.map(({ id, label, defaultVoice, description, category, subcategory, name, job, tag, iconType, context, practiceGoal, nameAr, jobAr, tagAr, contextAr, practiceGoalAr }) => ({
     id, label, defaultVoice, description, category, subcategory, name, job, tag, iconType, context, practiceGoal, nameAr, jobAr, tagAr, contextAr, practiceGoalAr,
   }))

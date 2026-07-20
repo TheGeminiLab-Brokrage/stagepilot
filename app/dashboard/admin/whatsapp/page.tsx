@@ -24,17 +24,17 @@ export default async function WhatsAppAdminPage() {
     .eq('company_id', profile.company_id)
     .order('created_at', { ascending: false })
 
-  const { data: contactCounts } = await adminClient
-    .from('whatsapp_contacts')
-    .select('sheet_id')
-    .eq('company_id', profile.company_id)
-
-  const counts: Record<string, number> = {}
-  for (const c of contactCounts ?? []) {
-    counts[c.sheet_id] = (counts[c.sheet_id] ?? 0) + 1
-  }
-
-  const sheetsWithCounts = (sheets ?? []).map(s => ({ ...s, contactCount: counts[s.id] ?? 0 }))
+  // Exact count per sheet — a single unpaginated select silently caps at
+  // 1000 rows and undercounts every sheet once total contacts exceed that.
+  const sheetsWithCounts = await Promise.all(
+    (sheets ?? []).map(async s => {
+      const { count } = await adminClient
+        .from('whatsapp_contacts')
+        .select('id', { count: 'exact', head: true })
+        .eq('sheet_id', s.id)
+      return { ...s, contactCount: count ?? 0 }
+    })
+  )
 
   let agentsQuery = adminClient
     .from('profiles')

@@ -3,10 +3,16 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = 'https://mvgmhasgwzybwvwyruac.supabase.co'
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12Z21oYXNnd3p5Ynd2d3lydWFjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTQzMjI5MiwiZXhwIjoyMDk3MDA4MjkyfQ.nLAden0IU65UBhgdC79EGFtV-2Z7iAfcDrSID93wWEc'
-const COMPANY_ID = '99128fef-60d3-44d9-b213-d7909a3a7499'
-const PASSWORD = '12345678'
+// Credentials come from env — never hardcode the service-role key in a committed file.
+// Run: SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... COMPANY_ID=... SEED_PASSWORD=... node scripts/seed-casablanca-agents.mjs
+const SUPABASE_URL = process.env.SUPABASE_URL
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const COMPANY_ID = process.env.COMPANY_ID
+const PASSWORD = process.env.SEED_PASSWORD
+if (!SUPABASE_URL || !SERVICE_KEY || !COMPANY_ID || !PASSWORD) {
+  console.error('Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / COMPANY_ID / SEED_PASSWORD env vars')
+  process.exit(1)
+}
 
 const AGENTS = [
   { fullName: 'Shahd',   email: 'shahd@Casablanca.com' },

@@ -2,9 +2,15 @@
 // Seeds bay_reports with historical agent data from the Google Sheet.
 // Run: node scripts/seed-bay-reports.mjs
 
-const SUPABASE_URL = 'https://mvgmhasgwzybwvwyruac.supabase.co'
-const SERVICE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12Z21oYXNnd3p5Ynd2d3lydWFjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTQzMjI5MiwiZXhwIjoyMDk3MDA4MjkyfQ.nLAden0IU65UBhgdC79EGFtV-2Z7iAfcDrSID93wWEc'
-const COMPANY_ID   = '99128fef-60d3-44d9-b213-d7909a3a7499'
+// Credentials come from env — never hardcode the service-role key in a committed file.
+// Run: SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... COMPANY_ID=... node scripts/seed-bay-reports.mjs
+const SUPABASE_URL = process.env.SUPABASE_URL
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
+const COMPANY_ID   = process.env.COMPANY_ID
+if (!SUPABASE_URL || !SERVICE_KEY || !COMPANY_ID) {
+  console.error('Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / COMPANY_ID env vars')
+  process.exit(1)
+}
 
 // ── Raw historical submissions ────────────────────────────────────────────────
 // format: [timestamp, agentName, reportDate,

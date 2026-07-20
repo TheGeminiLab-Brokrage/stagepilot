@@ -383,6 +383,7 @@ export default function PropertyDashboardClient({ userId }: { userId: string }) 
   const t = useT()
   const [rawData, setRawData] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [applied, setApplied] = useState<Filters>(DEFAULT_FILTERS)
   const [zone, setZone] = useState<'R' | 'R7' | 'R8'>('R')
@@ -402,12 +403,16 @@ export default function PropertyDashboardClient({ userId }: { userId: string }) 
   const [previewCopied, setPreviewCopied] = useState(false)
   const { record, undo } = useUndoStack()
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
+    setLoading(true)
+    setLoadError(false)
     fetch('/property-data.json')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then((data: Property[]) => { setRawData(data.filter(r => parseFloat(String(r.price)) > 0)); setLoading(false) })
-      .catch(() => setLoading(false))
+      .catch(() => { setLoadError(true); setLoading(false) })
   }, [])
+
+  useEffect(() => { loadData() }, [loadData])
 
   const setFilter = useCallback(<K extends keyof Filters>(key: K, val: Filters[K]) => {
     setFilters(f => ({ ...f, [key]: val }))
@@ -734,6 +739,22 @@ export default function PropertyDashboardClient({ userId }: { userId: string }) 
         <div className="ph-loading" style={{ minHeight: 'calc(100vh - 56px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div className="ph-spinner" />
           <p>Loading property database…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="ph-root">
+        <div className="ph-loading" style={{ minHeight: 'calc(100vh - 56px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <p>Couldn&apos;t load the property database. Check your connection and try again.</p>
+          <button
+            onClick={loadData}
+            style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#D7FF00', color: '#000', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+          >
+            Retry
+          </button>
         </div>
       </div>
     )
